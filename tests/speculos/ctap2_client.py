@@ -505,3 +505,34 @@ class LedgerCtap2(Ctap2):
         # TODO check home screen displayed
 
         self.parse_response(response)
+
+    def selection(self, *, event=None, on_keepalive=None, user_accept=True,
+                  check_cancel=False):
+        ctap_hid_cmd = self.send_cbor_nowait(Ctap2.CMD.SELECTION, event=event,
+                                             on_keepalive=on_keepalive)
+
+        # Check step 0 content
+        self.speculos_client.wait_for_screen_text("Device selection\nConfirm")
+
+        if check_cancel:
+            # Send a cancel command
+            self.device.send(CTAPHID.CANCEL, b"")
+        else:
+            # Go to step 1 and check content
+            self.press_and_release("right")
+            self.speculos_client.wait_for_screen_text("Device selection\nAbort")
+
+            if user_accept:
+                # Loop from step 1 to step 0 and check content
+                self.press_and_release("right")
+                self.speculos_client.wait_for_screen_text("Device selection\nConfirm")
+
+            # Confirm
+            self.press_and_release('both')
+
+        response = self.device.recv(ctap_hid_cmd)
+
+        # Check idle screen
+        self.speculos_client.wait_for_screen_text("Ready to\nauthenticate")
+
+        self.parse_response(response)

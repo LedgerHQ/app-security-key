@@ -113,6 +113,7 @@ void performBuiltInUv(void) {
 #define CBOR_GET_INFO           0x04
 #define CBOR_CLIENT_PIN         0x06
 #define CBOR_RESET              0x07
+#define CBOR_SELECTION          0x0B
 
 void ctap2_handle_cmd_cbor(u2f_service_t *service, uint8_t *buffer, uint16_t length) {
     int status;
@@ -157,6 +158,9 @@ void ctap2_handle_cmd_cbor(u2f_service_t *service, uint8_t *buffer, uint16_t len
             break;
         case CBOR_RESET:
             ctap2_reset_handle(service, buffer + 1, length - 1);
+            break;
+        case CBOR_SELECTION:
+            ctap2_selection_handle(service, buffer + 1, length - 1);
             break;
         default:
             send_cbor_error(service, ERROR_INVALID_CBOR);

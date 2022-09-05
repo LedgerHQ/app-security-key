@@ -176,6 +176,7 @@ typedef enum ctap2_ux_state_e {
     CTAP2_UX_STATE_MULTIPLE_ASSERTION,
     CTAP2_UX_STATE_NO_ASSERTION,
     CTAP2_UX_STATE_RESET,
+    CTAP2_UX_STATE_SELECTION,
     CTAP2_UX_STATE_CANCELLED = 0xff
 } ctap2_ux_state_t;
 
@@ -202,6 +203,7 @@ void ctap2_get_next_assertion_handle(u2f_service_t *service, uint8_t *buffer, ui
 void ctap2_get_info_handle(u2f_service_t *service, uint8_t *buffer, uint16_t length);
 void ctap2_client_pin_handle(u2f_service_t *service, uint8_t *buffer, uint16_t length);
 void ctap2_reset_handle(u2f_service_t *service, uint8_t *buffer, uint16_t length);
+void ctap2_selection_handle(u2f_service_t *service, uint8_t *buffer, uint16_t length);
 
 void ctap2_make_credential_ux(void);
 void ctap2_make_credential_confirm(void);
@@ -216,6 +218,10 @@ void ctap2_get_assertion_no_assertion_confirm(void);
 void ctap2_reset_ux(void);
 void ctap2_reset_confirm(void);
 void ctap2_reset_cancel(void);
+
+void ctap2_selection_ux(void);
+void ctap2_selection_confirm(void);
+void ctap2_selection_cancel(void);
 
 void ctap2_client_pin_reset_ctx(void);
 
