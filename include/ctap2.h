@@ -91,6 +91,23 @@
 
 extern const uint8_t AAGUID[16];
 
+typedef struct ctap2_proxy_s {
+    bool uiStarted;
+    uint32_t length;
+} ctap2_proxy_t;
+
+typedef enum ctap2_ux_state_e {
+    CTAP2_UX_STATE_NONE = 0,
+    CTAP2_UX_STATE_MAKE_CRED,
+    CTAP2_UX_STATE_GET_ASSERTION,
+    CTAP2_UX_STATE_MULTIPLE_ASSERTION,
+    CTAP2_UX_STATE_NO_ASSERTION,
+    CTAP2_UX_STATE_RESET,
+    CTAP2_UX_STATE_SELECTION
+} ctap2_ux_state_t;
+
+void ctap2_ux_get_rpid(const char *rpId, uint32_t rpIdLen, uint8_t *rpIdHash);
+
 // Correspond to FIDO2.1 spec performBuiltInUv() operation
 void performBuiltInUv(void);
 
@@ -100,6 +117,7 @@ void ctap2_get_next_assertion_handle(u2f_service_t *service, uint8_t *buffer, ui
 void ctap2_get_info_handle(u2f_service_t *service, uint8_t *buffer, uint16_t length);
 void ctap2_client_pin_handle(u2f_service_t *service, uint8_t *buffer, uint16_t length);
 void ctap2_reset_handle(u2f_service_t *service, uint8_t *buffer, uint16_t length);
+void ctap2_selection_handle(u2f_service_t *service, uint8_t *buffer, uint16_t length);
 
 void ctap2_client_pin_reset_ctx(void);
 

@@ -22,6 +22,7 @@
 
 #include "credential.h"
 #include "u2f_process.h"
+#include "ctap2.h"
 #include "ctap2/make_credential/make_credential_struct.h"
 #include "ctap2/get_assertion/get_assertion_struct.h"
 

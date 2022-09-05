@@ -57,12 +57,3 @@ typedef struct ctap2_assert_data_s {
     uint16_t currentCredentialIndex;
     ctap2_assert_multiple_flow_data_t multipleFlowData;
 } ctap2_assert_data_t;
-
-typedef enum ctap2_ux_state_e {
-    CTAP2_UX_STATE_NONE = 0,
-    CTAP2_UX_STATE_MAKE_CRED,
-    CTAP2_UX_STATE_GET_ASSERTION,
-    CTAP2_UX_STATE_MULTIPLE_ASSERTION,
-    CTAP2_UX_STATE_NO_ASSERTION,
-    CTAP2_UX_STATE_RESET,
-} ctap2_ux_state_t;
