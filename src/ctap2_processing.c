@@ -141,11 +141,7 @@ void ctap2_handle_cmd_cbor(u2f_service_t *service, uint8_t *buffer, uint16_t len
             ctap2_make_credential_handle(service, buffer + 1, length - 1);
             break;
         case CBOR_GET_ASSERTION: {
-            bool immediateReply;
-            ctap2_get_assertion_handle(service, buffer + 1, length - 1, &immediateReply);
-            if (immediateReply) {
-                ctap2_get_assertion_confirm();
-            }
+            ctap2_get_assertion_handle(service, buffer + 1, length - 1);
         } break;
         case CBOR_GET_NEXT_ASSERTION:
             ctap2_get_next_assertion_handle(service, buffer + 1, length - 1);

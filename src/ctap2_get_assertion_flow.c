@@ -221,7 +221,7 @@ static void get_next_multiple_flow_state(void) {
              sizeof(verifyName),
              "User %d / %d",
              ctap2AssertData->currentCredentialIndex,
-             ctap2AssertData->availableCredentials);
+             ctap2AssertData->numberOfCredentials);
 }
 
 static void ctap2_ux_multiple_next(void) {
@@ -232,20 +232,14 @@ static void ctap2_ux_multiple_next(void) {
                  &ux_ctap2_get_assertion_multiple_flow_2_step);
 }
 
-void ctap2_get_assertion_ux(ctap2_ux_state_t state) {
+void ctap2_get_assertion_ux(void) {
     ctap2_assert_data_t *ctap2AssertData = globals_get_ctap2_assert_data();
-
-    if (state == CTAP2_UX_STATE_MULTIPLE_ASSERTION) {
-        get_next_multiple_flow_state();
-    }
 
     // reserve a display stack slot if none yet
     if (G_ux.stack_count == 0) {
         ux_stack_push();
     }
     ctap2Proxy.uiStarted = true;
-
-    ctap2UxState = state;
 
     if (ctap2AssertData->txAuthMessage != NULL) {
         ctap2AssertData->txAuthLast = ctap2AssertData->txAuthMessage[ctap2AssertData->txAuthLength];
@@ -255,26 +249,20 @@ void ctap2_get_assertion_ux(ctap2_ux_state_t state) {
         G_ux.externalText = NULL;
     }
 
-    switch (state) {
-        case CTAP2_UX_STATE_GET_ASSERTION: {
-            if (ctap2AssertData->txAuthMessage != NULL) {
-                ux_flow_init(0, ux_ctap2_get_assertion_text_flow, NULL);
-            } else {
-                ux_flow_init(0, ux_ctap2_get_assertion_flow, NULL);
-            }
-            break;
+    if (ctap2AssertData->numberOfCredentials == 1) {
+        ctap2UxState = CTAP2_UX_STATE_GET_ASSERTION;
+        if (ctap2AssertData->txAuthMessage != NULL) {
+            ux_flow_init(0, ux_ctap2_get_assertion_text_flow, NULL);
+        } else {
+            ux_flow_init(0, ux_ctap2_get_assertion_flow, NULL);
         }
-        case CTAP2_UX_STATE_MULTIPLE_ASSERTION: {
-            if (ctap2AssertData->txAuthMessage != NULL) {
-                ux_flow_init(0, ux_ctap2_get_assertion_multiple_text_flow, NULL);
-            } else {
-                ux_flow_init(0, ux_ctap2_get_assertion_multiple_flow, NULL);
-            }
-            break;
-        }
-        default: {
-            ux_flow_init(0, ux_ctap2_no_assertion_flow, NULL);
-            break;
+    } else {
+        ctap2UxState = CTAP2_UX_STATE_MULTIPLE_ASSERTION;
+        get_next_multiple_flow_state();
+        if (ctap2AssertData->txAuthMessage != NULL) {
+            ux_flow_init(0, ux_ctap2_get_assertion_multiple_text_flow, NULL);
+        } else {
+            ux_flow_init(0, ux_ctap2_get_assertion_multiple_flow, NULL);
         }
     }
 }

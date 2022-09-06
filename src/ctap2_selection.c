@@ -28,14 +28,12 @@ void ctap2_selection_handle(u2f_service_t *service, uint8_t *buffer, uint16_t le
     UNUSED(length);
 
     PRINTF("ctap2_selection_handle\n");
-    ctap2_selection_ux();
+    ctap2_selection_ux(ERROR_NONE);
 }
 
-void ctap2_selection_confirm(void) {
+void ctap2_selection_confirm(uint8_t code) {
     ctap2UxState = CTAP2_UX_STATE_NONE;
-
-    G_io_apdu_buffer[0] = ERROR_NONE;
-    send_cbor_response(&G_io_u2f, 1);
+    send_cbor_error(&G_io_u2f, code);
     ui_idle();
 }
 

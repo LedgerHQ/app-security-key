@@ -12,7 +12,7 @@ You can also use [this demo](https://webauthn.me/) to test this app, or use [its
 
 * FIDO U2F (CTAP 1) specification can be found [here](https://fidoalliance.org/specs/fido-u2f-v1.2-ps-20170411/fido-u2f-raw-message-formats-v1.2-ps-20170411.html).
 * FIDO v2 (CTAP 2) specification can be found [here](https://fidoalliance.org/specs/fido-v2.0-ps-20190130/fido-client-to-authenticator-protocol-v2.0-ps-20190130.html).
-* FIDO v2.1 (CTAP 2.1) specification can be found [here](https://fidoalliance.org/specs/fido-v2.1-ps-20210615/fido-client-to-authenticator-protocol-v2.1-ps-20210615.html).
+* FIDO v2.1 (CTAP 2.1) specification can be found [here](https://fidoalliance.org/specs/fido-v2.1-ps-20210615/fido-client-to-authenticator-protocol-v2.1-ps-errata-20220621.html).
 
 
 ## Building

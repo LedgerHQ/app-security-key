@@ -41,7 +41,8 @@ def test_reset(client, test_name):
             client_data_hash = generate_random_bytes(32)
             allow_list = [{"id": credential_data.credential_id, "type": "public-key"}]
             with pytest.raises(CtapError) as e:
-                client.ctap2.get_assertion(rp["id"], client_data_hash, allow_list)
+                client.ctap2.get_assertion(rp["id"], client_data_hash, allow_list,
+                                           user_accept=None)
             assert e.value.code == CtapError.ERR.NO_CREDENTIALS
 
 

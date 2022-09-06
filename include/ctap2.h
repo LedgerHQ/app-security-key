@@ -36,21 +36,27 @@
 #define CRED_RANDOM_SIZE            32
 #define HMAC_SECRET_SALT_SIZE       32
 #define PIN_HASH_SIZE               16
-#define AUTH_TOKEN_SIZE             16
+#define IV_PROT_V2_SIZE             16
+#define AUTH_TOKEN_SIZE             32
 #define AUTH_TOKEN_PROT_V1_ENC_SIZE AUTH_TOKEN_SIZE
-#define AUTH_TOKEN_MAX_ENC_SIZE     AUTH_TOKEN_PROT_V1_ENC_SIZE
+#define AUTH_TOKEN_PROT_V2_ENC_SIZE (AUTH_TOKEN_SIZE + IV_PROT_V2_SIZE)
+#define AUTH_TOKEN_MAX_ENC_SIZE     AUTH_TOKEN_PROT_V2_ENC_SIZE
 #define AUTH_PROT_V1_SIZE           16
+#define AUTH_PROT_V2_SIZE           32
 #define SHARED_SECRET_V1_SIZE       32
 #define SECRET_HMAC_KEY_SIZE        32
 #define SECRET_AES_KEY_SIZE         32
-#define SHARED_SECRET_MAX_SIZE      SHARED_SECRET_V1_SIZE
+#define SHARED_SECRET_V2_SIZE       (SECRET_HMAC_KEY_SIZE + SECRET_AES_KEY_SIZE)
+#define SHARED_SECRET_MAX_SIZE      SHARED_SECRET_V2_SIZE
 
 #define KEY_RP_ID "id"
 
-#define OPTION_RESIDENT_KEY      "rk"
-#define OPTION_USER_PRESENCE     "up"
-#define OPTION_USER_VERIFICATION "uv"
-#define OPTION_CLIENT_PIN        "clientPin"
+#define OPTION_RESIDENT_KEY         "rk"
+#define OPTION_USER_PRESENCE        "up"
+#define OPTION_USER_VERIFICATION    "uv"
+#define OPTION_CLIENT_PIN           "clientPin"
+#define OPTION_PIN_UV_AUTH_TOKEN    "pinUvAuthToken"
+#define OPTION_MAKE_CRED_UV_NOT_RQD "makeCredUvNotRqd"
 
 #define CREDENTIAL_DESCRIPTOR_TYPE        "type"
 #define CREDENTIAL_TYPE_PUBLIC_KEY        "public-key"
@@ -85,6 +91,16 @@
 #define AUTHDATA_FLAG_EXTENSION_DATA_PRESENT           0x80
 
 #define PIN_PROTOCOL_VERSION_V1 1
+#define PIN_PROTOCOL_VERSION_V2 2
+
+#define AUTH_TOKEN_PERM_MAKE_CREDENTIAL  0x01
+#define AUTH_TOKEN_PERM_GET_ASSERTION    0x02
+#define AUTH_TOKEN_PERM_CREDENTIAL_MGMT  0x04
+#define AUTH_TOKEN_PERM_BIO_ENROLLMENT   0x08
+#define AUTH_TOKEN_PERM_LARGE_BLOB_wRITE 0x10
+#define AUTH_TOKEN_PERM_AUTHEN_CONFIG    0x20
+#define AUTH_TOKEN_PERM_MASK             0x3F
+#define AUTH_TOKEN_PERM_RP_ID            0x80
 
 #define FLAG_EXTENSION_HMAC_SECRET    0x01
 #define FLAG_EXTENSION_TX_AUTH_SIMPLE 0x02
@@ -117,13 +133,13 @@ typedef struct ctap2_register_data_s {
     uint32_t userIdLen;
     char *userStr;
     uint32_t userStrLen;
-    int coseAlgorithm;     // algorithm chosen following the request message
-    uint8_t pinRequired;   // set if uv is set
-    uint8_t pinPresented;  // set if the PIN request was acknowledged by the user
-    uint8_t
-        clientPinAuthenticated;  // set if a standard FIDO client PIN authentication was performed
-    uint8_t residentKey;         // set if the credential shall be created as a resident key
-    uint8_t extensions;          // extensions flags as a bitmask
+    uint8_t *pinAuth;
+    uint32_t pinAuthLen;
+    int coseAlgorithm;  // algorithm chosen following the request message
+    uint8_t responseUvBit;
+    uint8_t uvOption;
+    uint8_t rkOption;
+    uint8_t extensions;  // extensions flags as a bitmask
 } ctap2_register_data_t;
 
 typedef union ctap2_assert_multiple_flow_data_s {
@@ -143,21 +159,21 @@ typedef struct ctap2_assert_data_s {
     char *rpId;
     uint32_t rpIdLen;
     uint8_t *clientDataHash;
+    uint8_t *pinAuth;
+    uint32_t pinAuthLen;
     uint8_t *credId;
     uint32_t credIdLen;
     uint8_t *nonce;
     uint8_t *credential;
     uint32_t credentialLen;
-    uint8_t pinRequired;   // set if uv is set
-    uint8_t pinPresented;  // set if the PIN request was acknowledged by the user
-    uint8_t
-        clientPinAuthenticated;    // set if a standard FIDO client PIN authentication was performed
-    uint8_t userPresenceRequired;  // set if up is set
-    uint8_t singleCredential;      // set if a single credential was provided in the allow list
-    uint8_t extensions;            // extensions flags as a bitmask
+    uint8_t responseUvBit;
+    uint8_t responseUpBit;
+    uint8_t uvOption;
+    uint8_t upOption;
+    uint8_t extensions;  // extensions flags as a bitmask
 
     uint8_t allowListPresent;
-    uint16_t availableCredentials;
+    uint16_t numberOfCredentials;
 
     // Multiple flow data
     uint16_t currentCredentialIndex;
@@ -169,14 +185,23 @@ typedef struct ctap2_assert_data_s {
         txAuthLast;  // last character of the txAuth CBOR field overwritten by a '\0' when displayed
 } ctap2_assert_data_t;
 
+typedef struct ctap2_pin_data_s {
+    uint8_t rpIdHash[CX_SHA256_SIZE];
+    char *rpId;
+    uint32_t rpIdLen;
+    uint8_t sharedSecret[SHARED_SECRET_MAX_SIZE];
+    int protocol;
+    int perms;
+} ctap2_pin_data_t;
+
 typedef enum ctap2_ux_state_e {
     CTAP2_UX_STATE_NONE = 0,
     CTAP2_UX_STATE_MAKE_CRED,
     CTAP2_UX_STATE_GET_ASSERTION,
     CTAP2_UX_STATE_MULTIPLE_ASSERTION,
-    CTAP2_UX_STATE_NO_ASSERTION,
     CTAP2_UX_STATE_RESET,
     CTAP2_UX_STATE_SELECTION,
+    CTAP2_UX_STATE_CLIENT_PIN,
     CTAP2_UX_STATE_CANCELLED = 0xff
 } ctap2_ux_state_t;
 
@@ -195,10 +220,7 @@ void ctap2_send_keepalive_processing(void);
 void performBuiltInUv(void);
 
 void ctap2_make_credential_handle(u2f_service_t *service, uint8_t *buffer, uint16_t length);
-void ctap2_get_assertion_handle(u2f_service_t *service,
-                                uint8_t *buffer,
-                                uint16_t length,
-                                bool *immediateReply);
+void ctap2_get_assertion_handle(u2f_service_t *service, uint8_t *buffer, uint16_t length);
 void ctap2_get_next_assertion_handle(u2f_service_t *service, uint8_t *buffer, uint16_t length);
 void ctap2_get_info_handle(u2f_service_t *service, uint8_t *buffer, uint16_t length);
 void ctap2_client_pin_handle(u2f_service_t *service, uint8_t *buffer, uint16_t length);
@@ -209,7 +231,7 @@ void ctap2_make_credential_ux(void);
 void ctap2_make_credential_confirm(void);
 void ctap2_make_credential_user_cancel(void);
 
-void ctap2_get_assertion_ux(ctap2_ux_state_t state);
+void ctap2_get_assertion_ux(void);
 void ctap2_get_assertion_next_credential_ux_helper(void);
 void ctap2_get_assertion_confirm(void);
 void ctap2_get_assertion_user_cancel(void);
@@ -219,14 +241,17 @@ void ctap2_reset_ux(void);
 void ctap2_reset_confirm(void);
 void ctap2_reset_cancel(void);
 
-void ctap2_selection_ux(void);
-void ctap2_selection_confirm(void);
+void ctap2_selection_ux(uint8_t code);
+void ctap2_selection_confirm(uint8_t code);
 void ctap2_selection_cancel(void);
 
+void ctap2_ux_client_pin_get_token(void);
+void ctap2_confirm_client_pin_get_token(void);
+void ctap2_user_cancel_client_pin_get_token(void);
 void ctap2_client_pin_reset_ctx(void);
 
 /******************************************/
-/*       PIN Auth Protocol functions      */
+/*     PIN/UV Auth Protocol functions     */
 /******************************************/
 
 // Correspond to FIDO2.1 spec PIN/UV Auth Protocol regenerate() operation
@@ -267,13 +292,22 @@ int ctap2_client_pin_encrypt(int protocol,
                              uint32_t *dataOutLength);
 
 /******************************************/
-/*        Pin Auth Token helpers          */
+/*       PIN/UV Auth Token helpers        */
 /******************************************/
+// Correspond to spec operations
+bool getUserPresentFlagValue(void);
+bool getUserVerifiedFlagValue(void);
+void clearUserPresentFlag(void);
+void clearUserVerifiedFlag(void);
+void clearPinUvAuthTokenPermissionsExceptLbw(void);
 
 int ctap2_client_pin_verify_auth_token(int protocol,
+                                       uint8_t neededPerm,
+                                       uint8_t *rpIdHash,
                                        const uint8_t *msg,
                                        uint32_t msgLength,
                                        const uint8_t *signature,
-                                       uint32_t signatureLength);
+                                       uint32_t signatureLength,
+                                       bool needUserVerificated);
 
 #endif

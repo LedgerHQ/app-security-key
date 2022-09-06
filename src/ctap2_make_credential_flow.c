@@ -127,8 +127,8 @@ void ctap2_make_credential_ux(void) {
     ctap2Proxy.uiStarted = true;
 
     G_ux.externalText = NULL;
-    ux_flow_init(0,
-                 (ctap2RegisterData->residentKey ? ux_ctap2_make_cred_resident_flow
-                                                 : ux_ctap2_make_cred_flow),
-                 NULL);
+    ux_flow_init(
+        0,
+        (ctap2RegisterData->rkOption ? ux_ctap2_make_cred_resident_flow : ux_ctap2_make_cred_flow),
+        NULL);
 }

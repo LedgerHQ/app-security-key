@@ -24,11 +24,13 @@
 #include "ctap2.h"
 #include "globals.h"
 
+static uint8_t selectionConfirmedCode;
+
 // First step selects as fast as possible
 
 UX_STEP_CB(ux_ctap2_selection_flow_0_step,
            pbb,
-           ctap2_selection_confirm(),
+           ctap2_selection_confirm(selectionConfirmedCode),
            {
                &C_icon_validate_14,
                "Device selection",
@@ -49,7 +51,10 @@ UX_FLOW(ux_ctap2_selection_flow,
         &ux_ctap2_selection_flow_1_step,
         FLOW_LOOP);
 
-void ctap2_selection_ux(void) {
+void ctap2_selection_ux(uint8_t code) {
+    // Save code for response value if user confirm
+    selectionConfirmedCode = code;
+
     // reserve a display stack slot if none yet
     if (G_ux.stack_count == 0) {
         ux_stack_push();

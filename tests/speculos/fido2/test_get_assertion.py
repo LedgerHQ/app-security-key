@@ -92,15 +92,16 @@ def test_get_assertion_no_up(client):
     client_data_hash = generate_random_bytes(32)
     allow_list = [{"id": credential_data.credential_id, "type": "public-key"}]
     options = {"up": False}
+    # DEVIATION from spec: Always require user consent
     assertion = client.ctap2.get_assertion(rp["id"], client_data_hash,
                                            allow_list, options=options,
-                                           user_accept=None)
+                                           user_accept=True)
 
     assertion.verify(client_data_hash, credential_data.public_key)
 
     assert len(assertion.auth_data) == 37
     assert sha256(rp["id"].encode()) == assertion.auth_data.rp_id_hash
-    assert assertion.auth_data.flags == 0
+    assert assertion.auth_data.flags == AuthenticatorData.FLAG.USER_PRESENT
     assert assertion.user is None
     assert assertion.number_of_credentials is None
 
@@ -129,8 +130,7 @@ def test_get_assertion_no_credentials(client, test_name):
     with pytest.raises(CtapError) as e:
         client.ctap2.get_assertion(rp["id"], client_data_hash,
                                    login_type="none",
-                                   check_screens="full",
-                                   compare_args=compare_args)
+                                   user_accept=None)
     assert e.value.code == CtapError.ERR.NO_CREDENTIALS
 
     # Try with unknown credential in allow_list
@@ -139,8 +139,7 @@ def test_get_assertion_no_credentials(client, test_name):
     with pytest.raises(CtapError) as e:
         client.ctap2.get_assertion(rp["id"], client_data_hash, allow_list,
                                    login_type="none",
-                                   check_screens="full",
-                                   compare_args=compare_args)
+                                   user_accept=None)
     assert e.value.code == CtapError.ERR.NO_CREDENTIALS
 
 
@@ -162,8 +161,7 @@ def test_get_assertion_wrong_id(client, test_name):
         client.ctap2.get_assertion(rp["id"], client_data_hash,
                                    allow_list,
                                    login_type="none",
-                                   check_screens="full",
-                                   compare_args=compare_args)
+                                   user_accept=None)
     assert e.value.code == CtapError.ERR.NO_CREDENTIALS
 
 
@@ -180,8 +178,7 @@ def test_get_assertion_wrong_rp(client, test_name):
         client.ctap2.get_assertion(wrong_rp_id, client_data_hash,
                                    allow_list,
                                    login_type="none",
-                                   check_screens="full",
-                                   compare_args=compare_args)
+                                   user_accept=None)
     assert e.value.code == CtapError.ERR.NO_CREDENTIALS
 
 
@@ -264,7 +261,8 @@ def test_get_assertion_rpid_filter(client):
         with pytest.raises(CtapError) as e:
             client.ctap2.get_assertion(rp["id"], client_data_hash,
                                        allow_list,
-                                       login_type="none")
+                                       login_type="none",
+                                       user_accept=None)
         assert e.value.code == CtapError.ERR.NO_CREDENTIALS
 
 

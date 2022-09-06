@@ -24,6 +24,7 @@ def register_then_assert(client, test_name, user, options):
     client_data_hash = generate_random_bytes(32)
     if options and options.get("rk", False):
         allow_list = None
+        options["uv"] = True  # User verification mandatory when rk
     else:
         allow_list = [{"id": credential_data.credential_id, "type": "public-key"}]
     compare_args = (TESTS_SPECULOS_DIR, test_name + "/get")

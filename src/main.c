@@ -51,6 +51,7 @@ unsigned char io_event(unsigned char channel) {
             break;
 
         case SEPROXYHAL_TAG_TICKER_EVENT:
+            uptime_ms += 100;
             if (ctap2UxState == CTAP2_UX_STATE_CANCELLED) {
                 ctap2UxState = CTAP2_UX_STATE_NONE;
                 ux_stack_pop();

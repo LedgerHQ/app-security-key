@@ -34,6 +34,7 @@ typedef struct ctap2_data_t {
     union ctap2_data_u {
         ctap2_register_data_t ctap2RegisterData;
         ctap2_assert_data_t ctap2AssertData;
+        ctap2_pin_data_t ctap2PinData;
     } u;
 } ctap2_data_t;
 
@@ -46,6 +47,7 @@ typedef struct shared_ctx_s {
 } shared_ctx_t;
 
 extern shared_ctx_t shared_ctx;
+extern uint32_t uptime_ms;
 extern ctap2_ux_state_t ctap2UxState;
 extern ctap2_proxy_t ctap2Proxy;
 
@@ -63,6 +65,10 @@ static inline ctap2_register_data_t *globals_get_ctap2_register_data(void) {
 
 static inline ctap2_assert_data_t *globals_get_ctap2_assert_data(void) {
     return &shared_ctx.u.ctap2Data.u.ctap2AssertData;
+}
+
+static inline ctap2_pin_data_t *globals_get_ctap2_pin_data(void) {
+    return &shared_ctx.u.ctap2Data.u.ctap2PinData;
 }
 
 #endif

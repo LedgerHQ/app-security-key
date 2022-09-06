@@ -12,12 +12,12 @@ from pathlib import Path
 
 from fido2.attestation import AttestationVerifier
 from fido2.ctap import CtapError
-from fido2.ctap2.pin import ClientPin
+from fido2.ctap2.pin import PinProtocolV1, PinProtocolV2
 from fido2.hid import CtapHidDevice, TYPE_INIT, CAPABILITY, CTAPHID
 from fido2.hid.base import CtapHidConnection, HidDescriptor
 
 from ctap1_client import LedgerCtap1
-from ctap2_client import LedgerCtap2
+from ctap2_client import LedgerCtap2, LedgerClientPin
 
 TESTS_SPECULOS_DIR = Path(__file__).absolute().parent
 REPO_ROOT_DIR = TESTS_SPECULOS_DIR.parent.parent
@@ -256,13 +256,17 @@ class TestClient:
             try:
                 self.ctap2 = LedgerCtap2(self.dev, self.model, self.navigator,
                                          self.ctap2_u2f_proxy, self.debug)
-                self.client_pin = ClientPin(self.ctap2)
+                self.client_pin_v1 = LedgerClientPin(self.ctap2, PinProtocolV1())
+                self.client_pin_v2 = LedgerClientPin(self.ctap2, PinProtocolV2())
+                self.client_pin = self.client_pin_v2
             except Exception:
                 # Can occurs if the app is build without FIDO2 features.
                 # Then only U2F tests can be used.
                 print("FIDO2 not supported")
                 self.ctap2 = None
                 self.client_pin = None
+                self.client_pin_v1 = None
+                self.client_pin_v2 = None
 
         except Exception as e:
             raise e

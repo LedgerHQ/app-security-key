@@ -33,15 +33,16 @@
 #include "rk_storage.h"
 #include "globals.h"
 
-#define TAG_CLIENT_DATA_HASH    0x01
-#define TAG_RP                  0x02
-#define TAG_USER                0x03
-#define TAG_PUB_KEY_CRED_PARAMS 0x04
-#define TAG_EXCLUDE_LIST        0x05
-#define TAG_EXTENSIONS          0x06
-#define TAG_OPTIONS             0x07
-#define TAG_PIN_AUTH            0x08
-#define TAG_PIN_PROTOCOL        0x09
+#define TAG_CLIENT_DATA_HASH       0x01
+#define TAG_RP                     0x02
+#define TAG_USER                   0x03
+#define TAG_PUB_KEY_CRED_PARAMS    0x04
+#define TAG_EXCLUDE_LIST           0x05
+#define TAG_EXTENSIONS             0x06
+#define TAG_OPTIONS                0x07
+#define TAG_PIN_AUTH               0x08
+#define TAG_PIN_PROTOCOL           0x09
+#define TAG_ENTREPRISE_ATTESTATION 0x0A
 
 #define TAG_RESP_FMT      0x01
 #define TAG_RESP_AUTHDATA 0x02
@@ -178,7 +179,91 @@ static int parse_makeCred_authnr_user(cbipDecoder_t *decoder, cbipItem_t *mapIte
     return 0;
 }
 
-static int process_makeCred_authnr_keyCredParams(cbipDecoder_t *decoder, cbipItem_t *mapItem) {
+static int parse_makeCred_authnr_pinAuth(cbipDecoder_t *decoder, cbipItem_t *mapItem) {
+    ctap2_register_data_t *ctap2RegisterData = globals_get_ctap2_register_data();
+    int status;
+
+    status = cbiph_get_map_key_bytes(decoder,
+                                     mapItem,
+                                     TAG_PIN_AUTH,
+                                     &ctap2RegisterData->pinAuth,
+                                     &ctap2RegisterData->pinAuthLen);
+    if (status < CBIPH_STATUS_NOT_FOUND) {
+        return ERROR_INVALID_CBOR;
+    }
+    return 0;
+}
+
+static int parse_makeCred_authnr_extensions(cbipDecoder_t *decoder, cbipItem_t *mapItem) {
+    ctap2_register_data_t *ctap2RegisterData = globals_get_ctap2_register_data();
+    cbipItem_t extensionsItem;
+    int status;
+    bool value;
+
+    CHECK_MAP_KEY_ITEM_IS_VALID(decoder, mapItem, TAG_EXTENSIONS, extensionsItem, cbipMap);
+    if (status == CBIPH_STATUS_FOUND) {
+        status =
+            cbiph_get_map_key_str_bool(decoder, &extensionsItem, EXTENSION_HMAC_SECRET, &value);
+        if (status == CBIPH_STATUS_FOUND) {
+            if (value) {
+                ctap2RegisterData->extensions |= FLAG_EXTENSION_HMAC_SECRET;
+            }
+        } else if (status != CBIPH_STATUS_NOT_FOUND) {
+            return cbiph_map_cbor_error(status);
+        }
+    }
+
+    return 0;
+}
+
+static int process_makeCred_authnr_alg_step1(bool *silentExit) {
+    /* Step 1: Handle zero length pinUvAuthParam */
+
+    ctap2_register_data_t *ctap2RegisterData = globals_get_ctap2_register_data();
+    uint8_t selectionConfirmedCode;
+
+    *silentExit = false;
+    if (ctap2RegisterData->pinAuth != NULL) {
+        if (ctap2RegisterData->pinAuthLen == 0) {
+            if (N_u2f.pinSet) {
+                selectionConfirmedCode = ERROR_PIN_INVALID;
+            } else {
+                selectionConfirmedCode = ERROR_PIN_NOT_SET;
+            }
+            ctap2_selection_ux(selectionConfirmedCode);
+
+            // Request answer will be sent at the end of ctap2_selection_ux,
+            // therefore exit without response
+            *silentExit = true;
+        }
+    }
+    return 0;
+}
+
+static int process_makeCred_authnr_alg_step2(cbipDecoder_t *decoder,
+                                             cbipItem_t *mapItem,
+                                             int *protocol) {
+    /* Step 2: Check pinUvAuthProtocol consistency */
+
+    ctap2_register_data_t *ctap2RegisterData = globals_get_ctap2_register_data();
+    int status;
+
+    if (ctap2RegisterData->pinAuth != NULL) {
+        status = cbiph_get_map_key_int(decoder, mapItem, TAG_PIN_PROTOCOL, protocol);
+        if (status != CBIPH_STATUS_FOUND) {
+            return ERROR_MISSING_PARAMETER;
+        }
+
+        if ((*protocol != PIN_PROTOCOL_VERSION_V1) && (*protocol != PIN_PROTOCOL_VERSION_V2)) {
+            return ERROR_INVALID_PAR;
+        }
+    }
+    return 0;
+}
+
+static int process_makeCred_authnr_alg_step3(cbipDecoder_t *decoder, cbipItem_t *mapItem) {
+    /* Step 3: Validate pubKeyCredParams */
+
     ctap2_register_data_t *ctap2RegisterData = globals_get_ctap2_register_data();
     cbipItem_t tmpItem;
     int arrayLen;
@@ -240,7 +325,150 @@ static int process_makeCred_authnr_keyCredParams(cbipDecoder_t *decoder, cbipIte
     return 0;
 }
 
-static int process_makeCred_authnr_excludeList(cbipDecoder_t *decoder, cbipItem_t *mapItem) {
+static int process_makeCred_authnr_alg_step4(void) {
+    /* Step 4: Create a new response structure and initialize both
+     * its "uv" bit and "up" bit as false */
+
+    ctap2_register_data_t *ctap2RegisterData = globals_get_ctap2_register_data();
+
+    ctap2RegisterData->responseUvBit = 0;
+    // User presence is omitted as it is mandatory (see step 5)
+    return 0;
+}
+
+static int process_makeCred_authnr_alg_step5(cbipDecoder_t *decoder, cbipItem_t *mapItem) {
+    /* Step 5: Process all options */
+
+    ctap2_register_data_t *ctap2RegisterData = globals_get_ctap2_register_data();
+    cbipItem_t optionsItem;
+    int status;
+    bool boolValue;
+
+    ctap2RegisterData->uvOption = 0;
+    ctap2RegisterData->rkOption = 0;
+    CHECK_MAP_KEY_ITEM_IS_VALID(decoder, mapItem, TAG_OPTIONS, optionsItem, cbipMap);
+    if (status == CBIPH_STATUS_FOUND) {
+        // Uv option
+        status =
+            cbiph_get_map_key_str_bool(decoder, &optionsItem, OPTION_USER_VERIFICATION, &boolValue);
+        if ((status == CBIPH_STATUS_FOUND) && boolValue) {
+            ctap2RegisterData->uvOption = 1;
+        }
+
+        if (ctap2RegisterData->pinAuth != NULL) {
+            // "Note: pinUvAuthParam and the "uv" option are processed as mutually
+            // exclusive with pinUvAuthParam taking precedence."
+            ctap2RegisterData->uvOption = 0;
+        }
+
+        // Rk option
+        status = cbiph_get_map_key_str_bool(decoder, &optionsItem, OPTION_RESIDENT_KEY, &boolValue);
+        if ((status == CBIPH_STATUS_FOUND) && boolValue) {
+            ctap2RegisterData->rkOption = 1;
+        }
+
+        // Up option
+        status =
+            cbiph_get_map_key_str_bool(decoder, &optionsItem, OPTION_USER_PRESENCE, &boolValue);
+        if ((status == CBIPH_STATUS_FOUND) && !boolValue) {
+            PRINTF("Forbidden user presence option\n");
+            return ERROR_INVALID_OPTION;
+        }
+    }
+
+    return 0;
+}
+
+static int process_makeCred_authnr_alg_step6(void) {
+    /* Step 6: Handle alwaysUv option
+     * => Do nothing as this option is not enabled */
+    return 0;
+}
+
+static int process_makeCred_authnr_alg_step7(void) {
+    /* Step 7: Handle makeCredUvNotRqd option */
+
+    ctap2_register_data_t *ctap2RegisterData = globals_get_ctap2_register_data();
+
+    if ((ctap2RegisterData->uvOption == 0) && (ctap2RegisterData->pinAuth == NULL) &&
+        (ctap2RegisterData->rkOption == 1)) {
+        return ERROR_PIN_AUTH_INVALID;
+    }
+    return 0;
+}
+
+static int process_makeCred_authnr_alg_step8(void) {
+    /* Step 8: Behavior for when makeCredUvNotRqd option is not enable
+     * => Do nothing as this option is enabled */
+    return 0;
+}
+
+static int process_makeCred_authnr_alg_step9(cbipDecoder_t *decoder, cbipItem_t *mapItem) {
+    /* Step 9: Handle entrepriseAttestation */
+
+    int status;
+    cbipItem_t item;
+
+    status = cbiph_get_map_item(decoder,
+                                mapItem,
+                                TAG_ENTREPRISE_ATTESTATION,
+                                NULL,
+                                &item,
+                                CBIPH_TYPE_INT);
+    if (status != CBIPH_STATUS_NOT_FOUND) {
+        PRINTF("Error entreprise attestation not supported\n");
+        return ERROR_INVALID_PAR;
+    }
+    return 0;
+}
+
+static int process_makeCred_authnr_alg_step10_and_step11(int protocol) {
+    /* Step 10 in some condition allow to bypass step 11.
+     * Therefore we process them in the same handler for commodity*/
+
+    ctap2_register_data_t *ctap2RegisterData = globals_get_ctap2_register_data();
+    int status;
+
+    /* Step 10: Check if user verification can be skipped
+     * Technically this step is useless as step 11 already do nothing if:
+     * - uv option in not enabled
+     * - pinUvAuthParam is not present
+     * But we choose to skip to the spec steps for commodity. */
+
+    if ((ctap2RegisterData->uvOption == 0) && (ctap2RegisterData->rkOption == 0) &&
+        (ctap2RegisterData->pinAuth == NULL)) {
+        // Skip step 11
+        return 0;
+    }
+
+    /* Step 11: Check for user verification */
+
+    if (ctap2RegisterData->pinAuth != NULL) {
+        // Verify pinAuth, check permissions and userVerifiedFlagValue
+        status = ctap2_client_pin_verify_auth_token(protocol,
+                                                    AUTH_TOKEN_PERM_MAKE_CREDENTIAL,
+                                                    ctap2RegisterData->rpIdHash,
+                                                    ctap2RegisterData->clientDataHash,
+                                                    CX_SHA256_SIZE,
+                                                    ctap2RegisterData->pinAuth,
+                                                    ctap2RegisterData->pinAuthLen,
+                                                    true);
+        if (status != ERROR_NONE) {
+            return ERROR_PIN_AUTH_INVALID;
+        }
+
+        ctap2RegisterData->responseUvBit = 1;
+        PRINTF("Client PIN authenticated\n");
+    } else if (ctap2RegisterData->uvOption == 1) {
+        // DEVIATION from spec: move BuiltInUV check in ctap2_make_credential_confirm() after step 14 (user consent)
+    }
+
+    return 0;
+}
+
+static int process_makeCred_authnr_alg_step12(cbipDecoder_t *decoder, cbipItem_t *mapItem) {
+    /* Step 12: Process exclude list */
+
     ctap2_register_data_t *ctap2RegisterData = globals_get_ctap2_register_data();
     cbipItem_t tmpItem;
     int arrayLen;
@@ -286,9 +514,8 @@ static int process_makeCred_authnr_excludeList(cbipDecoder_t *decoder, cbipItem_
                 PRINTF("Skipping invalid credential candidate %d\n", i);
                 continue;
             }
-            // DEVIATION from FIDO2.0 spec: Should prompt user to exclude
-            // Impact is minor because user has manually unlocked its device.
-            // Therefore user presence is somehow guarantee.
+
+            // TODO: prompt user presence to exclude depending on credential credProtect value
             PRINTF("Valid candidate to exclude %d\n", i);
             return ERROR_CREDENTIAL_EXCLUDED;
         }
@@ -297,107 +524,9 @@ static int process_makeCred_authnr_excludeList(cbipDecoder_t *decoder, cbipItem_
     return 0;
 }
 
-static int process_makeCred_authnr_extensions(cbipDecoder_t *decoder, cbipItem_t *mapItem) {
-    ctap2_register_data_t *ctap2RegisterData = globals_get_ctap2_register_data();
-    cbipItem_t extensionsItem;
-    int status;
-    bool value;
-
-    CHECK_MAP_KEY_ITEM_IS_VALID(decoder, mapItem, TAG_EXTENSIONS, extensionsItem, cbipMap);
-    if (status == CBIPH_STATUS_FOUND) {
-        status =
-            cbiph_get_map_key_str_bool(decoder, &extensionsItem, EXTENSION_HMAC_SECRET, &value);
-        if (status == CBIPH_STATUS_FOUND) {
-            if (value) {
-                ctap2RegisterData->extensions |= FLAG_EXTENSION_HMAC_SECRET;
-            }
-        } else if (status != CBIPH_STATUS_NOT_FOUND) {
-            return cbiph_map_cbor_error(status);
-        }
-    }
-
-    return 0;
-}
-
-static int process_makeCred_authnr_options(cbipDecoder_t *decoder, cbipItem_t *mapItem) {
-    ctap2_register_data_t *ctap2RegisterData = globals_get_ctap2_register_data();
-    cbipItem_t optionsItem;
-    int status;
-    bool boolValue;
-
-    CHECK_MAP_KEY_ITEM_IS_VALID(decoder, mapItem, TAG_OPTIONS, optionsItem, cbipMap);
-    if (status == CBIPH_STATUS_FOUND) {
-        // Forbidden option
-        status =
-            cbiph_get_map_key_str_bool(decoder, &optionsItem, OPTION_USER_PRESENCE, &boolValue);
-        if ((status == CBIPH_STATUS_FOUND) && !boolValue) {
-            PRINTF("Forbidden user presence option\n");
-            return ERROR_INVALID_OPTION;
-        }
-
-        status =
-            cbiph_get_map_key_str_bool(decoder, &optionsItem, OPTION_USER_VERIFICATION, &boolValue);
-        if (status == CBIPH_STATUS_FOUND) {
-            ctap2RegisterData->pinRequired = boolValue;
-        }
-
-        status = cbiph_get_map_key_str_bool(decoder, &optionsItem, OPTION_RESIDENT_KEY, &boolValue);
-        if (status == CBIPH_STATUS_FOUND) {
-            ctap2RegisterData->residentKey = boolValue;
-        }
-    }
-
-    return 0;
-}
-
-static int process_makeCred_authnr_pin(cbipDecoder_t *decoder, cbipItem_t *mapItem) {
-    ctap2_register_data_t *ctap2RegisterData = globals_get_ctap2_register_data();
-    int status;
-    int pinProtocolVersion = 0;
-    uint8_t *pinAuth;
-    uint32_t pinAuthLen;
-
-    status = cbiph_get_map_key_int(decoder, mapItem, TAG_PIN_PROTOCOL, &pinProtocolVersion);
-    if (status == CBIPH_STATUS_FOUND) {
-        if (pinProtocolVersion != PIN_PROTOCOL_VERSION_V1) {
-            PRINTF("Unsupported PIN protocol version\n");
-            return ERROR_PIN_AUTH_INVALID;
-        }
-    }
-
-    status = cbiph_get_map_key_bytes(decoder, mapItem, TAG_PIN_AUTH, &pinAuth, &pinAuthLen);
-    if (status == CBIPH_STATUS_FOUND) {
-        if (!N_u2f.pinSet) {
-            PRINTF("PIN not set\n");
-            return ERROR_PIN_NOT_SET;
-        }
-
-        if (pinAuthLen == 0) {
-            // DEVIATION from FIDO2.0 spec: "If platform sends zero length pinAuth,
-            // authenticator needs to wait for user touch and then returns [...]"
-            // Impact is minor because user as still manually unlocked it's device.
-            // therefore user presence is somehow guarantee.
-            return ERROR_PIN_INVALID;
-        }
-
-        status = ctap2_client_pin_verify_auth_token(pinProtocolVersion,
-                                                    ctap2RegisterData->clientDataHash,
-                                                    CX_SHA256_SIZE,
-                                                    pinAuth,
-                                                    pinAuthLen);
-        if (status != ERROR_NONE) {
-            return ERROR_PIN_AUTH_INVALID;
-        }
-
-        ctap2RegisterData->clientPinAuthenticated = 1;
-        PRINTF("Client PIN authenticated\n");
-    } else {
-        if (N_u2f.pinSet) {
-            PRINTF("PIN set and no PIN authentication provided\n");
-            return ERROR_PIN_REQUIRED;
-        }
-    }
-
+static int process_makeCred_authnr_alg_step13(void) {
+    /* Skip user presence (user consent) if performBuiltInUv() was called in step 11
+     * => DEVIATION from spec: Do nothing as we don't want to skip user consent */
     return 0;
 }
 
@@ -405,7 +534,9 @@ void ctap2_make_credential_handle(u2f_service_t *service, uint8_t *buffer, uint1
     ctap2_register_data_t *ctap2RegisterData = globals_get_ctap2_register_data();
     cbipDecoder_t decoder;
     cbipItem_t mapItem;
+    int protocol = 0;
     int status;
+    bool silentExit;
 
     PRINTF("ctap2_make_credential_handle\n");
 
@@ -421,60 +552,117 @@ void ctap2_make_credential_handle(u2f_service_t *service, uint8_t *buffer, uint1
         goto exit;
     }
 
-    // Handle clientDataHash
+    /* Extract data from CBOR */
     status = parse_makeCred_authnr_clientDataHash(&decoder, &mapItem);
     if (status != 0) {
         goto exit;
     }
 
-    // Handle rp
     status = parse_makeCred_authnr_rp(&decoder, &mapItem);
     if (status != 0) {
         goto exit;
     }
 
-    // Handle user
     status = parse_makeCred_authnr_user(&decoder, &mapItem);
     if (status != 0) {
         goto exit;
     }
 
-    // Handle cryptographic algorithms
-    status = process_makeCred_authnr_keyCredParams(&decoder, &mapItem);
+    status = parse_makeCred_authnr_pinAuth(&decoder, &mapItem);
     if (status != 0) {
         goto exit;
     }
 
-    // Check exclude list
-    status = process_makeCred_authnr_excludeList(&decoder, &mapItem);
+    status = parse_makeCred_authnr_extensions(&decoder, &mapItem);
     if (status != 0) {
         goto exit;
     }
 
-    // Check extensions
-    status = process_makeCred_authnr_extensions(&decoder, &mapItem);
+    /* Process each step of specification authenticatorMakeCredential Algorithm */
+    status = process_makeCred_authnr_alg_step1(&silentExit);
+    if (status != 0) {
+        goto exit;
+    }
+    if (silentExit) {
+        return;
+    }
+
+    status = process_makeCred_authnr_alg_step2(&decoder, &mapItem, &protocol);
     if (status != 0) {
         goto exit;
     }
 
-    // Check options
-    status = process_makeCred_authnr_options(&decoder, &mapItem);
+    status = process_makeCred_authnr_alg_step3(&decoder, &mapItem);
     if (status != 0) {
         goto exit;
     }
 
-    PRINTF("uv %d rk %d extensions %d\n",
-           ctap2RegisterData->pinRequired,
-           ctap2RegisterData->residentKey,
-           ctap2RegisterData->extensions);
-
-    // Check PIN auth
-    status = process_makeCred_authnr_pin(&decoder, &mapItem);
+    status = process_makeCred_authnr_alg_step4();
     if (status != 0) {
         goto exit;
     }
 
+    status = process_makeCred_authnr_alg_step5(&decoder, &mapItem);
+    if (status != 0) {
+        goto exit;
+    }
+
+    status = process_makeCred_authnr_alg_step6();
+    if (status != 0) {
+        goto exit;
+    }
+
+    status = process_makeCred_authnr_alg_step7();
+    if (status != 0) {
+        goto exit;
+    }
+
+    status = process_makeCred_authnr_alg_step8();
+    if (status != 0) {
+        goto exit;
+    }
+
+    status = process_makeCred_authnr_alg_step9(&decoder, &mapItem);
+    if (status != 0) {
+        goto exit;
+    }
+
+    status = process_makeCred_authnr_alg_step10_and_step11(protocol);
+    if (status != 0) {
+        goto exit;
+    }
+
+    status = process_makeCred_authnr_alg_step12(&decoder, &mapItem);
+    if (status != 0) {
+        goto exit;
+    }
+
+    status = process_makeCred_authnr_alg_step13();
+    if (status != 0) {
+        goto exit;
+    }
+
+    /* authenticatorMakeCredential Algorithm step 14:
+     * - up option is mandatory true see step 5
+     * - => DEVIATION from spec: Always require user consent
+     */
     ctap2_make_credential_ux();
+    clearUserPresentFlag();
+    clearUserVerifiedFlag();
+    clearPinUvAuthTokenPermissionsExceptLbw();
+
+    /* authenticatorMakeCredential Algorithm next steps:
+     * - step 15: Extension output generation is done after user consent in
+     *   - ctap2_make_credential_confirm()
+     *     -> build_makeCred_authData()
+     * - step 16-17-18: Credential creation is done after user consent in
+     *   - ctap2_make_credential_confirm()
+     *     -> build_makeCred_authData()
+     *        -> ctap2_crypto_generate_wrapped_credential_and_pubkey()
+     * - step 19: Generation of the attestation statement is done after user consent in
+     *   - ctap2_make_credential_confirm()
+     -     -> sign_and_build_makeCred_response()
+     */
 
 exit:
     if (status != 0) {
@@ -524,7 +712,7 @@ static int build_makeCred_authData(uint8_t *nonce, uint8_t *buffer, uint32_t buf
     offset += CX_SHA256_SIZE;
 
     buffer[offset] = AUTHDATA_FLAG_USER_PRESENCE | AUTHDATA_FLAG_ATTESTED_CREDENTIAL_DATA_PRESENT;
-    if (ctap2RegisterData->pinRequired || ctap2RegisterData->clientPinAuthenticated) {
+    if (ctap2RegisterData->responseUvBit) {
         buffer[offset] |= AUTHDATA_FLAG_USER_VERIFIED;
     }
     if (ctap2RegisterData->extensions != 0) {
@@ -547,7 +735,7 @@ static int build_makeCred_authData(uint8_t *nonce, uint8_t *buffer, uint32_t buf
     ctap2CredentailData.userStr = ctap2RegisterData->userStr;
     ctap2CredentailData.userStrLen = ctap2RegisterData->userStrLen;
     ctap2CredentailData.coseAlgorithm = ctap2RegisterData->coseAlgorithm;
-    ctap2CredentailData.residentKey = ctap2RegisterData->residentKey;
+    ctap2CredentailData.residentKey = ctap2RegisterData->rkOption;
     status = credential_wrap(ctap2RegisterData->rpIdHash,
                              nonce,
                              &ctap2CredentailData,
@@ -661,8 +849,9 @@ void ctap2_make_credential_confirm() {
     ui_idle();
 
     // Perform User Verification if required
-    if (ctap2RegisterData->pinRequired) {
+    if (ctap2RegisterData->uvOption) {
         performBuiltInUv();
+        ctap2RegisterData->responseUvBit = 1;
     }
 
     ctap2_send_keepalive_processing();

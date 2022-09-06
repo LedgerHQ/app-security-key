@@ -24,5 +24,6 @@ char verifyName[20];
 char verifyHash[65];
 
 shared_ctx_t shared_ctx;
+uint32_t uptime_ms = 0;
 ctap2_ux_state_t ctap2UxState;
 ctap2_proxy_t ctap2Proxy;

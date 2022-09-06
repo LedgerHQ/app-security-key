@@ -23,7 +23,7 @@ def test_option_rk_make_cred_exclude_refused(client, test_name):
     # CTAP2_ERR_CREDENTIAL_EXCLUDED.
 
     # Create a first credential with rk=True
-    rp, credential_data, _ = generate_get_assertion_params(client, rk=True)
+    rp, credential_data, _ = generate_get_assertion_params(client, rk=True, uv=True)
 
     # Now create a new one with:
     # - Same RP
@@ -41,9 +41,7 @@ def test_option_rk_make_cred_exclude_refused(client, test_name):
                                      user_accept=None)
 
     assert e.value.code == CtapError.ERR.CREDENTIAL_EXCLUDED
-    # DEVIATION from FIDO2.0 spec: Should prompt user to exclude
-    # Impact is minor because user has manually unlocked its device.
-    # Therefore user presence is somehow guarantee.
+    # TODO: user presence is sometime necessary to exclude depending on credential credProtect value
 
     # Check that if the RP didn't match, the request is accepted
     client_data_hash, rp, user, key_params = generate_make_credentials_params(ref=0)
@@ -66,7 +64,7 @@ def test_option_rk_get_assertion(client, test_name):
     _, _, user2, key_params = generate_make_credentials_params(ref=2)
     _, _, user3, key_params = generate_make_credentials_params(ref=3)
     user2["name"] = "user name"
-    options = {"rk": True}
+    options = {"rk": True, "uv": True}  # User verification mandatory when rk
 
     users = []
     allow_list = []
@@ -97,6 +95,10 @@ def test_option_rk_get_assertion(client, test_name):
 
         assertion.verify(client_data_hash, credential_data.public_key)
         assert assertion.user["id"] == users[0]["id"]  # most recent selected
+        if len(users) > 1:
+            assert assertion.user_selected
+        else:
+            assert assertion.user_selected is None
 
         # Check with allowList
         allow_list = [{"id": credential_data.credential_id, "type": "public-key"}] + allow_list
@@ -109,13 +111,17 @@ def test_option_rk_get_assertion(client, test_name):
                                                login_type=login_type, compare_args=compare_args)
         assertion.verify(client_data_hash, credential_data.public_key)
         assert assertion.user["id"] == users[0]["id"]  # first of allow_list selected
+        if len(users) > 1:
+            assert assertion.user_selected
+        else:
+            assert assertion.user_selected is None
 
     # Check that nothing remains after a reset
     client.ctap2.reset()
 
     client_data_hash = generate_random_bytes(32)
     with pytest.raises(CtapError) as e:
-        client.ctap2.get_assertion(rp["id"], client_data_hash)
+        client.ctap2.get_assertion(rp["id"], client_data_hash, user_accept=None)
     assert e.value.code == CtapError.ERR.NO_CREDENTIALS
 
 
@@ -123,17 +129,17 @@ def test_option_rk_key_store_full(client):
     # Check that at some point KEY_STORE_FULL error is returned
     with pytest.raises(CtapError) as e:
         for _ in range(30):
-            generate_get_assertion_params(client, rk=True)
+            generate_get_assertion_params(client, rk=True, uv=True)
     assert e.value.code == CtapError.ERR.KEY_STORE_FULL
 
     # Check that it is consistently returned
     with pytest.raises(CtapError) as e:
-        generate_get_assertion_params(client, rk=True)
+        generate_get_assertion_params(client, rk=True, uv=True)
     assert e.value.code == CtapError.ERR.KEY_STORE_FULL
 
     # Check that credentials can be stored again after a reset
     client.ctap2.reset()
-    generate_get_assertion_params(client, rk=True)
+    generate_get_assertion_params(client, rk=True, uv=True)
 
     # Reset device to clean rk credentials for next tests
     client.ctap2.reset()
@@ -147,7 +153,7 @@ def test_option_rk_overwrite_get_assertion(client, test_name):
     # Make a first "user1" credential
     client_data_hash, rp, user1, key_params = generate_make_credentials_params(ref=1)
     user1["name"] = "user1"
-    options = {"rk": True}
+    options = {"rk": True, "uv": True}  # User verification mandatory when rk
     compare_args = (TESTS_SPECULOS_DIR, test_name + "/" + "1" + "/make")
     attestation = client.ctap2.make_credential(client_data_hash,
                                                rp,
