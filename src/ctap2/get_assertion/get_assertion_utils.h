@@ -48,6 +48,8 @@ void get_assertion_confirm(uint16_t idx);
  */
 void get_assertion_send(void);
 
+int compute_hmacSecret_output(uint8_t **output, uint32_t *outputLen, uint8_t *credRandom);
+
 void get_assertion_user_cancel();
 
 int handle_allowList_item(cbipDecoder_t *decoder, cbipItem_t *item, bool unwrap);

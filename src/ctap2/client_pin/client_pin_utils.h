@@ -1,7 +1,7 @@
 /*
 *******************************************************************************
 *   Ledger App Security Key
-*   (c) 2022 Ledger
+*   (c) 2023 Ledger
 *
 *  Licensed under the Apache License, Version 2.0 (the "License");
 *  you may not use this file except in compliance with the License.
@@ -16,18 +16,29 @@
 *   limitations under the License.
 ********************************************************************************/
 
-#include "os.h"
+#pragma once
 
 #include "globals.h"
 
-#include "selection_ui.h"
+#define TAG_RESP_KEY_AGREEMENT 0x01
+#define TAG_RESP_PIN_TOKEN     0x02
+#define TAG_RESP_PIN_RETRIES   0x03
+#define TAG_RESP_UV_RETRIES    0x05
 
+typedef struct auth_token_s {
+    uint8_t value[AUTH_TOKEN_SIZE];
+    uint8_t protocol;
+    uint8_t perms;
+    uint8_t rpIdHash[CX_SHA256_SIZE];
+} auth_token_t;
 
-void ctap2_selection_handle(u2f_service_t *service, uint8_t *buffer, uint16_t length) {
-    UNUSED(service);
-    UNUSED(buffer);
-    UNUSED(length);
+extern auth_token_t authToken;
 
-    PRINTF("ctap2_selection_handle\n");
-    selection_ux();
+bool is_token_valid(void);
+void stopUsingPinUvAuthToken(void);
+void user_cancel_client_pin_get_token(void);
+void confirm_client_pin_get_token(void);
+
+static inline ctap2_pin_data_t *get_ctap2_pin_data(void) {
+    return &shared_ctx.u.ctap2Data.u.ctap2PinData;
 }

@@ -135,13 +135,13 @@ void ctap2_make_credential_ux(void) {
 
 #if defined(HAVE_BAGL)
     ux_flow_init(0,
-                 (ctap2RegisterData->residentKey ? ux_ctap2_make_cred_resident_flow
-                                                 : ux_ctap2_make_cred_flow),
+                 (ctap2RegisterData->rkOption ? ux_ctap2_make_cred_resident_flow
+                                              : ux_ctap2_make_cred_flow),
                  NULL);
 #elif defined(HAVE_NBGL)
     io_seproxyhal_play_tune(TUNE_LOOK_AT_ME);
 
-    if (ctap2RegisterData->residentKey) {
+    if (ctap2RegisterData->rkOption) {
         app_nbgl_start_review(NB_OF_PAIRS,
                               pairs,
                               "Register resident key",

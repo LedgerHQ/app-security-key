@@ -23,18 +23,15 @@
 #include "globals.h"
 #include "ui_shared.h"
 
-#include "selection_ui.h"
-
-
-void ctap2_selection_confirm(void) {
+static void selection_confirm(uint8_t code) {
     ctap2UxState = CTAP2_UX_STATE_NONE;
 
     G_io_apdu_buffer[0] = ERROR_NONE;
-    send_cbor_response(&G_io_u2f, 1, NULL);
+    send_cbor_response(&G_io_u2f, code, NULL);
     ui_idle();
 }
 
-void ctap2_selection_cancel(void) {
+static void selection_cancel(void) {
     ctap2UxState = CTAP2_UX_STATE_NONE;
     send_cbor_error(&G_io_u2f, ERROR_OPERATION_DENIED);
     ui_idle();
@@ -43,11 +40,13 @@ void ctap2_selection_cancel(void) {
 
 #if defined(HAVE_BAGL)
 
+static uint8_t selectionConfirmedCode;
+
 // First step selects as fast as possible
 
 UX_STEP_CB(ux_ctap2_selection_flow_0_step,
            pbb,
-           ctap2_selection_confirm(),
+           selection_confirm(selectionConfirmedCode),
            {
                &C_icon_validate_14,
                "Device selection",
@@ -56,7 +55,7 @@ UX_STEP_CB(ux_ctap2_selection_flow_0_step,
 
 UX_STEP_CB(ux_ctap2_selection_flow_1_step,
            pbb,
-           ctap2_selection_cancel(),
+           selection_cancel(),
            {
                &C_icon_crossmark,
                "Device selection",
@@ -68,7 +67,10 @@ UX_FLOW(ux_ctap2_selection_flow,
         &ux_ctap2_selection_flow_1_step,
         FLOW_LOOP);
 
-void selection_ux(void) {
+void ctap2_selection_ux(uint8_t code) {
+    // Save code for response value if user confirm
+    selectionConfirmedCode = code;
+
     // reserve a display stack slot if none yet
     if (G_ux.stack_count == 0) {
         ux_stack_push();
@@ -81,6 +83,18 @@ void selection_ux(void) {
 
 #elif defined(HAVE_NBGL)
 
-void selection_ux(void) { }
+void ctap2_selection_ux(uint8_t code) {
+    UNUSED(code);
+}
 
 #endif
+
+
+void ctap2_selection_handle(u2f_service_t *service, uint8_t *buffer, uint16_t length) {
+    UNUSED(service);
+    UNUSED(buffer);
+    UNUSED(length);
+
+    PRINTF("ctap2_selection_handle\n");
+    ctap2_selection_ux(ERROR_NONE);
+}

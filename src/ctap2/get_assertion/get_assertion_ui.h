@@ -18,4 +18,4 @@
 
 #pragma once
 
-void get_assertion_ux(ctap2_ux_state_t state);
+void get_assertion_ux();

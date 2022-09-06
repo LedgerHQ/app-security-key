@@ -24,6 +24,7 @@
 typedef union ctap2_assert_multiple_flow_data_s {
     struct {
         cbipItem_t credentialItem;
+        uint32_t credentialsNumber;
         uint32_t currentCredential;
     } allowList;
     struct {
@@ -38,22 +39,27 @@ typedef struct ctap2_assert_data_s {
     uint32_t rpIdLen;
     uint8_t clientDataHash[CX_SHA256_SIZE];  // Could be reused over successive GET_ASSERTION /
                                              // GET_NEXT_ASSERTION calls
+    uint8_t *pinAuth;
+    uint32_t pinAuthLen;
     uint8_t *credId;
     uint32_t credIdLen;
     uint8_t *nonce;
     uint8_t *credential;
     uint32_t credentialLen;
-    uint8_t pinRequired;   // set if uv is set
-    uint8_t pinPresented;  // set if the PIN request was acknowledged by the user
-    uint8_t
-        clientPinAuthenticated;    // set if a standard FIDO client PIN authentication was performed
-    uint8_t userPresenceRequired;  // set if up is set
-    uint8_t extensions;            // extensions flags as a bitmask
+    uint8_t responseUvBit;
+    uint8_t responseUpBit;
+    uint8_t uvOption;
+    uint8_t upOption;
+    uint8_t extensions;  // extensions flags as a bitmask
 
     uint8_t allowListPresent;
-    uint16_t availableCredentials;
+    uint16_t numberOfCredentials;
 
     // Multiple flow data
     uint16_t currentCredentialIndex;
     ctap2_assert_multiple_flow_data_t multipleFlowData;
+
+    char *txAuthMessage;    // pointer to the TX Auth message or NULL
+    uint32_t txAuthLength;  // length of the TX Auth message
+    char txAuthLast;  // last character of the txAuth CBOR field overwritten by a '\0' when displayed
 } ctap2_assert_data_t;

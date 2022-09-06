@@ -18,4 +18,4 @@
 
 #pragma once
 
-void selection_ux(void);
+void ux_client_pin_get_token(void);

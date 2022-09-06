@@ -79,6 +79,7 @@ uint8_t io_event(uint8_t channel) {
             break;
 #endif  // HAVE_NBGL
         case SEPROXYHAL_TAG_TICKER_EVENT:
+            uptime_ms += 100;
             app_ticker_event_callback();
             UX_TICKER_EVENT(G_io_seproxyhal_spi_buffer, {});
             break;

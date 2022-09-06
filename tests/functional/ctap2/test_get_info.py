@@ -1,4 +1,5 @@
 from fido2.ctap2.base import Ctap2, Info
+from fido2.ctap2.pin import PinProtocolV1, PinProtocolV2
 from hashlib import sha256
 from ragger.firmware import Firmware
 
@@ -56,9 +57,12 @@ def test_get_info_options(client):
     else:
         assert info.options["rk"]
 
+    assert info.options["rk"]
+    assert "clientPin" in info.options
     assert info.options["up"]
     assert info.options["uv"]
-    assert "clientPin" in info.options
+    assert info.options["pinUvAuthToken"]
+    assert info.options["makeCredUvNotRqd"]
 
     # Value depends on if a pin as been set.
     # Upon boot, pin is never set as we don't have NVM
@@ -67,7 +71,7 @@ def test_get_info_options(client):
     # Default value options
     assert "plat" not in info.options
 
-    assert len(info.options) == 4
+    assert len(info.options) == 6
 
 
 def test_get_info_max_msg_size(client):
@@ -79,4 +83,4 @@ def test_get_info_max_msg_size(client):
 def test_get_info_pin_protocol(client):
     info = client.ctap2.info
 
-    assert info.pin_uv_protocols == [1]
+    assert info.pin_uv_protocols == [PinProtocolV2.VERSION, PinProtocolV1.VERSION]

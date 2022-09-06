@@ -8,8 +8,10 @@ from fido2 import cbor
 from fido2.ctap import CtapError
 from fido2.ctap1 import ApduError
 from fido2.ctap2.base import Ctap2, args, AttestationResponse, AssertionResponse
+from fido2.ctap2.pin import ClientPin
 from fido2.hid import CTAPHID
 from fido2.hid import CtapHidDevice
+from fido2.utils import sha256
 
 from .ctap1_client import APDU
 from .transport import TransportType
@@ -114,6 +116,9 @@ class LedgerCtap2(Ctap2, LedgerCTAP):
         cmd = Ctap2.CMD.MAKE_CREDENTIAL
         ctap_hid_cmd = self.send_cbor_nowait(cmd, args.cbor_args, event=event,
                                              on_keepalive=on_keepalive)
+        if args.pin_uv_param == b"":
+            # This parameter leads to authenticator selection flow
+            return self.selection(user_accept=user_accept, cmd_sent=ctap_hid_cmd)
 
         text = None
         nav_ins = None
@@ -198,6 +203,11 @@ class LedgerCtap2(Ctap2, LedgerCTAP):
                     pin_uv_protocol)
 
         ctap_hid_cmd = self.send_cbor_nowait(cmd, data, event=event, on_keepalive=on_keepalive)
+
+        if pin_uv_param == b"":
+            # This parameter leads to authenticator selection flow
+            return self.selection(user_accept=user_accept, cmd_sent=ctap_hid_cmd)
+
         text = None
         nav_ins = None
         val_ins: List[Union[NavIns, NavInsID]] = list()
@@ -327,9 +337,13 @@ class LedgerCtap2(Ctap2, LedgerCTAP):
 
         self.parse_response(response)
 
-    def selection(self, *, event=None, on_keepalive=None, user_accept=True, check_cancel=False):
-        ctap_hid_cmd = self.send_cbor_nowait(Ctap2.CMD.SELECTION, event=event,
-                                             on_keepalive=on_keepalive)
+        def selection(self, *, event=None, on_keepalive=None, user_accept=True,
+                      cmd_sent=None, check_cancel=False):
+            if cmd_sent:
+                ctap_hid_cmd = cmd_sent
+            else:
+                ctap_hid_cmd = self.send_cbor_nowait(Ctap2.CMD.SELECTION, event=event,
+                                                     on_keepalive=on_keepalive)
 
         # Check step 0 content
         self.speculos_client.wait_for_screen_text("Device selection\nConfirm")
@@ -356,3 +370,169 @@ class LedgerCtap2(Ctap2, LedgerCTAP):
         self.speculos_client.wait_for_screen_text("Ready to\nauthenticate")
 
         self.parse_response(response)
+
+    def client_pin(self, pin_uv_protocol, sub_cmd, key_agreement=None, pin_uv_param=None,
+                   new_pin_enc=None, pin_hash_enc=None, permissions=None,
+                   permissions_rpid=None, *, event=None, on_keepalive=None,
+                   user_accept=True, check_screens=None):
+        cmd = Ctap2.CMD.CLIENT_PIN
+        data = args(pin_uv_protocol,
+                    sub_cmd,
+                    key_agreement,
+                    pin_uv_param,
+                    new_pin_enc,
+                    pin_hash_enc,
+                    None,
+                    None,
+                    permissions,
+                    permissions_rpid)
+
+        ctap_hid_cmd = self.send_cbor_nowait(cmd, data, event=event,
+                                             on_keepalive=on_keepalive)
+
+        if sub_cmd not in [ClientPin.CMD.GET_TOKEN_USING_PIN_LEGACY,
+                           ClientPin.CMD.GET_TOKEN_USING_PIN,
+                           ClientPin.CMD.GET_TOKEN_USING_UV]:
+            response = self.device.recv(ctap_hid_cmd)
+            return self.parse_response(response)
+
+        if user_accept and check_screens is None:
+            # Still give time for screen thread to parse screens
+            # Also this make sure the device doesn't receive the button press event
+            # before launching the UI Flow.
+            time.sleep(0.1)
+
+            # Validate blindly
+            self.press_and_release("both")
+
+        elif user_accept is not None:
+
+            if sub_cmd == ClientPin.CMD.GET_TOKEN_USING_PIN_LEGACY:
+                expected_screen_perms = "register, login"
+            else:
+                perms = []
+                if permissions & ClientPin.PERMISSION.MAKE_CREDENTIAL:
+                    perms.append("register")
+                if permissions & ClientPin.PERMISSION.GET_ASSERTION:
+                    perms.append("login")
+                if permissions & ClientPin.PERMISSION.CREDENTIAL_MGMT:
+                    perms.append("manage creds")
+                if permissions & ClientPin.PERMISSION.LARGE_BLOB_WRITE:
+                    perms.append("write blobs")
+                if perms:
+                    expected_screen_perms = ", ".join(perms)
+                else:
+                    expected_screen_perms = ""
+
+            # Check step 0 content
+            self.speculos_client.wait_for_screen_text("Grant permissions\nFIDO 2")
+
+            # Go to step 1 and check content
+            self.press_and_release("right")
+            screen_permissions = self.speculos_client.parse_bnnn_paging_screen("Permissions")
+            assert screen_permissions == expected_screen_perms
+
+            # Go to step 2 and check content
+            self.press_and_release("right")
+            domain_text = self.speculos_client.parse_bnnn_paging_screen("Domain")
+
+            if not permissions_rpid:
+                assert domain_text == "All"
+            else:
+                rp_id_hash = get_rp_id_hash(permissions_rpid)
+                if rp_id_hash in fido_known_appid:
+                    expected = fido_known_appid[rp_id_hash]
+                    if domain_text != expected:
+                        raise ValueError("Expecting {} instead of {}".format(
+                                         repr(expected), repr(domain_text)))
+                else:
+                    expected = permissions_rpid
+                    if domain_text != expected:
+                        raise ValueError("Expecting {} instead of {}".format(
+                                         repr(expected), repr(domain_text)))
+
+            # Go to step 3 and check content
+            self.press_and_release("right")
+            self.speculos_client.wait_for_screen_text("Refuse\npermissions")
+
+            # Loop from step 3 to step 0 and check content
+            self.press_and_release("right")
+            self.speculos_client.wait_for_screen_text("Grant permissions\nFIDO 2")
+
+            # Loop from step 0 to step 3 and check content
+            self.press_and_release("left")
+            self.speculos_client.wait_for_screen_text("Refuse\npermissions")
+
+            if user_accept:
+                # Go back to step 0
+                self.press_and_release("right")
+                self.speculos_client.wait_for_screen_text("Grant permissions\nFIDO 2")
+
+            # Confirm
+            self.press_and_release('both')
+
+        response = self.device.recv(ctap_hid_cmd)
+        return self.parse_response(response)
+
+
+class LedgerClientPin(ClientPin):
+    """ Overriding fido2.ctap2.pin.ClientPin
+
+    This is to allow to add check_screen and user_accept parameters to
+    get_pin_token() and get_uv_token() function so that they are forwarded to
+    LedgerCtap2().client_pin().
+    """
+    def get_pin_token(self, pin, permissions=None, permissions_rpid=None,
+                      user_accept=True, check_screens=None):
+        """ See fido2.ctap2.pin.ClientPin.get_pin_token() for implem explanation """
+        key_agreement, shared_secret = self._get_shared_secret()
+
+        pin_hash = sha256(pin.encode())[:16]
+        pin_hash_enc = self.protocol.encrypt(shared_secret, pin_hash)
+
+        if self._supports_permissions and permissions:
+            cmd = ClientPin.CMD.GET_TOKEN_USING_PIN
+        else:
+            cmd = ClientPin.CMD.GET_TOKEN_USING_PIN_LEGACY
+            # Ignore permissions if not supported
+            permissions = None
+            permissions_rpid = None
+
+        resp = self.ctap.client_pin(
+            self.protocol.VERSION,
+            cmd,
+            key_agreement=key_agreement,
+            pin_hash_enc=pin_hash_enc,
+            permissions=permissions,
+            permissions_rpid=permissions_rpid,
+            user_accept=user_accept,
+            check_screens=check_screens
+        )
+        pin_token_enc = resp[ClientPin.RESULT.PIN_UV_TOKEN]
+        return self.protocol.validate_token(
+            self.protocol.decrypt(shared_secret, pin_token_enc)
+        )
+
+    def get_uv_token(self, permissions=None, permissions_rpid=None, event=None,
+                     on_keepalive=None, user_accept=True, check_screens=None):
+        """ See fido2.ctap2.pin.ClientPin.get_uv_token() for implem explanation """
+        if not self.ctap.info.options.get("pinUvAuthToken"):
+            raise ValueError("Authenticator does not support get_uv_token")
+
+        key_agreement, shared_secret = self._get_shared_secret()
+
+        resp = self.ctap.client_pin(
+            self.protocol.VERSION,
+            ClientPin.CMD.GET_TOKEN_USING_UV,
+            key_agreement=key_agreement,
+            permissions=permissions,
+            permissions_rpid=permissions_rpid,
+            event=event,
+            on_keepalive=on_keepalive,
+            user_accept=user_accept,
+            check_screens=check_screens
+        )
+        pin_token_enc = resp[ClientPin.RESULT.PIN_UV_TOKEN]
+        return self.protocol.validate_token(
+            self.protocol.decrypt(shared_secret, pin_token_enc)
+        )

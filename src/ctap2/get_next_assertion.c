@@ -35,7 +35,7 @@ void ctap2_get_next_assertion_handle(u2f_service_t *service, uint8_t *buffer, ui
     } else {
         // No allow list -> RK credentials
         PRINTF("GET_NEXT_ASSERTION: looking for the next RK credential.\n");
-        ctap2AssertData->availableCredentials = 1;
+        ctap2AssertData->numberOfCredentials = 1;
         int status = rk_next_credential_from_RKList(NULL,
                                                     &ctap2AssertData->nonce,
                                                     &ctap2AssertData->credential,

@@ -6,7 +6,7 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.x509 import load_pem_x509_certificate
 from fido2.attestation import AttestationVerifier
 from fido2.ctap import CtapDevice
-from fido2.ctap2.pin import ClientPin
+from fido2.ctap2.pin import PinProtocolV1, PinProtocolV2
 from pathlib import Path
 from ragger.backend import BackendInterface
 from ragger.firmware import Firmware
@@ -14,7 +14,7 @@ from ragger.navigator import Navigator, NavInsID, NavIns
 from typing import Optional
 
 from .ctap1_client import LedgerCtap1
-from .ctap2_client import LedgerCtap2
+from .ctap2_client import LedgerCtap2, LedgerClientPin
 from .transport import TransportType
 from .transport.hid import LedgerCtapHidDevice
 from .transport.nfc import LedgerCtapNFCDevice
@@ -107,7 +107,9 @@ class TestClient:
             self.ctap1 = LedgerCtap1(self._device, self.firmware, self.navigator, self.debug)
             self.ctap2 = LedgerCtap2(self._device, self.firmware, self.navigator,
                                      self.ctap2_u2f_proxy, self.debug)
-            self.client_pin = ClientPin(self.ctap2)
+            self.client_pin_v1 = LedgerClientPin(self.ctap2, PinProtocolV1())
+            self.client_pin_v2 = LedgerClientPin(self.ctap2, PinProtocolV2())
+            self.client_pin = self.client_pin_v2
 
         except Exception as e:
             raise e

@@ -25,6 +25,7 @@
 global_t g;
 
 shared_ctx_t shared_ctx;
+uint32_t uptime_ms = 0;
 ctap2_ux_state_t ctap2UxState;
 
 #ifdef TARGET_NANOS

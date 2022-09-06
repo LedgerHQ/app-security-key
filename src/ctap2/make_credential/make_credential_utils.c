@@ -137,7 +137,7 @@ static int build_makeCred_authData(uint8_t *nonce, uint8_t *buffer, uint32_t buf
     offset += CX_SHA256_SIZE;
 
     buffer[offset] = AUTHDATA_FLAG_USER_PRESENCE | AUTHDATA_FLAG_ATTESTED_CREDENTIAL_DATA_PRESENT;
-    if (ctap2RegisterData->pinRequired || ctap2RegisterData->clientPinAuthenticated) {
+    if (ctap2RegisterData->uvOption) {
         buffer[offset] |= AUTHDATA_FLAG_USER_VERIFIED;
     }
     if (ctap2RegisterData->extensions != 0) {
@@ -160,7 +160,7 @@ static int build_makeCred_authData(uint8_t *nonce, uint8_t *buffer, uint32_t buf
     ctap2CredentailData.userStr = ctap2RegisterData->userStr;
     ctap2CredentailData.userStrLen = ctap2RegisterData->userStrLen;
     ctap2CredentailData.coseAlgorithm = ctap2RegisterData->coseAlgorithm;
-    ctap2CredentailData.residentKey = ctap2RegisterData->residentKey;
+    ctap2CredentailData.residentKey = ctap2RegisterData->rkOption;
     status = credential_wrap(ctap2RegisterData->rpIdHash,
                              nonce,
                              &ctap2CredentailData,
@@ -270,7 +270,7 @@ void ctap2_make_credential_confirm() {
     ctap2_send_keepalive_processing();
 
     // Perform User Verification if required
-    if (ctap2RegisterData->pinRequired) {
+    if (ctap2RegisterData->uvOption) {
         performBuiltInUv();
     }
 

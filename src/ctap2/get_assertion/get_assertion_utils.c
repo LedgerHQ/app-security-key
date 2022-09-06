@@ -33,11 +33,12 @@
 
 #include "get_assertion_utils.h"
 
-#define TAG_RESP_CREDENTIAL  0x01
-#define TAG_RESP_AUTH_DATA   0x02
-#define TAG_RESP_SIGNATURE   0x03
-#define TAG_RESP_USER        0x04
-#define TAG_RESP_NB_OF_CREDS 0x05
+#define TAG_RESP_CREDENTIAL    0x01
+#define TAG_RESP_AUTH_DATA     0x02
+#define TAG_RESP_SIGNATURE     0x03
+#define TAG_RESP_USER          0x04
+#define TAG_RESP_NB_OF_CREDS   0x05
+#define TAG_RESP_USER_SELECTED 0x06
 
 size_t load_user_in_buffer(char *buffer, uint8_t max_size) {
     ctap2_assert_data_t *ctap2AssertData = globals_get_ctap2_assert_data();
@@ -72,7 +73,7 @@ static void copy_assert_info_on_buffers(void) {
     PRINTF("After copy, buffer content:\n1 - '%s'\n2 - '%s'\n", g.buffer1_65, g.buffer2_65);
 }
 
-static int compute_hmacSecret_output(uint8_t **output, uint32_t *outputLen, uint8_t *credRandom) {
+int compute_hmacSecret_output(uint8_t **output, uint32_t *outputLen, uint8_t *credRandom) {
     ctap2_assert_data_t *ctap2AssertData = globals_get_ctap2_assert_data();
     cbipDecoder_t decoder;
     cbipItem_t mapItem, tmpItem;
@@ -83,7 +84,10 @@ static int compute_hmacSecret_output(uint8_t **output, uint32_t *outputLen, uint
     uint32_t saltEncLength;
     int status;
     uint8_t sharedSecret[SHARED_SECRET_MAX_SIZE];
+    int protocol = PIN_PROTOCOL_VERSION_V1;
     uint8_t *salt;
+
+    // TODO use CredRandomWithUV and CredRandomWithoutUV
 
     // Attempt to process hmac-secret extension if flagged for processing
     cbip_decoder_init(&decoder, ctap2AssertData->buffer, CUSTOM_IO_APDU_BUFFER_SIZE);
@@ -92,8 +96,19 @@ static int compute_hmacSecret_output(uint8_t **output, uint32_t *outputLen, uint
     GET_MAP_KEY_ITEM(&decoder, &mapItem, TAG_EXTENSIONS, tmpItem, cbipMap);
     GET_MAP_STR_KEY_ITEM(&decoder, &tmpItem, EXTENSION_HMAC_SECRET, mapItem, cbipMap);
 
+    if (!ctap2AssertData->upOption) {
+        PRINTF("hmac-secret not allowed without up\n");
+        return ERROR_INVALID_OPTION;
+    }
+
+    // Get pin protocol
+    status = cbiph_get_map_key_int(&decoder, &mapItem, TAG_HMAC_SECRET_PROTOCOL, &protocol);
+    if (status < CBIPH_STATUS_NOT_FOUND) {
+        return ERROR_INVALID_CBOR;
+    }
+
     // Check KEY_AGREEMENT
-    status = ctap2_client_pin_decapsulate(PIN_PROTOCOL_VERSION_V1,
+    status = ctap2_client_pin_decapsulate(protocol,
                                           &decoder,
                                           &mapItem,
                                           TAG_HMAC_SECRET_KEY_AGREEMENT,
@@ -109,8 +124,7 @@ static int compute_hmacSecret_output(uint8_t **output, uint32_t *outputLen, uint
                                 TAG_HMAC_SECRET_SALT_ENC,
                                 &saltEnc,
                                 &saltEncLength) != CBIPH_STATUS_FOUND) {
-        PRINTF("Unexpected modification of CBOR data\n");
-        return ERROR_INVALID_CBOR;
+        return ERROR_MISSING_PARAMETER;
     }
 
     // Check SALT_AUTH
@@ -119,12 +133,11 @@ static int compute_hmacSecret_output(uint8_t **output, uint32_t *outputLen, uint
                                 TAG_HMAC_SECRET_SALT_AUTH,
                                 &saltAuth,
                                 &saltAuthLength) != CBIPH_STATUS_FOUND) {
-        PRINTF("Unexpected modification of CBOR data\n");
-        return ERROR_INVALID_CBOR;
+        return ERROR_MISSING_PARAMETER;
     }
 
     // Verify saltAuth
-    if (!ctap2_client_pin_verify(PIN_PROTOCOL_VERSION_V1,
+    if (!ctap2_client_pin_verify(protocol,
                                  sharedSecret,
                                  sizeof(sharedSecret),
                                  saltEnc,
@@ -137,7 +150,7 @@ static int compute_hmacSecret_output(uint8_t **output, uint32_t *outputLen, uint
     }
 
     // Decrypt salt in place
-    status = ctap2_client_pin_decrypt(PIN_PROTOCOL_VERSION_V1,
+    status = ctap2_client_pin_decrypt(protocol,
                                       sharedSecret,
                                       saltEnc,
                                       saltEncLength,
@@ -157,6 +170,11 @@ static int compute_hmacSecret_output(uint8_t **output, uint32_t *outputLen, uint
 
     // Prepare the salt in "saltEnc" "buffer"
     salt = saltEnc;
+    if (protocol == PIN_PROTOCOL_VERSION_V2) {
+        // Use an offset that will be used for IV, so that encryption in place works
+        salt += IV_PROT_V2_SIZE;
+    }
+
     cx_hmac_sha256(credRandom, CRED_RANDOM_SIZE, saltEnc, CX_SHA256_SIZE, salt, CX_SHA256_SIZE);
     PRINTF("hmac-secret prepared salt1 %.*H\n", CX_SHA256_SIZE, salt);
 
@@ -171,7 +189,7 @@ static int compute_hmacSecret_output(uint8_t **output, uint32_t *outputLen, uint
     }
 
     // Encrypt salt into saltEnc
-    status = ctap2_client_pin_encrypt(PIN_PROTOCOL_VERSION_V1,
+    status = ctap2_client_pin_encrypt(protocol,
                                       sharedSecret,
                                       salt,
                                       saltLength,
@@ -198,10 +216,10 @@ static int build_authData(uint8_t *buffer, uint32_t bufferLength, uint32_t *auth
     memmove(buffer, ctap2AssertData->rpIdHash, CX_SHA256_SIZE);
     offset += CX_SHA256_SIZE;
     buffer[offset] = 0;
-    if (ctap2AssertData->pinRequired || ctap2AssertData->clientPinAuthenticated) {
+    if (ctap2AssertData->responseUvBit) {
         buffer[offset] |= AUTHDATA_FLAG_USER_VERIFIED;
     }
-    if (ctap2AssertData->userPresenceRequired) {
+    if (ctap2AssertData->responseUpBit) {
         buffer[offset] |= AUTHDATA_FLAG_USER_PRESENCE;
     }
     if (ctap2AssertData->extensions != 0) {
@@ -226,7 +244,7 @@ static int build_authData(uint8_t *buffer, uint32_t bufferLength, uint32_t *auth
 
             crypto_generate_credRandom_key(ctap2AssertData->nonce,
                                            credRandom,
-                                           ctap2AssertData->pinRequired);
+                                           ctap2AssertData->uvOption);
 
             status = compute_hmacSecret_output(&salt, &saltLength, credRandom);
             if (status != ERROR_NONE) {
@@ -242,7 +260,7 @@ static int build_authData(uint8_t *buffer, uint32_t bufferLength, uint32_t *auth
         offset += encoder.offset;
     }
 
-    // Check that sign_and_build_authData() can add clientDataHash
+    // Check that sign_and_encode_authData() can add clientDataHash
     // (CX_SHA256_SIZE bytes) at the end of authData for hash computing.
     if (offset + CX_SHA256_SIZE > bufferLength) {
         PRINTF("Shared buffer size issue!\n");
@@ -395,8 +413,9 @@ static int build_and_encode_getAssertion_response(uint8_t *buffer,
         mapSize++;
         // TAG_RESP_NB_OF_CREDS != NULL will allow GET_NEXT_ASSERTION
         // which is currently only available on RKs
-        if (ctap2AssertData->availableCredentials >= 2) {
-            mapSize++;
+        if (ctap2AssertData->numberOfCredentials > 1) {
+            // Adding TAG_RESP_NB_OF_CREDS and TAG_RESP_USER_SELETE
+            mapSize += 2;
         }
     }
 
@@ -418,6 +437,7 @@ static int build_and_encode_getAssertion_response(uint8_t *buffer,
     }
     // If RK: encoding credential info
     if (credData->residentKey) {
+        PRINTF("Adding user to response %.*H\n", credData->userIdLen, credData->userId);
         const bool encode_username = (!g.display_status && credData->userStr != NULL);
         cbip_add_int(&encoder, TAG_RESP_USER);
         cbip_add_map_header(&encoder, encode_username ? 3 : 1);
@@ -434,14 +454,14 @@ static int build_and_encode_getAssertion_response(uint8_t *buffer,
             cbip_add_string(&encoder, credData->userStr, credData->userStrLen);
         }
 
-        PRINTF("Adding user to response %.*H\n", credData->userIdLen, credData->userId);
-
         // If several possible credentials, encoding the number
         // TAG_RESP_NB_OF_CREDS != NULL will allow GET_NEXT_ASSERTION
         // which is currently only available on RKs
-        if (ctap2AssertData->availableCredentials >= 2) {
+        if (ctap2AssertData->numberOfCredentials > 1) {
             cbip_add_int(&encoder, TAG_RESP_NB_OF_CREDS);
-            cbip_add_int(&encoder, ctap2AssertData->availableCredentials);
+            cbip_add_int(&encoder, ctap2AssertData->numberOfCredentials);
+            cbip_add_int(&encoder, TAG_RESP_USER_SELECTED);
+            cbip_add_boolean(&encoder, true);
         }
     }
 
@@ -576,14 +596,15 @@ void get_assertion_confirm(uint16_t idx) {
     ctap2_send_keepalive_processing();
 
     // Perform User Verification if required
-    if (ctap2AssertData->pinRequired) {
+    if (ctap2AssertData->uvOption) {
         performBuiltInUv();
+        ctap2AssertData->responseUvBit = 1;
     }
 
     ctap2_send_keepalive_processing();
 
     // Return immediately in case there is no available credentials
-    if (ctap2AssertData->availableCredentials == 0) {
+    if (ctap2AssertData->numberOfCredentials == 0) {
         send_cbor_error(&G_io_u2f, ERROR_NO_CREDENTIALS);
         return;
     }

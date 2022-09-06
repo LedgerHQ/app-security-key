@@ -30,11 +30,11 @@ typedef struct ctap2_register_data_s {
     uint32_t userIdLen;
     char *userStr;
     uint32_t userStrLen;
+    uint8_t *pinAuth;
+    uint32_t pinAuthLen;
     int coseAlgorithm;     // algorithm chosen following the request message
-    uint8_t pinRequired;   // set if uv is set
-    uint8_t pinPresented;  // set if the PIN request was acknowledged by the user
-    uint8_t
-        clientPinAuthenticated;  // set if a standard FIDO client PIN authentication was performed
-    uint8_t residentKey;         // set if the credential shall be created as a resident key
-    uint8_t extensions;          // extensions flags as a bitmask
+    uint8_t responseUvBit;
+    uint8_t uvOption;
+    uint8_t rkOption;
+    uint8_t extensions;  // extensions flags as a bitmask
 } ctap2_register_data_t;

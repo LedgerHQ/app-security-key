@@ -50,8 +50,8 @@ static void ctap_ux_on_user_choice(bool confirm, uint16_t idx) {
         // As the choice is made authenticator-side, according to the spec SK should not let the
         // client being aware of additional credentials. This will prevent the client to call
         // getNextAssertion to discover more credentials.
-        globals_get_ctap2_assert_data()->availableCredentials =
-            MIN(globals_get_ctap2_assert_data()->availableCredentials, 1);
+        globals_get_ctap2_assert_data()->numberOfCredentials =
+            MIN(globals_get_ctap2_assert_data()->numberOfCredentials, 1);
         get_assertion_confirm(idx);
 #ifdef HAVE_NBGL
         app_nbgl_status("Login request signed", true, ui_idle);
@@ -136,7 +136,7 @@ static void display_next_multiple_flow_state(uint16_t idx) {
              // As the parameters are uint16_t, this could overflow, but it is very unlikely
              "Log in user %d/%d",
              ctap2AssertData->currentCredentialIndex,
-             ctap2AssertData->availableCredentials);
+             ctap2AssertData->numberOfCredentials);
     ux_display_user_assertion(g.buffer2_65);
 }
 
@@ -383,7 +383,7 @@ static void app_nbgl_no_assertion(void) {
 
 #endif
 
-void get_assertion_ux(ctap2_ux_state_t state) {
+void get_assertion_ux() {
     ctap2_assert_data_t *ctap2AssertData = globals_get_ctap2_assert_data();
 
     // TODO show that rp.id is truncated if necessary
@@ -391,8 +391,6 @@ void get_assertion_ux(ctap2_ux_state_t state) {
     memcpy(g.buffer1_65, ctap2AssertData->rpId, len);
     g.buffer1_65[len] = '\0';
     PRINTF("GET_ASSERTION: rpId %s\n", g.buffer1_65);
-
-    ctap2UxState = state;
 
     UX_WAKE_UP();
 
@@ -402,44 +400,36 @@ void get_assertion_ux(ctap2_ux_state_t state) {
     selected_credential = 1;
     io_seproxyhal_play_tune(TUNE_LOOK_AT_ME);
 #endif
-
-    switch (state) {
-        // Only one possible credential
-        case CTAP2_UX_STATE_GET_ASSERTION: {
-            ux_display_user_assertion(g.buffer2_65);
-            PRINTF("GET_ASSERTION: buffer2_65 %s\n", g.buffer2_65);
+    if (ctap2AssertData->numberOfCredentials == 0) {
+        // No credential possible
 #if defined(HAVE_BAGL)
-            ux_flow_init(0, ux_get_assertion_flow, NULL);
+        ux_flow_init(0, ux_ctap2_no_assertion_flow, NULL);
 #elif defined(HAVE_NBGL)
-            app_nbgl_start_review(NB_OF_PAIRS, pairs, "Log in", on_user_choice, NULL);
+        app_nbgl_no_assertion();
 #endif
-            break;
-        }
-
+    } else if (ctap2AssertData->numberOfCredentials == 1) {
+        ctap2UxState = CTAP2_UX_STATE_GET_ASSERTION;
+        ux_display_user_assertion(g.buffer2_65);
+        PRINTF("GET_ASSERTION: buffer2_65 %s\n", g.buffer2_65);
+#if defined(HAVE_BAGL)
+        ux_flow_init(0, ux_get_assertion_flow, NULL);
+#elif defined(HAVE_NBGL)
+        app_nbgl_start_review(NB_OF_PAIRS, pairs, "Log in", on_user_choice, NULL);
+#endif
+    } else {
         // Multiple credentials possible
-        case CTAP2_UX_STATE_MULTIPLE_ASSERTION: {
+        ctap2UxState = CTAP2_UX_STATE_MULTIPLE_ASSERTION;
 #if defined(HAVE_BAGL)
-            ux_step_count = ctap2AssertData->availableCredentials;
-            ux_flow_init(0, ux_get_assertion_multiple_flow, NULL);
+        ux_step_count = ctap2AssertData->numberOfCredentials;
+        ux_flow_init(0, ux_get_assertion_multiple_flow, NULL);
 #elif defined(HAVE_NBGL)
-            available_credentials = ctap2AssertData->availableCredentials;
-            // Pre-filling the first selected credential
-            // If the user wants to use another one, it will be changed in `on_user_select_callback`
-            get_assertion_credential_idx(selected_credential);
-            ux_display_user_assertion(g.buffer2_65);
-            PRINTF("GET_ASSERTION: buffer2_65 %s\n", g.buffer2_65);
-            app_nbgl_start_review(NB_OF_PAIRS, pairs, "Log in", on_user_choice, on_user_select);
+        available_credentials = ctap2AssertData->numberOfCredentials;
+        // Pre-filling the first selected credential
+        // If the user wants to use another one, it will be changed in `on_user_select_callback`
+        get_assertion_credential_idx(selected_credential);
+        ux_display_user_assertion(g.buffer2_65);
+        PRINTF("GET_ASSERTION: buffer2_65 %s\n", g.buffer2_65);
+        app_nbgl_start_review(NB_OF_PAIRS, pairs, "Log in", on_user_choice, on_user_select);
 #endif
-            break;
-        }
-        default: {
-            // No credential possible
-#if defined(HAVE_BAGL)
-            ux_flow_init(0, ux_ctap2_no_assertion_flow, NULL);
-#elif defined(HAVE_NBGL)
-            app_nbgl_no_assertion();
-#endif
-            break;
-        }
     }
 }
