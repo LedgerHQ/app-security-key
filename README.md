@@ -1,6 +1,6 @@
-# Ledger App FIDO U2F
+# Ledger App Security Key
 
-Ledger App FIDO U2F for Ledger devices.
+Ledger App Security Key for Ledger devices.
 
 This application implements an U2F Authenticator for Ledger devices. 
 
