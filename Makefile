@@ -1,5 +1,5 @@
 #******************************************************************************
-#   Ledger App FIDO U2F
+#   Ledger App Security Key
 #   (c) 2022 Ledger
 #
 #  Licensed under the Apache License, Version 2.0 (the "License");
@@ -25,7 +25,7 @@ ifneq ($(TARGET_NAME),$(filter $(TARGET_NAME),TARGET_NANOS TARGET_NANOX TARGET_N
 $(error Environment variable TARGET_NAME is not valid or not supported)
 endif
 
-APPNAME = "Fido U2F"
+APPNAME = "Security Key"
 
 APP_LOAD_PARAMS  = --curve secp256r1
 APP_LOAD_PARAMS += --path "5583430'"  # int("U2F".encode("ascii").hex(), 16)
@@ -157,4 +157,4 @@ include $(BOLOS_SDK)/Makefile.rules
 dep/%.d: %.c Makefile
 
 listvariants:
-	@echo VARIANTS NONE fido_u2f
+	@echo VARIANTS NONE SecurityKey

@@ -1,6 +1,6 @@
 /*
 *******************************************************************************
-*   Ledger App FIDO U2F
+*   Ledger App Security Key
 *   (c) 2022 Ledger
 *
 *  Licensed under the Apache License, Version 2.0 (the "License");

@@ -36,13 +36,13 @@ jobs:
         run: |
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
           make BOLOS_SDK=${{ matrix.sdk.path }} ${{ matrix.sdk.build_arg }}
-          cp bin/app.elf bin/u2f_${{ matrix.sdk.name }}.elf
+          cp bin/app.elf bin/securityKey_${{ matrix.sdk.name }}.elf
 
       - name: Upload app binary
         uses: actions/upload-artifact@82c141cc518b40d92cc801eee768e7aafc9c2fa2
         with:
           name: u2f_binaries
-          path: ./bin/u2f_${{ matrix.sdk.name }}.elf
+          path: ./bin/securityKey_${{ matrix.sdk.name }}.elf
           if-no-files-found: error
 
   job_scan_build:
