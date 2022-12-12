@@ -1,4 +1,4 @@
-# Generating U2F attestations for a device
+# Generating U2F and FIDO2 attestations for a device
 
 
 ## CA generation
@@ -23,6 +23,8 @@ They can be accessed from the public repository and should therefore never be us
 You should create an `cnf/<version>/openssl_cert_<model>.cnf` file.
 You can start from a copy of an other model and should update:
 - The `req_distinguished_name` CN field.
+- For FIDO2:
+	- An extension should be added to the certificate using `v3_req` `id-fido-gen-ce-aaguid` OID (`1.3.6.1.4.1.45724.1.1.4`) with set value depending on device `AAGUID` (see `ctap2_aaguid.c` for `AAGUID` generation). See https://www.w3.org/TR/webauthn-2/#sctn-packed-attestation-cert-requirements
 - For U2F:
 	- An extension should be added to the certificate using `v3_req` `id-fido-u2f-ce-transports` OID (`1.3.6.1.4.1.45724.2.1.1`) with set value depending on supported transports. See https://fidoalliance.org/specs/fido-u2f-v1.2-ps-20170411/fido-u2f-authenticator-transports-extension-v1.2-ps-20170411.html#fido-u2f-extensions
 
@@ -32,7 +34,7 @@ You can start from a copy of an other model and should update:
 Then you can run `./createKeyAndCert.sh <env> <version> <model>` to generate the device key and certificate.
 It takes three parameters:
 - `<env>`: an env (`test`, `prod`, ...) that is used when retrieving the CA inputs and generating the outputs.
-- `<version>`: either `U2F`
+- `<version>`: either `U2F` or `FIDO2`
 - `<model>`: device model (`nanos`, `nanosp`, `nanox`, ...)
 
 They will be generated as:

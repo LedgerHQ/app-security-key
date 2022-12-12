@@ -231,7 +231,7 @@ def test_authenticate_length_too_short(client):
     challenge = generate_random_bytes(32)
 
     # Shorten public key
-    key_handle = registration_data.key_handle[:62]
+    key_handle = registration_data.key_handle[:-1]
 
     with pytest.raises(ApduError) as e:
         client.ctap1.authenticate(challenge,

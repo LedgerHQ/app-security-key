@@ -1,0 +1,81 @@
+From c1440016691c73349d391dcbdf6ea80c0aa9192c Mon Sep 17 00:00:00 2001
+From: Xavier Chapron <xavier.chapron@ledger.fr>
+Date: Wed, 6 Jul 2022 17:22:08 +0200
+Subject: [PATCH 1/2] Link tests with Speculos running the FIDO2 application
+
+---
+ tests/conftest.py | 47 +++++++++++++++++++++++++++++++++++++++++++++--
+ 1 file changed, 45 insertions(+), 2 deletions(-)
+
+diff --git a/tests/conftest.py b/tests/conftest.py
+index 761a684..312600a 100644
+--- a/tests/conftest.py
++++ b/tests/conftest.py
+@@ -206,6 +206,43 @@ class MoreRobustPcscDevice(CtapPcscDevice):
+                 except Exception as e:
+                     print(e)
+ 
++
++import socket
++import fido2
++class LedgerSpeculosU2FDevice(fido2._pyu2f.base.HidDevice):
++    """Speculos with HID support"""
++    def __init__(self):
++        self.sock = socket.create_connection(('127.0.0.1', 9999))
++
++    def GetInReportDataLength(self):
++        return 64
++
++    def GetOutReportDataLength(self):
++        return 64
++
++    def Write(self, packet):
++        packet = bytes(packet)
++        print(f"DEBUG > pkt = {packet.hex()}")
++        self.sock.send(struct.pack('>I', len(packet)) + packet)
++
++    def Read(self):
++        resp_size_bytes = b''
++        while len(resp_size_bytes) < 4:
++            new_bytes = self.sock.recv(4 - len(resp_size_bytes))
++            assert new_bytes, "connection closed"
++            resp_size_bytes += new_bytes
++        resp_size = (int.from_bytes(resp_size_bytes, 'big') + 2) & 0xffffffff
++        assert resp_size == 64
++
++        packet = b''
++        while len(packet) < 64:
++            new_bytes = self.sock.recv(64 - len(packet))
++            assert new_bytes, "connection closed"
++            packet += new_bytes
++        print(f"DEBUG < pkt = {packet.hex()}")
++        return packet
++
++
+ class TestDevice:
+     def __init__(self, tester=None):
+         self.origin = "https://examplo.org"
+@@ -230,12 +267,18 @@ class TestDevice:
+     def find_device(self, nfcInterfaceOnly=False):
+         dev = None
+         self.nfc_interface_only = nfcInterfaceOnly
+-        if not nfcInterfaceOnly:
++
++        if self.is_sim:
++            hid_dev = LedgerSpeculosU2FDevice()
++            usbhid_dev = fido2._pyu2f.hidtransport.UsbHidTransport(hid_dev)
++            dev = CtapHidDevice({'path': 'sim'}, usbhid_dev)
++
++        if not dev and not nfcInterfaceOnly:
+             print("--- HID ---")
+             print(list(CtapHidDevice.list_devices()))
+             dev = next(CtapHidDevice.list_devices(), None)
+ 
+-        else:
++        if not dev:
+             from fido2.pcsc import CtapPcscDevice
+ 
+             print("--- NFC ---")
+-- 
+2.25.1
+

@@ -24,6 +24,8 @@
 #include "config.h"
 #include "u2f_process.h"
 #include "ui_shared.h"
+#include "ctap2.h"
+#include "rk_storage.h"
 
 unsigned char G_io_seproxyhal_spi_buffer[IO_SEPROXYHAL_BUFFER_SIZE_B];
 
@@ -49,6 +51,14 @@ unsigned char io_event(unsigned char channel) {
             break;
 
         case SEPROXYHAL_TAG_TICKER_EVENT:
+            if (ctap2UxState == CTAP2_UX_STATE_CANCELLED) {
+                ctap2UxState = CTAP2_UX_STATE_NONE;
+                ux_stack_pop();
+                ux_stack_push();
+                ui_idle();
+            } else if (ctap2UxState != CTAP2_UX_STATE_NONE) {
+                u2f_transport_ctap2_send_keepalive(&G_io_u2f, KEEPALIVE_REASON_TUP_NEEDED);
+            }
             UX_TICKER_EVENT(G_io_seproxyhal_spi_buffer, {});
             break;
 
@@ -66,10 +76,6 @@ unsigned char io_event(unsigned char channel) {
         default:
             UX_DEFAULT_EVENT();
             break;
-    }
-
-    if (!io_seproxyhal_spi_is_status_sent()) {
-        io_seproxyhal_general_status();
     }
 
     // command has been processed, DO NOT reset the current APDU transport
@@ -169,6 +175,9 @@ void app_main(void) {
 
                 // Initialize U2F service
                 config_init();
+                rk_storage_init();
+                ctap2UxState = CTAP2_UX_STATE_NONE;
+                ctap2_client_pin_reset_ctx();
 
                 // request device status (charging/usbpower/etc)
                 io_seproxyhal_request_mcu_status();

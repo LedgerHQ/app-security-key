@@ -9,7 +9,13 @@ env="$1"
 
 if [ -z "$2" ]
   then
-    echo "U2F should be supplied as argument"
+    echo "U2F or FIDO2 should be supplied as argument"
+    exit
+fi
+
+if [ "$2" != "U2F" ] && [ "$2" != "FIDO2" ]
+  then
+    echo "2: U2F or FIDO2 should be supplied as argument"
     exit
 fi
 version=$2

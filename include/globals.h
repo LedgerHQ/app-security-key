@@ -23,23 +23,46 @@
 
 #include "credential.h"
 #include "u2f_process.h"
+#include "ctap2.h"
 
 extern char verifyHash[65];
 extern char verifyName[20];
 
 extern u2f_service_t G_io_u2f;
 
+typedef struct ctap2_data_t {
+    union ctap2_data_u {
+        ctap2_register_data_t ctap2RegisterData;
+        ctap2_assert_data_t ctap2AssertData;
+    } u;
+} ctap2_data_t;
+
 typedef struct shared_ctx_s {
     union shared_ctx_u {
         u2f_data_t u2fData;
+        ctap2_data_t ctap2Data;
     } u;
     uint8_t sharedBuffer[500];
 } shared_ctx_t;
 
 extern shared_ctx_t shared_ctx;
+extern ctap2_ux_state_t ctap2UxState;
+extern ctap2_proxy_t ctap2Proxy;
 
 static inline u2f_data_t *globals_get_u2f_data(void) {
     return &shared_ctx.u.u2fData;
+}
+
+static inline ctap2_data_t *globals_get_ctap2_data(void) {
+    return &shared_ctx.u.ctap2Data;
+}
+
+static inline ctap2_register_data_t *globals_get_ctap2_register_data(void) {
+    return &shared_ctx.u.ctap2Data.u.ctap2RegisterData;
+}
+
+static inline ctap2_assert_data_t *globals_get_ctap2_assert_data(void) {
+    return &shared_ctx.u.ctap2Data.u.ctap2AssertData;
 }
 
 #endif

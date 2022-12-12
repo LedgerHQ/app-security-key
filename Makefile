@@ -28,7 +28,8 @@ endif
 APPNAME = "Security Key"
 
 APP_LOAD_PARAMS  = --curve secp256r1
-APP_LOAD_PARAMS += --path "5583430'"  # int("U2F".encode("ascii").hex(), 16)
+APP_LOAD_PARAMS += --path "5722689'"  # int("WRA".encode("ascii").hex(), 16)
+APP_LOAD_PARAMS += --path "5262163'"  # int("PKS".encode("ascii").hex(), 16)
 APP_LOAD_PARAMS += --appFlags 0x040
 APP_LOAD_PARAMS += $(COMMON_LOAD_PARAMS)
 
@@ -57,14 +58,29 @@ ifneq ($(PROD_U2F_NANOS_PRIVATE_KEY),0)
     DEFINES += PROD_U2F_NANOS_PRIVATE_KEY=${PROD_U2F_NANOS_PRIVATE_KEY}
 endif
 
+PROD_FIDO2_NANOS_PRIVATE_KEY?=0
+ifneq ($(PROD_FIDO2_NANOS_PRIVATE_KEY),0)
+    DEFINES += PROD_FIDO2_NANOS_PRIVATE_KEY=${PROD_FIDO2_NANOS_PRIVATE_KEY}
+endif
+
 PROD_U2F_NANOX_PRIVATE_KEY?=0
 ifneq ($(PROD_U2F_NANOX_PRIVATE_KEY),0)
     DEFINES += PROD_U2F_NANOX_PRIVATE_KEY=${PROD_U2F_NANOX_PRIVATE_KEY}
 endif
 
+PROD_FIDO2_NANOX_PRIVATE_KEY?=0
+ifneq ($(PROD_FIDO2_NANOX_PRIVATE_KEY),0)
+    DEFINES += PROD_FIDO2_NANOX_PRIVATE_KEY=${PROD_FIDO2_NANOX_PRIVATE_KEY}
+endif
+
 PROD_U2F_NANOSP_PRIVATE_KEY?=0
 ifneq ($(PROD_U2F_NANOSP_PRIVATE_KEY),0)
     DEFINES += PROD_U2F_NANOSP_PRIVATE_KEY=${PROD_U2F_NANOSP_PRIVATE_KEY}
+endif
+
+PROD_FIDO2_NANOSP_PRIVATE_KEY?=0
+ifneq ($(PROD_FIDO2_NANOSP_PRIVATE_KEY),0)
+    DEFINES += PROD_FIDO2_NANOSP_PRIVATE_KEY=${PROD_FIDO2_NANOSP_PRIVATE_KEY}
 endif
 
 ############
@@ -77,6 +93,7 @@ DEFINES += HAVE_IO_USB HAVE_L4_USBLIB IO_USB_MAX_ENDPOINTS=6 IO_HID_EP_LENGTH=64
 DEFINES += HAVE_WEBUSB WEBUSB_URL_SIZE_B=0 WEBUSB_URL=""
 
 DEFINES += HAVE_U2F HAVE_IO_U2F
+DEFINES += HAVE_FIDO2
 DEFINES += USB_SEGMENT_SIZE=64
 DEFINES += CUSTOM_IO_APDU_BUFFER_SIZE=1031 # 1024 + 7
 DEFINES += UNUSED\(x\)=\(void\)x
@@ -118,9 +135,15 @@ DEFINES += HAVE_UX_STACK_INIT_KEEP_TICKER
 # This is necessary to never use the counter with a lower value than previous calls.
 DEFINES += HAVE_COUNTER_MARKER
 
-# Used to disable user presence check.
-# This is against U2F standard and should be used only for development purposes.
-#DEFINES += HAVE_NO_USER_PRESENCE_CHECK
+DEFINES += HAVE_FIDO2_RPID_FILTER
+
+ifeq ($(TARGET_NAME),TARGET_NANOS)
+DEFINES += RK_SIZE=2048
+else
+DEFINES += RK_SIZE=6144
+endif
+
+#DEFINES  += HAVE_CBOR_DEBUG
 
 ##############
 # Compiler #
@@ -145,7 +168,7 @@ CFLAGS += -Wno-format-invalid-specifier -Wno-format-extra-args
 include $(BOLOS_SDK)/Makefile.glyphs
 
 # Define directory to build
-APP_SOURCE_PATH  += src
+APP_SOURCE_PATH  += src src-cbor
 SDK_SOURCE_PATH  += lib_stusb lib_ux lib_u2f lib_stusb_impl
 
 load: all

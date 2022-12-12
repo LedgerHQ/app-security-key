@@ -26,6 +26,15 @@
 bool crypto_compare(const uint8_t *a, const uint8_t *b, uint16_t length);
 
 /**
+ * Compute the sha256 of in1 and in2.
+ */
+void crypto_compute_sha256(uint8_t *in1,
+                           uint32_t in1_len,
+                           uint8_t *in2,
+                           uint32_t in2_len,
+                           uint8_t *out);
+
+/**
  * Generate private key for specific curve from nonce.
  */
 int crypto_generate_private_key(const uint8_t *nonce,
@@ -40,6 +49,11 @@ int crypto_generate_public_key(cx_ecfp_private_key_t *private_key,
                                cx_curve_t curve);
 
 /**
+ * Generate credRandom key from nonce.
+ */
+void crypto_generate_credRandom_key(const uint8_t *nonce, uint8_t *credRandom);
+
+/**
  * Sign data_hash with private_key and store it in signature.
  * Return the length of the signature.
  */
@@ -51,6 +65,15 @@ int crypto_sign_application(const uint8_t *data_hash,
  * Sign data_hash with the attestation private key and store it in signature.
  * Return the length of the signature.
  */
-int crypto_sign_attestation(const uint8_t *data_hash, uint8_t *signature);
+int crypto_sign_attestation(const uint8_t *data_hash, uint8_t *signature, bool fido2);
+
+/**
+ * Sign message with private_key and store it in signature.
+ * Return the length of the signature.
+ */
+int crypto_sign_application_eddsa(cx_ecfp_private_key_t *private_key,
+                                  const uint8_t *message,
+                                  uint16_t length,
+                                  uint8_t *signature);
 
 #endif

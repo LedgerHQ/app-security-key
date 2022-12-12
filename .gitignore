@@ -6,6 +6,15 @@ debug/
 dep/
 obj/
 
+# Unit tests
+tests/unit-tests/fuzz_cbip_decode
+tests/unit-tests/fuzz_cbip_helper
+tests/unit-tests/test_aes_ccm
+tests/unit-tests/test_cbip_decode
+tests/unit-tests/test_cbip_encode
+tests/unit-tests/*.d
+tests/unit-tests/*.o
+
 # Editors
 .idea/
 
@@ -23,6 +32,7 @@ doc/latex
 
 # Prod private keys should not be committed
 attestations/data/prod/*/*priv-key.*
+attestations/data/prod/*priv-key.*
 
 tests/elfs/
 tests/speculos/snapshots-tmp/
