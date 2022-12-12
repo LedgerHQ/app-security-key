@@ -19,12 +19,19 @@
 #ifndef __CONFIG_H__
 #define __CONFIG_H__
 
-#define PRIVATE_KEY_PATH 0x80553246  // "U2F".encode("ascii").hex()
+#define WRAPPING_KEY_PATH     0x80575241  // "WRA".encode("ascii").hex()
+#define PRIVATE_KEY_SEED_PATH 0x80504b53  // "PKS".encode("ascii").hex()
 
 typedef struct config_t {
     uint32_t authentificationCounter;
     uint8_t initialized;
-    uint8_t privateHmacKey[64];
+    uint8_t wrappingKeyU2F[32];
+    uint8_t wrappingKeyCTAP2[32];
+    uint8_t privateKeySeed[64];
+    uint32_t resetGeneration;
+    uint8_t pin[16];
+    uint8_t pinSet;
+    uint8_t pinRetries;
 } config_t;
 
 extern config_t const N_u2f_real;
@@ -34,5 +41,10 @@ extern config_t const N_u2f_real;
 void config_init(void);
 
 uint8_t config_increase_and_get_authentification_counter(uint8_t *buffer);
+
+void config_process_ctap2_reset(void);
+void config_set_ctap2_pin(uint8_t *pin);
+void config_decrease_ctap2_pin_retry_counter(void);
+void config_reset_ctap2_pin_retry_counter(void);
 
 #endif

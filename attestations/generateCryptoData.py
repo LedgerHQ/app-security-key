@@ -10,7 +10,7 @@ attestation_cert_prefix = "static const uint8_t {}_{}_{}_ATTESTATION_CERT[] ="
 
 parser = argparse.ArgumentParser()
 parser.add_argument('env', type=str, help='CA, key and cert env')
-parser.add_argument('version', type=str, help='target protocol version', choices=["U2F"])
+parser.add_argument('version', type=str, help='target protocol version', choices=["U2F", "FIDO2"])
 parser.add_argument('model', type=str, help='device model')
 
 args = parser.parse_args()

@@ -16,7 +16,7 @@ jobs:
         uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e
 
       - name: Lint C code
-        run: clang-format --dry-run --Werror include/* src/*
+        run: clang-format --dry-run --Werror include/* src/* src-cbor/*
 
   job_lint_python:
     name: Lint Python code

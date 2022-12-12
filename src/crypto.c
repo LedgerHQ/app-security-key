@@ -24,6 +24,10 @@
 #include "config.h"
 #include "crypto_data.h"
 #include "credential.h"
+#include "ctap2.h"
+
+#define ROLE_PRIVATE_KEY     0
+#define ROLE_CRED_RANDOM_KEY 1
 
 bool crypto_compare(const uint8_t *a, const uint8_t *b, uint16_t length) {
     uint16_t given_length = length;
@@ -43,18 +47,35 @@ bool crypto_compare(const uint8_t *a, const uint8_t *b, uint16_t length) {
     return (status == 0);
 }
 
+void crypto_compute_sha256(const uint8_t *in1,
+                           uint32_t in1_len,
+                           const uint8_t *in2,
+                           uint32_t in2_len,
+                           uint8_t *out) {
+    cx_sha256_t hash;
+
+    cx_sha256_init(&hash);
+    cx_hash(&hash.header, 0, in1, in1_len, NULL, 0);
+    cx_hash(&hash.header, CX_LAST, in2, in2_len, out, CX_SHA256_SIZE);
+}
+
 int crypto_generate_private_key(const uint8_t *nonce,
                                 cx_ecfp_private_key_t *private_key,
                                 cx_curve_t curve) {
     int status = 0;
+    uint8_t extended_nonce[32];
     uint8_t private_key_data[CREDENTIAL_PRIVATE_KEY_SIZE];
 
-    cx_hmac_sha256((const uint8_t *) N_u2f.privateHmacKey,
-                   sizeof(N_u2f.privateHmacKey),
-                   nonce,
-                   CREDENTIAL_NONCE_SIZE,
-                   private_key_data,
-                   CREDENTIAL_PRIVATE_KEY_SIZE);
+    // private = SHA256((0 << 128 | nonce) || privateKeySeed)
+    memset(extended_nonce, 0, sizeof(extended_nonce));
+    extended_nonce[15] = ROLE_PRIVATE_KEY;
+    memcpy(extended_nonce + 16, nonce, CREDENTIAL_NONCE_SIZE);
+    crypto_compute_sha256(extended_nonce,
+                          sizeof(extended_nonce),
+                          (const uint8_t *) N_u2f.privateKeySeed,
+                          sizeof(N_u2f.privateKeySeed),
+                          private_key_data);
+
     if (cx_ecfp_init_private_key_no_throw(curve,
                                           private_key_data,
                                           CREDENTIAL_PRIVATE_KEY_SIZE,
@@ -83,6 +104,20 @@ int crypto_generate_public_key(cx_ecfp_private_key_t *private_key,
     return app_public_key.W_len;
 }
 
+void crypto_generate_credRandom_key(const uint8_t *nonce, uint8_t *credRandom) {
+    uint8_t extended_nonce[32];
+
+    // credRandomKey = SHA256((1 << 128 | nonce) || privateKeySeed)
+    memset(extended_nonce, 0, sizeof(extended_nonce));
+    extended_nonce[15] = ROLE_CRED_RANDOM_KEY;
+    memcpy(extended_nonce + 16, nonce, CREDENTIAL_NONCE_SIZE);
+    crypto_compute_sha256(extended_nonce,
+                          sizeof(extended_nonce),
+                          (const uint8_t *) N_u2f.privateKeySeed,
+                          sizeof(N_u2f.privateKeySeed),
+                          credRandom);
+}
+
 static int crypto_sign(const uint8_t *data_hash,
                        cx_ecfp_private_key_t *private_key,
                        uint8_t *signature) {
@@ -109,21 +144,37 @@ static int crypto_sign(const uint8_t *data_hash,
     return length;
 }
 
+int crypto_sign_application_eddsa(cx_ecfp_private_key_t *private_key,
+                                  const uint8_t *message,
+                                  uint16_t length,
+                                  uint8_t *signature) {
+    size_t size;
+
+    if (cx_eddsa_sign_no_throw(private_key, CX_SHA512, message, length, signature, 72) != CX_OK) {
+        return -1;
+    }
+
+    if (cx_ecdomain_parameters_length(private_key->curve, &size) != CX_OK) {
+        return -1;
+    }
+
+    return 2 * size;
+}
+
 int crypto_sign_application(const uint8_t *data_hash,
                             cx_ecfp_private_key_t *private_key,
                             uint8_t *signature) {
     return crypto_sign(data_hash, private_key, signature);
 }
 
-int crypto_sign_attestation(const uint8_t *data_hash, uint8_t *signature) {
+int crypto_sign_attestation(const uint8_t *data_hash, uint8_t *signature, bool fido2) {
     cx_ecfp_private_key_t attestation_private_key;
 
     if (cx_ecfp_init_private_key_no_throw(CX_CURVE_SECP256R1,
-                                          ATTESTATION_KEY,
+                                          (fido2 ? FIDO2_ATTESTATION_KEY : ATTESTATION_KEY),
                                           32,
                                           &attestation_private_key) != CX_OK) {
         return -1;
     }
-
     return crypto_sign(data_hash, &attestation_private_key, signature);
 }

@@ -1,6 +1,9 @@
+import json
 import os
 import socket
 import struct
+
+from base64 import b64decode
 
 from cryptography.x509 import load_pem_x509_certificate
 from cryptography.hazmat.primitives import serialization
@@ -9,15 +12,18 @@ from pathlib import Path
 
 from fido2.attestation import AttestationVerifier
 from fido2.ctap import CtapError
+from fido2.ctap2.pin import ClientPin
 from fido2.hid import CtapHidDevice, TYPE_INIT, CAPABILITY, CTAPHID
 from fido2.hid.base import CtapHidConnection, HidDescriptor
 
 from ctap1_client import LedgerCtap1
+from ctap2_client import LedgerCtap2
 
 TESTS_SPECULOS_DIR = Path(__file__).absolute().parent
 REPO_ROOT_DIR = TESTS_SPECULOS_DIR.parent.parent
 APP_ELF_PATH = REPO_ROOT_DIR / "bin" / "app.elf"
 
+METADATAS_PATH = REPO_ROOT_DIR / "conformance"
 CA_PATH = REPO_ROOT_DIR / "attestations" / "data"
 TEST_CA_PATH = CA_PATH / "test" / "ca-cert.pem"
 PROD_CA_PATH = CA_PATH / "prod" / "ca-cert.pem"
@@ -30,16 +36,25 @@ class LedgerAttestationVerifier(AttestationVerifier):
         use_prod_ca = os.environ.get("USE_PROD_CA", False)
 
         if use_prod_ca:
+            self.metadata_path = METADATAS_PATH / "prod-{}.json".format(device_model)
             self.ca_path = PROD_CA_PATH
         else:
+            self.metadata_path = METADATAS_PATH / "test-{}.json".format(device_model)
             self.ca_path = TEST_CA_PATH
 
     def ca_lookup(self, result, auth_data):
+        # A real platform normally take CA information from certification metadatas
+        # but we check that the data is the same in attestation ca-cert.pem file
+        with open(self.metadata_path, "r") as f:
+            data = json.load(f)
+        metadata_cert = b64decode(data["attestationRootCertificates"][0])
+
         with open(self.ca_path, "rb") as f:
             root_cert = load_pem_x509_certificate(f.read())
         attestation_cert = root_cert.public_bytes(serialization.Encoding.DER)
 
-        return attestation_cert
+        assert metadata_cert == attestation_cert
+        return metadata_cert
 
 
 class LedgerCtapHidConnection(CtapHidConnection):
@@ -201,7 +216,8 @@ class LedgerCtapHidDevice(CtapHidDevice):
 
 
 class TestClient:
-    def __init__(self, firmware, ragger_backend, navigator, transport, debug=False):
+    def __init__(self, firmware, ragger_backend, navigator, transport,
+                 ctap2_u2f_proxy, debug=False):
         self.firmware = firmware
         self.model = firmware.device
         self.ragger_backend = ragger_backend
@@ -215,6 +231,18 @@ class TestClient:
         if not self.use_U2F_endpoint and not self.use_raw_HID_endpoint:
             assert ValueError("Invalid endpoint")
 
+        # CTAP2 (cbor) messages can be sent using CTAPHID.CBOR command or
+        # they can be encapsulated in an U2F (APDU) message using INS=0x10
+        self.ctap2_u2f_proxy = ctap2_u2f_proxy
+
+        # On USB_HID transport endpoint, only CTAPHID.MSG are supported
+        # and they must be sent without encapsulation, e.g. without the
+        # header containing the channel_id, the command type and the command
+        # length.
+        if self.use_raw_HID_endpoint and not self.ctap2_u2f_proxy:
+            print("Enforce using CTAP2 U2F proxy over raw HID endpoint")
+            self.ctap2_u2f_proxy = True
+
     def start(self):
         try:
             hid_dev = LedgerCtapHidConnection(self.USB_transport,
@@ -225,6 +253,16 @@ class TestClient:
 
             self.ctap1 = LedgerCtap1(self.dev, self.model, self.navigator,
                                      self.debug)
+            try:
+                self.ctap2 = LedgerCtap2(self.dev, self.model, self.navigator,
+                                         self.ctap2_u2f_proxy, self.debug)
+                self.client_pin = ClientPin(self.ctap2)
+            except Exception:
+                # Can occurs if the app is build without FIDO2 features.
+                # Then only U2F tests can be used.
+                print("FIDO2 not supported")
+                self.ctap2 = None
+                self.client_pin = None
 
         except Exception as e:
             raise e

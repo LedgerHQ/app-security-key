@@ -35,6 +35,7 @@
 #include "ui_shared.h"
 #include "globals.h"
 #include "fido_known_apps.h"
+#include "ctap2.h"
 
 #define U2F_VERSION      "U2F_V2"
 #define U2F_VERSION_SIZE (sizeof(U2F_VERSION) - 1)
@@ -206,19 +207,20 @@ static int u2f_prepare_enroll_response(void) {
             explicit_bzero(&private_key, sizeof(private_key));
             goto exit;
         }
-
-        // Generate key handle
-        // This also generate nonce needed for public key generation
-        key_handle_length = credential_wrap(globals_get_u2f_data()->application_param,
-                                            globals_get_u2f_data()->nonce,
-                                            &private_key,
-                                            reg_resp_base->key_handle,
-                                            sizeof(reg_resp_base->key_handle));
-
         explicit_bzero(&private_key, sizeof(private_key));
     }
 
-    // We only support generating key_handle with length of 64 bytes
+    // Generate key handle
+    // This also generate nonce needed for public key generation
+    key_handle_length = credential_wrap(globals_get_u2f_data()->application_param,
+                                        globals_get_u2f_data()->nonce,
+                                        NULL,
+                                        reg_resp_base->key_handle,
+                                        sizeof(reg_resp_base->key_handle),
+                                        false,
+                                        false);
+
+    // We only support generating key_handle with fixed length
     if (key_handle_length == sizeof(reg_resp_base->key_handle)) {
         // Fill key handle length
         reg_resp_base->key_handle_length = key_handle_length;
@@ -233,7 +235,7 @@ static int u2f_prepare_enroll_response(void) {
 
         // Fill signature
         uint8_t *signature = (G_io_apdu_buffer + offset);
-        result = crypto_sign_attestation(data_hash, signature);
+        result = crypto_sign_attestation(data_hash, signature, false);
         if (result > 0) {
             offset += result;
 
@@ -520,11 +522,13 @@ static void u2f_handle_apdu_sign(unsigned char *flags, unsigned short *tx, uint3
     if (credential_unwrap(auth_req_base->application_param,
                           key_handle,
                           auth_req_base->key_handle_length,
-                          &nonce) < 0) {
+                          &nonce,
+                          NULL,
+                          NULL) < 0) {
         return u2f_send_error(SW_WRONG_DATA, tx);
     }
 
-    // If we only check user presence, get rid of the private key and answer immediately
+    // If we only check user presence answer immediately
     if (!sign) {
         return u2f_send_error(SW_CONDITIONS_NOT_SATISFIED, tx);
     }
@@ -571,8 +575,29 @@ static void u2f_handle_apdu_get_version(unsigned char *flags,
     *tx = offset;
 }
 
+static void u2f_handle_apdu_ctap2_proxy(unsigned char *flags,
+                                        unsigned short *tx,
+                                        uint32_t data_length) {
+    if ((G_io_apdu_buffer[OFFSET_P1] != 0) || (G_io_apdu_buffer[OFFSET_P2] != 0)) {
+        return u2f_send_error(SW_INCORRECT_P1P2, tx);
+    }
+
+    ctap2Proxy.uiStarted = false;
+    ctap2Proxy.length = 0;
+    ctap2_handle_cmd_cbor(&G_io_u2f, G_io_apdu_buffer + OFFSET_DATA, data_length);
+    if (ctap2Proxy.uiStarted) {
+        *flags |= IO_ASYNCH_REPLY;
+    }
+    *tx = ctap2Proxy.length;
+}
+
 void handleApdu(unsigned char *flags, unsigned short *tx, unsigned short length) {
     PRINTF("Media handleApdu %d\n", G_io_app.apdu_state);
+
+    // Make sure cmd is detected as over U2F_CMD and not as CMD_IS_OVER_CTAP2_CBOR_CMD
+    if (!CMD_IS_OVER_U2F_CMD) {
+        return u2f_send_error(SW_CONDITIONS_NOT_SATISFIED, tx);
+    }
 
     int data_length = u2f_get_cmd_msg_data_length(G_io_apdu_buffer, length);
     if (data_length < 0) {
@@ -596,6 +621,12 @@ void handleApdu(unsigned char *flags, unsigned short *tx, unsigned short length)
             PRINTF("version\n");
             u2f_handle_apdu_get_version(flags, tx, data_length);
             break;
+
+        case FIDO_INS_CTAP2_PROXY:
+            PRINTF("ctap2_proxy\n");
+            u2f_handle_apdu_ctap2_proxy(flags, tx, data_length);
+            break;
+
         default:
             PRINTF("unsupported\n");
             return u2f_send_error(SW_INS_NOT_SUPPORTED, tx);

@@ -5,19 +5,34 @@ on:
   pull_request:
 
 jobs:
+  unit_test:
+    name: Unit tests
+    runs-on: orange-classic
+
+    steps:
+      - name: Clone
+        uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e
+
+      - name: Install make and clang
+        run: |
+          sudo apt update
+          sudo apt install -y make clang
+
+      - name: Run unit tests
+        run: |
+          make -C tests/unit-tests
+
   app_build:
     name: Build app
     strategy:
       matrix:
-        sdk:
-        - path: $NANOS_SDK
-          name: nanos
-        - path: $NANOX_SDK
-          name: nanox
-        - path: $NANOSP_SDK
-          name: nanosp
-          build_arg: "WERROR=0"
-
+        include:
+          - SDK: "$NANOS_SDK"
+            model: nanos
+          - SDK: "$NANOX_SDK"
+            model: nanox
+          - SDK: "$NANOSP_SDK"
+            model: nanosp
     runs-on: orange-classic
     container:
       image: ghcr.io/ledgerhq/ledger-app-builder/ledger-app-builder-lite:latest
@@ -26,24 +41,17 @@ jobs:
       - name: Clone
         uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e
 
-      - name: Patch SDK
-        run: |
-          git config --global user.email "you@example.com"
-          git config --global user.name "Your Name"
-          git -C ${{ matrix.sdk.path }} am $PWD/sdk-patch/*
-
       - name: Build
         run: |
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
-          make BOLOS_SDK=${{ matrix.sdk.path }} ${{ matrix.sdk.build_arg }}
-          cp bin/app.elf bin/securityKey_${{ matrix.sdk.name }}.elf
+          make BOLOS_SDK=${{ matrix.SDK }}
+          cp bin/app.elf bin/security_key_${{ matrix.model }}.elf
 
       - name: Upload app binary
         uses: actions/upload-artifact@82c141cc518b40d92cc801eee768e7aafc9c2fa2
         with:
-          name: u2f_binaries
-          path: ./bin/securityKey_${{ matrix.sdk.name }}.elf
-          if-no-files-found: error
+          name: apps
+          path: bin/*.elf
 
   job_scan_build:
     name: Clang Static Analyzer

@@ -11,7 +11,7 @@ from client import TestClient
 # This variable is needed for Speculos only
 APPS_DIRECTORY = (Path(__file__).parent.parent / "elfs").resolve()
 
-APP_NAME = "u2f"
+APP_NAME = "security_key"
 
 BACKENDS = ["speculos"]
 
@@ -29,6 +29,7 @@ def pytest_addoption(parser):
     parser.addoption("--golden_run", action="store_true", default=False)
     parser.addoption("--transport", default="U2F")
     parser.addoption("--fast", action="store_true")
+    parser.addoption("--ctap2_u2f_proxy", action="store_true")
 
 
 @pytest.fixture(scope="session")
@@ -49,6 +50,11 @@ def golden_run(pytestconfig):
 @pytest.fixture(scope="session")
 def transport(pytestconfig):
     return pytestconfig.getoption("transport")
+
+
+@pytest.fixture(scope="session")
+def ctap2_u2f_proxy(pytestconfig):
+    return pytestconfig.getoption("ctap2_u2f_proxy")
 
 
 @pytest.fixture
@@ -112,13 +118,13 @@ def create_backend(backend_name: str, firmware: Firmware, display: bool, transpo
         raise ValueError(f"Backend '{backend_name}' is unknown. Valid backends are: {BACKENDS}")
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="module")
 def backend(backend_name, firmware, display, transport):
     with create_backend(backend_name, firmware, display, transport) as b:
         yield b
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="module")
 def navigator(backend, firmware, golden_run):
     if firmware.device.startswith("nano"):
         return NanoNavigator(backend, firmware, golden_run)
@@ -140,8 +146,8 @@ def pytest_configure(config):
     )
 
 
-@pytest.fixture(scope="session")
-def client(firmware, backend, navigator, transport: str):
-    client = TestClient(firmware, backend, navigator, transport)
+@pytest.fixture(scope="module")
+def client(firmware, backend, navigator, transport: str, ctap2_u2f_proxy):
+    client = TestClient(firmware, backend, navigator, transport, ctap2_u2f_proxy)
     client.start()
     return client

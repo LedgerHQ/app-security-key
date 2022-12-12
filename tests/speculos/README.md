@@ -45,12 +45,12 @@ Or you can refer to the section `Available pytest options` to configure the opti
 Given the requirements are installed and the app has been built, just run one of the following commands:
 
 ```
-pytest tests/speculos/ --device nanos
-pytest tests/speculos/ --device nanos --transport HID
+pytest tests/speculos/ --device nanosp
+pytest tests/speculos/ --device nanosp --transport HID
 pytest tests/speculos/ --device nanox
-pytest tests/speculos/ --device display
+pytest tests/speculos/ --device nanosp --display
+pytest tests/speculos/ --device nanosp --ctap2_u2f_proxy
 ```
-
 
 
 ## Available pytest options
@@ -70,4 +70,5 @@ Custom pytest options
     --golden_run              on Speculos, screen comparison functions will save the current screen instead of comparing
     --transport <transport>   run the test above the transport [U2F, HID]. U2F is the default
     --fast                    skip some long tests
+    --ctap2_u2f_proxy         Use U2F proxy for CTAP2 commands
 ```

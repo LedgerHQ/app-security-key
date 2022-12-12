@@ -1,11 +1,34 @@
+import random
 import secrets
+import string
 import struct
 
+from fido2.cose import ES256
 from fido2.utils import sha256
-
+from fido2.webauthn import AttestedCredentialData
 
 FIDO_RP_ID_HASH_1 = bytes.fromhex("000102030405060708090a0b0c0d0e0f"
                                   "101112131415161718191a1b1c1d1e1f")
+
+
+CRED_PARAMS = [
+    ("webctap.myservice.com",
+     bytes.fromhex("000102030405060708090a0b0c0d0e0f"
+                   "101112131415161718191a1b1c1d1e1f"),
+     "My user name"),
+    ("webctap.myservice_1.com",
+     bytes.fromhex("00000000000000000000000000000000"
+                   "00000000000000000000000000000001"),
+     "My user 1 name"),
+    ("webctap.myservice_2.com",
+     bytes.fromhex("00000000000000000000000000000000"
+                   "00000000000000000000000000000002"),
+     "My user 2 name"),
+    ("webctap.myservice_3.com",
+     bytes.fromhex("00000000000000000000000000000000"
+                   "00000000000000000000000000000003"),
+     "My user 3 name")
+]
 
 
 def prepare_apdu(cla=0, ins=0, p1=0, p2=0, data=b""):
@@ -19,6 +42,68 @@ def prepare_apdu(cla=0, ins=0, p1=0, p2=0, data=b""):
 
 def generate_random_bytes(length):
     return secrets.token_bytes(length)
+
+
+def generate_random_string(length):
+    return "".join(random.choice(string.ascii_lowercase) for _ in range(length))
+
+
+def generate_make_credentials_params(ref=None):
+    if ref is None:
+        rp_base = generate_random_string(20)
+        rp_id = "webctap.{}.com".format(rp_base)
+        user_id = generate_random_bytes(64)
+        user_name = None
+    else:
+        rp_id, user_id, user_name = CRED_PARAMS[ref]
+
+    client_data_hash = generate_random_bytes(32)
+    rp = {"id": rp_id}
+    user = {"id": user_id}
+    if user_name:
+        user["name"] = user_name
+    key_params = [{"type": "public-key", "alg": ES256.ALGORITHM}]
+    return client_data_hash, rp, user, key_params
+
+
+def generate_get_assertion_params(client, rp=None, rk=None, uv=None,
+                                  key_params=None, user_accept=True,
+                                  pin=None, ref=None):
+    client_data_hash, _rp, user, _key_params = generate_make_credentials_params(ref=ref)
+    options = None
+
+    if not rp:
+        rp = _rp
+
+    if rk is not None or uv is not None:
+        options = {}
+        if rk is not None:
+            options["rk"] = rk
+        if uv is not None:
+            options["uv"] = uv
+
+    if not key_params:
+        key_params = _key_params
+
+    if pin:
+        token = client.client_pin.get_pin_token(pin)
+        pin_uv_param = client.client_pin.protocol.authenticate(token, client_data_hash)
+        pin_uv_protocol = client.client_pin.protocol.VERSION
+    else:
+        pin_uv_param = None
+        pin_uv_protocol = None
+
+    attestation = client.ctap2.make_credential(client_data_hash,
+                                               rp,
+                                               user,
+                                               key_params,
+                                               options=options,
+                                               user_accept=user_accept,
+                                               pin_uv_param=pin_uv_param,
+                                               pin_uv_protocol=pin_uv_protocol)
+    credential_data = AttestedCredentialData(attestation.auth_data.credential_data)
+
+    return rp, credential_data, user
 
 
 def get_rp_id_hash(rp_id):
@@ -53,12 +138,3 @@ fido_known_app = {
     "demo.yubico.com": "demo.yubico.com",
 }
 fido_known_appid = {get_rp_id_hash(x): y for x, y in fido_known_app.items()}
-
-
-def parse_identifier_screen(app_param, speculos_client):
-    identifier_text = speculos_client.parse_bnnn_paging_screen("Identifier")
-
-    expected = app_param.hex().upper()
-    if identifier_text != expected:
-        raise ValueError("Expecting {} instead of {}".format(
-                         repr(expected), repr(identifier_text)))
