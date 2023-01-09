@@ -1,0 +1,54 @@
+From 1437ff4fc936f91223ee14d092ab39238e5145c3 Mon Sep 17 00:00:00 2001
+From: Xavier Chapron <xavier.chapron@ledger.fr>
+Date: Wed, 22 Jun 2022 10:22:21 +0200
+Subject: [PATCH 1/4] lib_stusb_impl/u2f_impl.c: Fix build warning when
+ building without U2F_PROXY_MAGIC
+
+---
+ lib_stusb_impl/u2f_impl.c | 12 ++++++++++--
+ 1 file changed, 10 insertions(+), 2 deletions(-)
+
+diff --git a/lib_stusb_impl/u2f_impl.c b/lib_stusb_impl/u2f_impl.c
+index 2aa70b9..b4a948f 100644
+--- a/lib_stusb_impl/u2f_impl.c
++++ b/lib_stusb_impl/u2f_impl.c
+@@ -52,6 +52,12 @@
+ 
+ #define SIGN_USER_PRESENCE_MASK 0x01
+ 
++#ifndef U2F_PROXY_MAGIC
++
++static const uint8_t SW_WRONG_LENGTH[] = {0x67, 0x00};
++
++#else // U2F_PROXY_MAGIC
++
+ static const uint8_t SW_BUSY[] = {0x90, 0x01};
+ static const uint8_t SW_PROOF_OF_PRESENCE_REQUIRED[] = {0x69, 0x85};
+ static const uint8_t SW_BAD_KEY_HANDLE[] = {0x6A, 0x80};
+@@ -61,8 +67,6 @@ static const uint8_t SW_UNKNOWN_CLASS[] = {0x6e, 0x00};
+ static const uint8_t SW_WRONG_LENGTH[] = {0x67, 0x00};
+ static const uint8_t SW_INTERNAL[] = {0x6F, 0x00};
+ 
+-#ifdef U2F_PROXY_MAGIC
+-
+ static const uint8_t U2F_VERSION[] = {'U', '2', 'F', '_', 'V', '2', 0x90, 0x00};
+ 
+ // take into account max header (u2f usb)
+@@ -225,10 +229,14 @@ void u2f_handle_cmd_ping(u2f_service_t *service, uint8_t *buffer,
+ void u2f_handle_cmd_msg(u2f_service_t *service, uint8_t *buffer,
+                         uint16_t length) {
+     // screen_printf("U2F msg\n");
++
++#ifdef U2F_PROXY_MAGIC
+     uint8_t cla = buffer[0];
+     uint8_t ins = buffer[1];
+     uint8_t p1 = buffer[2];
+     uint8_t p2 = buffer[3];
++#endif // U2F_PROXY_MAGIC
++
+     // in extended length buffer[4] must be 0
+     uint32_t dataLength = /*(buffer[4] << 16) |*/ (buffer[5] << 8) | (buffer[6]);
+     if (dataLength == (uint16_t)(length - 9) || dataLength == (uint16_t)(length - 7)) {
+-- 
+2.25.1
+

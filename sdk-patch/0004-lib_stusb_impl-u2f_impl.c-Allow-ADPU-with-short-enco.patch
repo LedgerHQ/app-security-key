@@ -1,0 +1,35 @@
+From 9b1c81f43e6a2b996eb311d60ae1674a933271ac Mon Sep 17 00:00:00 2001
+From: Xavier Chapron <xavier.chapron@ledger.fr>
+Date: Mon, 8 Aug 2022 15:46:15 +0200
+Subject: [PATCH 4/4] lib_stusb_impl: u2f_impl.c: Allow ADPU with short
+ encoding when APDU length is 5bytes
+
+---
+ lib_stusb_impl/u2f_impl.c | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
+
+diff --git a/lib_stusb_impl/u2f_impl.c b/lib_stusb_impl/u2f_impl.c
+index b2257d9..cb44e89 100644
+--- a/lib_stusb_impl/u2f_impl.c
++++ b/lib_stusb_impl/u2f_impl.c
+@@ -250,6 +250,17 @@ int u2f_get_cmd_msg_data_length(const uint8_t *buffer, uint16_t length) {
+         return 0;
+     }
+ 
++    if (length == APDU_MIN_HEADER + 1) {
++        // Short encoding, with next byte either Le or Lc with the other one omitted
++        // There is no way to tell so no way to check the value
++        // but anyway the data length is 0
++
++        // Support this particular short encoding APDU as Fido Conformance Tool v1.7.0
++        // is using it even though spec requires that short encoding should not be used
++        // over HID.
++        return 0;
++    }
++
+     if (length < APDU_MIN_HEADER + 3) {
+         // Short encoding or bad length
+         // We don't support short encoding
+-- 
+2.25.1
+
