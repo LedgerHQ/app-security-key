@@ -38,9 +38,9 @@ APPVERSION_P=10
 APPVERSION=$(APPVERSION_M).$(APPVERSION_N).$(APPVERSION_P)
 
 ifeq ($(TARGET_NAME),TARGET_NANOS)
-ICONNAME=icons/icon_id_nanos.gif
+ICONNAME=icons/icon_security_key_nanos.gif
 else
-ICONNAME=icons/icon_id.gif
+ICONNAME=icons/icon_security_key.gif
 endif
 
 ################
