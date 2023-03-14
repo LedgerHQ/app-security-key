@@ -68,7 +68,7 @@
 #define TAG_COSE_X     -2
 #define TAG_COSE_Y     -3
 #define COSE_ALG_ES256 -7
-// Assigment should be complete
+// Assignment should be complete
 // https://tools.ietf.org/html/draft-ietf-cose-webauthn-algorithms-06
 #define COSE_ALG_ES256K           -47
 #define COSE_CURVE_P256K          8
