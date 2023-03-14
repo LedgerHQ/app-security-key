@@ -21,7 +21,7 @@ endif
 include $(BOLOS_SDK)/Makefile.defines
 
 $(info TARGET_NAME=$(TARGET_NAME))
-ifneq ($(TARGET_NAME),$(filter $(TARGET_NAME),TARGET_NANOS TARGET_NANOX TARGET_NANOS2))
+ifneq ($(TARGET_NAME),$(filter $(TARGET_NAME),TARGET_NANOX TARGET_NANOS2))
 $(error Environment variable TARGET_NAME is not valid or not supported)
 endif
 
@@ -38,11 +38,7 @@ APPVERSION_N=1
 APPVERSION_P=0
 APPVERSION=$(APPVERSION_M).$(APPVERSION_N).$(APPVERSION_P)
 
-ifeq ($(TARGET_NAME),TARGET_NANOS)
-ICONNAME=icons/icon_security_key_nanos.gif
-else
 ICONNAME=icons/icon_security_key.gif
-endif
 
 ################
 # Default rule #
@@ -137,11 +133,7 @@ DEFINES += HAVE_COUNTER_MARKER
 
 DEFINES += HAVE_FIDO2_RPID_FILTER
 
-ifeq ($(TARGET_NAME),TARGET_NANOS)
-DEFINES += RK_SIZE=2048
-else
 DEFINES += RK_SIZE=6144
-endif
 
 #DEFINES  += HAVE_CBOR_DEBUG
 
