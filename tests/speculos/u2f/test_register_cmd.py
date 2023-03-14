@@ -173,6 +173,7 @@ def test_register_raw(client):
                                   data=data)
 
     response = client.ctap1.device.recv(CTAPHID.MSG)
+    client.ctap1.wait_for_return_on_dashboard()
     response = client.ctap1.parse_response(response)
 
     registration_data = RegistrationData(response)

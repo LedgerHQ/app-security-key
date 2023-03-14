@@ -340,6 +340,7 @@ def test_authenticate_raw(client):
                                           p1=p1, data=data)
 
             response = client.ctap1.device.recv(CTAPHID.MSG)
+            client.ctap1.wait_for_return_on_dashboard()
             response = client.ctap1.parse_response(response)
 
             authentication_data = SignatureData(response)
