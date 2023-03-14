@@ -1,10 +1,7 @@
 # Compilation of Ledger's app
-src/glyphs.c
-src/glyphs.h
 bin/
 debug/
-dep/
-obj/
+build
 
 # Unit tests
 tests/unit-tests/fuzz_cbip_decode
@@ -34,5 +31,4 @@ doc/latex
 attestations/data/prod/*/*priv-key.*
 attestations/data/prod/*priv-key.*
 
-tests/elfs/
 tests/speculos/snapshots-tmp/
