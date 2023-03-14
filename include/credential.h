@@ -54,7 +54,7 @@
  *   so that the key can be used without allowList.
  *   Therefore, many fields can be optimized out when the encodedCredential will be send to
  *   the platform and is associated to a resident key as the resident storage already
- *   contains theses information.
+ *   contains these information.
  *
  *   In brief:
  *   - when the key is not resident, the fullCredentials is sent to the platform.

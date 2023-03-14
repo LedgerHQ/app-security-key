@@ -82,3 +82,24 @@ uint8_t const AAGUID[16] = {0x58,
                             0x13,
                             0x52};
 #endif
+
+#if defined(TARGET_STAX)
+
+// sha256 "Ledger FIDO 2 1.0 Stax"
+uint8_t const AAGUID[16] = {0x6e,
+                            0x24,
+                            0xd3,
+                            0x85,
+                            0x00,
+                            0x4a,
+                            0x16,
+                            0xa0,
+                            0x7b,
+                            0xfe,
+                            0xef,
+                            0xd9,
+                            0x63,
+                            0x84,
+                            0x5b,
+                            0x34};
+#endif

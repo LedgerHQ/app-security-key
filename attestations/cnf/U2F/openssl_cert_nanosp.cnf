@@ -6,7 +6,7 @@ prompt = no
 C = FR 
 O = Ledger 
 OU = Authenticator Attestation
-CN = Ledger Nano-SP U2F Attestation Batch 1
+CN = Ledger Nano-SP FIDO 1 Attestation Batch 1
 
 [v3_req]
 1.3.6.1.4.1.45724.2.1.1=DER:03:02:05:20 # USB

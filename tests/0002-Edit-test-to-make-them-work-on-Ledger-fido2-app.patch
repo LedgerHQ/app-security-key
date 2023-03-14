@@ -197,7 +197,7 @@ index fd9dbe1..5637953 100644
  
 +    @pytest.mark.skipif(
 +        "ledger" in sys.argv,
-+        reason="To big message leading to catched overflow, anyway won't work as is because of get_next_assertion() and number_of_credentials",
++        reason="To big message leading to caught overflow, anyway won't work as is because of get_next_assertion() and number_of_credentials",
 +    )
      def test_get_assertion_allow_list_filtering_and_buffering(self, device):
          """ Check that authenticator filters and stores items in allow list correctly """

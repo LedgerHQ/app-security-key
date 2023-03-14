@@ -2,7 +2,7 @@ import pytest
 import sys
 import time
 
-from ragger.navigator import NavInsID, NavIns
+from ragger.navigator import NavInsID
 
 from client import TESTS_SPECULOS_DIR
 from utils import generate_random_bytes, fido_known_appid
@@ -15,9 +15,9 @@ def test_u2f_screens_idle(client, test_name):
 
     instructions = []
     # Screen 0 -> 1
-    instructions.append(NavIns(NavInsID.RIGHT_CLICK))
+    instructions.append(NavInsID.RIGHT_CLICK)
     # Screen 1 -> 2
-    instructions.append(NavIns(NavInsID.RIGHT_CLICK))
+    instructions.append(NavInsID.RIGHT_CLICK)
 
     client.navigator.navigate_and_compare(TESTS_SPECULOS_DIR, test_name, instructions,
                                           screen_change_before_first_instruction=False)
