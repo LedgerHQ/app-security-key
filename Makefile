@@ -21,7 +21,7 @@ endif
 include $(BOLOS_SDK)/Makefile.defines
 
 $(info TARGET_NAME=$(TARGET_NAME))
-ifneq ($(TARGET_NAME),$(filter $(TARGET_NAME),TARGET_NANOS TARGET_NANOX TARGET_NANOS2))
+ifneq ($(TARGET_NAME),$(filter $(TARGET_NAME),TARGET_NANOX TARGET_NANOS2))
 $(error Environment variable TARGET_NAME is not valid or not supported)
 endif
 
@@ -33,16 +33,12 @@ APP_LOAD_PARAMS += --path "5262163'"  # int("PKS".encode("ascii").hex(), 16)
 APP_LOAD_PARAMS += --appFlags 0x040
 APP_LOAD_PARAMS += $(COMMON_LOAD_PARAMS)
 
-APPVERSION_M=0
-APPVERSION_N=1
-APPVERSION_P=0
+APPVERSION_M=1
+APPVERSION_N=0
+APPVERSION_P=1
 APPVERSION=$(APPVERSION_M).$(APPVERSION_N).$(APPVERSION_P)
 
-ifeq ($(TARGET_NAME),TARGET_NANOS)
-ICONNAME=icons/icon_security_key_nanos.gif
-else
 ICONNAME=icons/icon_security_key.gif
-endif
 
 ################
 # Default rule #
@@ -81,6 +77,16 @@ endif
 PROD_FIDO2_NANOSP_PRIVATE_KEY?=0
 ifneq ($(PROD_FIDO2_NANOSP_PRIVATE_KEY),0)
     DEFINES += PROD_FIDO2_NANOSP_PRIVATE_KEY=${PROD_FIDO2_NANOSP_PRIVATE_KEY}
+endif
+
+PROD_U2F_STAX_PRIVATE_KEY?=0
+ifneq ($(PROD_U2F_STAX_PRIVATE_KEY),0)
+    DEFINES += PROD_U2F_STAX_PRIVATE_KEY=${PROD_U2F_STAX_PRIVATE_KEY}
+endif
+
+PROD_FIDO2_STAX_PRIVATE_KEY?=0
+ifneq ($(PROD_FIDO2_STAX_PRIVATE_KEY),0)
+    DEFINES += PROD_FIDO2_STAX_PRIVATE_KEY=${PROD_FIDO2_STAX_PRIVATE_KEY}
 endif
 
 ############
@@ -133,15 +139,14 @@ DEFINES += HAVE_UX_STACK_INIT_KEEP_TICKER
 # Used to initialize app counter to current timestamp directly in the app bin code
 # when the app is streamed from the HSM.
 # This is necessary to never use the counter with a lower value than previous calls.
+# This means that the app APDU will be patched when streamed from the HSM and therefore
+# the apdu should not contain a crc.
 DEFINES += HAVE_COUNTER_MARKER
+APP_LOAD_PARAMS += --nocrc
 
 DEFINES += HAVE_FIDO2_RPID_FILTER
 
-ifeq ($(TARGET_NAME),TARGET_NANOS)
-DEFINES += RK_SIZE=2048
-else
 DEFINES += RK_SIZE=6144
-endif
 
 #DEFINES  += HAVE_CBOR_DEBUG
 

@@ -1,0 +1,28 @@
+name: Unit testing with Codecov coverage checking
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - master
+      - main
+      - develop
+  pull_request:
+
+jobs:
+  job_unit_test:
+    name: Unit test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Clone
+        uses: actions/checkout@v3
+
+      - name: Install make and clang
+        run: |
+          sudo apt update
+          sudo apt install -y make clang
+
+      - name: Run unit tests
+        run: |
+          make -C tests/unit-tests

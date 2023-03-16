@@ -51,3 +51,14 @@ See dedicated `README.md` in tests `directory`.
 ## Known limitations
 
 On Linux and Mac, Firefox support only U2F but not CTAP2, see [corresponding tracker](https://bugzilla.mozilla.org/show_bug.cgi?id=1530370).
+
+Due to OS constraints, this Security Key App as some limitations:
+
+* It is not available on the Nano S due to the lack of support of AES-SIV on Nano S OS.
+* Discoverable / Resident credentials are supported but are stored on a part of the device flash that will be wiped upon app deletion, which can happen:
+  - If the user chooses to uninstall it from Ledger Live
+  - If the user chooses to update the app to a new available version
+  - If the user updates the OS version
+* Following FIDO2 spec, credentials can be revoked, but the revocation mechanism is based on a counter that - as discoverable credentials - will be wiped upon app deletion.
+
+Please look at the dedicated section at the end of [this blog post](https://blog.ledger.com/security-key/) for more detailed explanations.

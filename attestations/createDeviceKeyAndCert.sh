@@ -41,12 +41,6 @@ if [ ! -f $cnf_file ]
     exit
 fi
 
-if [ -f $key_file ]
-  then
-    echo "File <$key_file> already exist!"
-    exit
-fi
-
 if [ -f $cert_file ]
   then
     echo "File <$cert_file> already exist!"
@@ -57,7 +51,12 @@ fi
 mkdir -p $dir_path
 
 # Generate private key
-openssl ecparam -out $key_file -name prime256v1 -genkey
+if [ -f $key_file ]
+  then
+    echo "File <$key_file> already exist, using it."
+  else
+    openssl ecparam -out $key_file -name prime256v1 -genkey
+fi
 
 # Generate associated certificate
 openssl req -new -key $key_file -config $cnf_file |

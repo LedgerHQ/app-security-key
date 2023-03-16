@@ -18,12 +18,6 @@ if [ ! -f $cnf_file ]
     exit
 fi
 
-if [ -f $ca_key_file ]
-  then
-    echo "File <$ca_key_file> already exist!"
-    exit
-fi
-
 if [ -f $ca_cert_file ]
   then
     echo "File <$ca_cert_file> already exist!"
@@ -33,8 +27,13 @@ fi
 # Create dir if not present
 mkdir -p $dir_ca_path
 
-# Generate private key
-openssl ecparam -out $ca_key_file -name prime256v1 -genkey
+# Generate private key if necessary
+if [ -f $ca_key_file ]
+  then
+    echo "File <$ca_key_file> already exist, using it."
+  else
+    openssl ecparam -out $ca_key_file -name prime256v1 -genkey
+fi
 
 # Generate random file if missing
 openssl rand -writerand .rnd
