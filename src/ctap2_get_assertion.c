@@ -779,9 +779,9 @@ static int sign_and_build_getAssert_authData(uint8_t *authData,
             credentialLength = status;
         } else {
             // No allow list scenario, which mean the credential is already resident
-            credential_data_t credData;
+            credential_data_t tmpCredData;
 
-            status = credential_decode(&credData,
+            status = credential_decode(&tmpCredData,
                                        ctap2AssertData->credential,
                                        ctap2AssertData->credentialLen,
                                        false);
@@ -794,7 +794,7 @@ static int sign_and_build_getAssert_authData(uint8_t *authData,
             credentialLength = bufferLen - WRAPPED_CREDENTIAL_OFFSET;
             status = credential_wrap(ctap2AssertData->rpIdHash,
                                      ctap2AssertData->nonce,
-                                     &credData,
+                                     &tmpCredData,
                                      credential,
                                      credentialLength,
                                      true,
