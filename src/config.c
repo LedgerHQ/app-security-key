@@ -25,8 +25,6 @@
 #include "rk_storage.h"
 #include "crypto.h"
 
-#define RNG_MODULO 5
-
 config_t const N_u2f_real;
 
 static void derive_and_store_keys(uint32_t resetGeneration) {

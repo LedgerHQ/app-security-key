@@ -37,11 +37,11 @@ class LedgerCtap2(Ctap2):
 
     def confirm(self):
         instructions = [NavInsID.BOTH_CLICK]
-        self.navigator.navigate(instructions)
+        self.navigator.navigate(instructions,
+                                screen_change_after_last_instruction=False)
 
     def wait_for_return_on_dashboard(self):
-        self.navigator._backend.wait_for_screen_change()
-        # TODO check home screen displayed
+        self.navigator._backend.wait_for_home_screen()
 
     def send_cbor_nowait(self, cmd, data=None, *, event=None, on_keepalive=None):
         request = struct.pack(">B", cmd)
@@ -192,9 +192,8 @@ class LedgerCtap2(Ctap2):
             self.navigator.navigate_and_compare(root, test_name, instructions,
                                                 screen_change_after_last_instruction=False)
         elif instructions:
-            for instruction in instructions:
-                self.navigator._backend.wait_for_screen_change()
-                self.navigator.navigate([instruction])
+            self.navigator.navigate(instructions,
+                                    screen_change_after_last_instruction=False)
 
         if check_cancel:
             # Send a cancel command
@@ -346,9 +345,8 @@ class LedgerCtap2(Ctap2):
             self.navigator.navigate_and_compare(root, test_name, instructions,
                                                 screen_change_after_last_instruction=False)
         elif instructions:
-            for instruction in instructions:
-                self.navigator._backend.wait_for_screen_change()
-                self.navigator.navigate([instruction])
+            self.navigator.navigate(instructions,
+                                    screen_change_after_last_instruction=False)
 
         if check_cancel:
             # Send a cancel command
@@ -503,9 +501,8 @@ class LedgerCtap2(Ctap2):
             self.navigator.navigate_and_compare(root, test_name, instructions,
                                                 screen_change_after_last_instruction=False)
         elif instructions:
-            for instruction in instructions:
-                self.navigator._backend.wait_for_screen_change()
-                self.navigator.navigate([instruction])
+            self.navigator.navigate(instructions,
+                                    screen_change_after_last_instruction=False)
 
         if check_cancel:
             # Send a cancel command
