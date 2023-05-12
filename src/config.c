@@ -104,14 +104,16 @@ uint8_t config_increase_and_get_authentification_counter(uint8_t *buffer) {
 }
 
 void config_process_ctap2_reset(void) {
+#ifndef HAVE_NO_RESET_GENERATION_INCREMENT
     uint32_t resetGeneration = N_u2f.resetGeneration + 1;
-    uint8_t pinSet = 0;
 
     nvm_write((void *) &N_u2f.resetGeneration, (void *) &resetGeneration, sizeof(uint32_t));
 
     // Update keys derived from seed
     derive_and_store_keys(N_u2f.resetGeneration);
+#endif
 
+    uint8_t pinSet = 0;
     nvm_write((void *) &N_u2f.pinSet, (void *) &pinSet, sizeof(uint8_t));
 
     ctap2_client_pin_reset_ctx();

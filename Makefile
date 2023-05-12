@@ -144,6 +144,14 @@ DEFINES += HAVE_UX_STACK_INIT_KEEP_TICKER
 DEFINES += HAVE_COUNTER_MARKER
 APP_LOAD_PARAMS += --nocrc
 
+# Disable resetGeneration increment during ctap2 reset
+# This means credentials that are not discoverable won't be properly
+# revocated anymore. Now not that due to the fact this resetGeneration
+# counter was in NVM, it was reset to 0 after each app reinstallation (due
+# to an app update, a firmware update, or just a user triggered uninstall
+# then reinstall flow), and this reset was causing even more issues
+DEFINES += HAVE_NO_RESET_GENERATION_INCREMENT
+
 DEFINES += HAVE_FIDO2_RPID_FILTER
 
 DEFINES += RK_SIZE=6144
