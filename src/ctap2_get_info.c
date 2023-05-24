@@ -73,7 +73,11 @@ void ctap2_get_info_handle(u2f_service_t *service, uint8_t *buffer, uint16_t len
     cbip_add_int(&encoder, TAG_OPTIONS);
     cbip_add_map_header(&encoder, 4);
     cbip_add_string(&encoder, OPTION_RESIDENT_KEY, sizeof(OPTION_RESIDENT_KEY) - 1);
+#ifdef HAVE_RK_SUPPORT_SETTING
+    cbip_add_boolean(&encoder, config_get_rk_enabled());
+#else
     cbip_add_boolean(&encoder, true);
+#endif
     cbip_add_string(&encoder, OPTION_USER_PRESENCE, sizeof(OPTION_USER_PRESENCE) - 1);
     cbip_add_boolean(&encoder, true);
     cbip_add_string(&encoder, OPTION_USER_VERIFICATION, sizeof(OPTION_USER_VERIFICATION) - 1);

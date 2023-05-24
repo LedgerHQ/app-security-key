@@ -152,6 +152,15 @@ APP_LOAD_PARAMS += --nocrc
 # then reinstall flow), and this reset was causing even more issues
 DEFINES += HAVE_NO_RESET_GENERATION_INCREMENT
 
+# Disable by default rk support and expose a setting to enable it
+# This means that by default user won't be able to create "Resident Keys",
+# which are also named "Discoverable Credentials".
+# This has been implemented to protect user from the nvram wipe mostly happening
+# during an app update which will erase their RK credentials we no possibility
+# to restore them.
+# Advanced user can still choose to enable this setting at their own risk.
+DEFINES += HAVE_RK_SUPPORT_SETTING
+
 DEFINES += HAVE_FIDO2_RPID_FILTER
 
 DEFINES += RK_SIZE=6144

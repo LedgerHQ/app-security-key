@@ -9,6 +9,7 @@ from fido2.webauthn import AttestedCredentialData
 
 # Application build configuration
 HAVE_NO_RESET_GENERATION_INCREMENT = True
+HAVE_RK_SUPPORT_SETTING = True
 
 
 FIDO_RP_ID_HASH_1 = bytes.fromhex("000102030405060708090a0b0c0d0e0f"
