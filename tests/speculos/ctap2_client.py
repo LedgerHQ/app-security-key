@@ -141,21 +141,16 @@ class LedgerCtap2(Ctap2):
         ctap_hid_cmd = self.send_cbor_nowait(cmd, data, event=event,
                                              on_keepalive=on_keepalive)
 
+        rk = False
+        if options and options.get("rk", False):
+            rk = True
+
         instructions = []
-        if user_accept and check_screens is None:
-            # Validate blindly
-            instructions.append(NavInsID.BOTH_CLICK)
-
-        elif user_accept is not None:
-            # check_screens == None only supported when user accept
-            assert check_screens in ["full", "fast"]
-
-            if options and options.get("rk", False):
+        if user_accept is not None:
+            if rk:
                 # Check resident key extra step 0bis content
                 # Screen 0 -> 0bis
-                warning = "This credential will be lost on application reset"
-                nb = get_message_nb_screen(self.model, warning)
-                instructions += [NavInsID.RIGHT_CLICK] * nb
+                instructions.append(NavInsID.RIGHT_CLICK)
 
             # Screen 0 -> 1
             instructions.append(NavInsID.RIGHT_CLICK)
@@ -166,15 +161,13 @@ class LedgerCtap2(Ctap2):
             # Screen 2 -> 3
             instructions += self.get_user_screen_instructions(user)
 
-            if check_screens == "full":
-                # Screen 3 -> 0
-                instructions.append(NavInsID.RIGHT_CLICK)
+            if rk:
+                if user_accept:
+                    # Screen 3 -> 4
+                    instructions.append(NavInsID.RIGHT_CLICK)
 
-                # Screen 0 -> 3
-                instructions.append(NavInsID.LEFT_CLICK)
-
-            if user_accept:
-                # Screen 3 -> 0
+            elif not user_accept:
+                # Screen 3 -> 4
                 instructions.append(NavInsID.RIGHT_CLICK)
 
             # Validate
@@ -233,18 +226,11 @@ class LedgerCtap2(Ctap2):
                                              on_keepalive=on_keepalive)
 
         instructions = []
-        if user_accept and check_screens is None:
-            if login_type == "multi":
-                # Go to confirm step
-                instructions += [NavInsID.LEFT_CLICK] * 2
-
+        if user_accept and check_screens is None and login_type not in ["none", "multi"]:
             # Validate blindly
             instructions.append(NavInsID.BOTH_CLICK)
 
         elif user_accept is not None:
-            # check_screens == None only supported when user accept
-            assert check_screens in ["full", "fast"]
-
             if login_type == "none":
                 # Screen 0 -> 1
                 instructions.append(NavInsID.RIGHT_CLICK)
@@ -268,23 +254,6 @@ class LedgerCtap2(Ctap2):
                 for user in check_users:
                     # Screen 2 -> 3
                     instructions += self.get_user_screen_instructions(user)
-
-                    if check_screens == "full":
-                        # Screen 3 -> 4
-                        instructions.append(NavInsID.RIGHT_CLICK)
-
-                        # Screen 4 -> 5
-                        instructions.append(NavInsID.RIGHT_CLICK)
-
-                        # Screen 5 -> 0
-                        instructions.append(NavInsID.RIGHT_CLICK)
-
-                        # Screen 0 -> 5
-                        instructions.append(NavInsID.LEFT_CLICK)
-
-                        # Go back to "Next User" (5 -> 4 -> 3) screen
-                        instructions.append(NavInsID.LEFT_CLICK)
-                        instructions.append(NavInsID.LEFT_CLICK)
 
                     # Validate
                     instructions.append(NavInsID.BOTH_CLICK)
@@ -319,15 +288,8 @@ class LedgerCtap2(Ctap2):
                 # Screen 2 -> 3
                 instructions += self.get_user_screen_instructions(check_users[0])
 
-                if check_screens == "full":
-                    # Screen 3 -> 0
-                    instructions.append(NavInsID.RIGHT_CLICK)
-
-                    # Screen 0 -> 3
-                    instructions.append(NavInsID.LEFT_CLICK)
-
-                if user_accept:
-                    # Screen 3 -> 0
+                if not user_accept:
+                    # Screen 3 -> 4
                     instructions.append(NavInsID.RIGHT_CLICK)
 
                 # Validate
@@ -412,12 +374,12 @@ class LedgerCtap2(Ctap2):
             instructions += self.get_user_screen_instructions(check_users[0])
 
             if login_type == "multi":
-                # Go to "Confirm" screen
+                # Skip "Next user" screen
                 # Screen 3 -> 4
                 instructions.append(NavInsID.RIGHT_CLICK)
 
-            if not user_accept:
-                # Go to "Reject" screen
+            if user_accept:
+                # Go to "Accept" screen
                 instructions.append(NavInsID.RIGHT_CLICK)
 
             # Validate
@@ -466,29 +428,7 @@ class LedgerCtap2(Ctap2):
             # check_screens == None only supported when user accept
             assert check_screens in ["full", "fast"]
 
-            # Screen 0 -> 1
-            instructions.append(NavInsID.RIGHT_CLICK)
-
-            # Screen 1 -> 2
-            warning = "All credentials will be invalidated"
-            nb = get_message_nb_screen(self.model, warning)
-            instructions += [NavInsID.RIGHT_CLICK] * nb
-
-            # Screen 2 -> 3
-            instructions.append(NavInsID.RIGHT_CLICK)
-
-            # Screen 3 -> 0
-            instructions.append(NavInsID.RIGHT_CLICK)
-
-            # Screen 0 -> 3
-            instructions.append(NavInsID.LEFT_CLICK)
-
-            if validate_step == 0:
-                # Screen 3 -> 0
-                instructions.append(NavInsID.RIGHT_CLICK)
-            elif validate_step == 2:
-                # Screen 3 -> 2
-                instructions.append(NavInsID.LEFT_CLICK)
+            instructions += [NavInsID.RIGHT_CLICK] * validate_step
 
             # Confirm
             instructions.append(NavInsID.BOTH_CLICK)

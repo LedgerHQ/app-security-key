@@ -176,10 +176,14 @@ def test_option_rk_get_assertion(client, test_name):
 
     client_data_hash = generate_random_bytes(32)
     with pytest.raises(CtapError) as e:
-        client.ctap2.get_assertion(rp["id"], client_data_hash)
+        client.ctap2.get_assertion(rp["id"], client_data_hash, login_type="none")
     assert e.value.code == CtapError.ERR.NO_CREDENTIALS
 
 
+@pytest.mark.skipif(
+    "--fast" in sys.argv,
+    reason="running in fast mode",
+)
 def test_option_rk_key_store_full(client):
     enable_rk_option(client)
 
