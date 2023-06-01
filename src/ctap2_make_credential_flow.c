@@ -52,32 +52,28 @@ static void ctap2_ux_display_user(void) {
     }
 }
 
-UX_STEP_CB(ux_ctap2_make_cred_flow_0_step,
-           pbb,
-           ctap2_make_credential_confirm(),
-           {
-               &C_icon_validate_14,
-               "Register",
-               "FIDO 2",
-           });
-
-UX_STEP_CB(ux_ctap2_make_cred_resident_flow_0_step,
-           pbb,
-           ctap2_make_credential_confirm(),
-           {
-               &C_icon_validate_14,
-               "Register local",
-               "FIDO 2",
-           });
-
-UX_STEP_NOCB(ux_ctap2_make_cred_resident_flow_0b_step,
-             bnnn_paging,
+UX_STEP_NOCB(ux_ctap2_make_cred_flow_first_step,
+             pnn,
              {
-                 .title = "Warning",
-                 .text = "This credential will be lost on application reset",
+                 &C_icon_security_key,
+                 "Register new",
+                 "credential",
              });
 
-UX_STEP_NOCB_INIT(ux_ctap2_make_cred_flow_1_step,
+UX_STEP_NOCB(ux_ctap2_make_cred_resident_flow_first_step,
+             pbn,
+             {
+                 &C_icon_warning,
+                 "Warning",
+                 "Resident key",
+             });
+
+UX_STEP_NOCB(
+    ux_ctap2_make_cred_resident_flow_warning_step,
+    nnnn,
+    {"You are about to", "register a credential", "that will be lost upon", "app or OS update."});
+
+UX_STEP_NOCB_INIT(ux_ctap2_make_cred_flow_domain_step,
                   bnnn_paging,
                   ctap2_ux_display_rp(),
                   {
@@ -85,36 +81,53 @@ UX_STEP_NOCB_INIT(ux_ctap2_make_cred_flow_1_step,
                       .text = (char *) verifyHash,
                   });
 
-UX_STEP_NOCB_INIT(ux_ctap2_make_cred_flow_2_step,
+UX_STEP_NOCB_INIT(ux_ctap2_make_cred_flow_user_step,
                   bnnn_paging,
                   ctap2_ux_display_user(),
                   {
                       .title = "User",
                       .text = (char *) verifyHash,
                   });
-UX_STEP_CB(ux_ctap2_make_cred_flow_3_step,
-           pbb,
+
+UX_STEP_CB(ux_ctap2_make_cred_flow_accept_step,
+           pb,
+           ctap2_make_credential_confirm(),
+           {
+               &C_icon_validate_14,
+               "Register",
+           });
+
+UX_STEP_CB(ux_ctap2_make_cred_flow_refuse_step,
+           pb,
            ctap2_make_credential_user_cancel(),
            {
                &C_icon_crossmark,
-               "Abort",
-               "register",
+               "Don't register",
+           });
+
+UX_STEP_CB(ux_ctap2_make_cred_resident_flow_accept_step,
+           pbb,
+           ctap2_make_credential_confirm(),
+           {
+               &C_icon_validate_14,
+               "Register",
+               "resident key",
            });
 
 UX_FLOW(ux_ctap2_make_cred_flow,
-        &ux_ctap2_make_cred_flow_0_step,
-        &ux_ctap2_make_cred_flow_1_step,
-        &ux_ctap2_make_cred_flow_2_step,
-        &ux_ctap2_make_cred_flow_3_step,
-        FLOW_LOOP);
+        &ux_ctap2_make_cred_flow_first_step,
+        &ux_ctap2_make_cred_flow_domain_step,
+        &ux_ctap2_make_cred_flow_user_step,
+        &ux_ctap2_make_cred_flow_accept_step,
+        &ux_ctap2_make_cred_flow_refuse_step);
 
 UX_FLOW(ux_ctap2_make_cred_resident_flow,
-        &ux_ctap2_make_cred_resident_flow_0_step,
-        &ux_ctap2_make_cred_resident_flow_0b_step,
-        &ux_ctap2_make_cred_flow_1_step,
-        &ux_ctap2_make_cred_flow_2_step,
-        &ux_ctap2_make_cred_flow_3_step,
-        FLOW_LOOP);
+        &ux_ctap2_make_cred_resident_flow_first_step,
+        &ux_ctap2_make_cred_resident_flow_warning_step,
+        &ux_ctap2_make_cred_flow_domain_step,
+        &ux_ctap2_make_cred_flow_user_step,
+        &ux_ctap2_make_cred_flow_refuse_step,
+        &ux_ctap2_make_cred_resident_flow_accept_step);
 
 void ctap2_make_credential_ux(void) {
     ctap2_register_data_t *ctap2RegisterData = globals_get_ctap2_register_data();

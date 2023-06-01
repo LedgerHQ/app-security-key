@@ -34,8 +34,8 @@ APP_LOAD_PARAMS += --appFlags 0x040
 APP_LOAD_PARAMS += $(COMMON_LOAD_PARAMS)
 
 APPVERSION_M=1
-APPVERSION_N=0
-APPVERSION_P=1
+APPVERSION_N=1
+APPVERSION_P=0
 APPVERSION=$(APPVERSION_M).$(APPVERSION_N).$(APPVERSION_P)
 
 ICONNAME=icons/icon_security_key.gif
@@ -143,6 +143,23 @@ DEFINES += HAVE_UX_STACK_INIT_KEEP_TICKER
 # the apdu should not contain a crc.
 DEFINES += HAVE_COUNTER_MARKER
 APP_LOAD_PARAMS += --nocrc
+
+# Disable resetGeneration increment during ctap2 reset
+# This means credentials that are not discoverable won't be properly
+# revocated anymore. Now not that due to the fact this resetGeneration
+# counter was in NVM, it was reset to 0 after each app reinstallation (due
+# to an app update, a firmware update, or just a user triggered uninstall
+# then reinstall flow), and this reset was causing even more issues
+DEFINES += HAVE_NO_RESET_GENERATION_INCREMENT
+
+# Disable by default rk support and expose a setting to enable it
+# This means that by default user won't be able to create "Resident Keys",
+# which are also named "Discoverable Credentials".
+# This has been implemented to protect user from the nvram wipe mostly happening
+# during an app update which will erase their RK credentials we no possibility
+# to restore them.
+# Advanced user can still choose to enable this setting at their own risk.
+DEFINES += HAVE_RK_SUPPORT_SETTING
 
 DEFINES += HAVE_FIDO2_RPID_FILTER
 

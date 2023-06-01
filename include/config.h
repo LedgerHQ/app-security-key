@@ -19,6 +19,8 @@
 #ifndef __CONFIG_H__
 #define __CONFIG_H__
 
+#include "os.h"
+
 #define WRAPPING_KEY_PATH     0x80575241  // "WRA".encode("ascii").hex()
 #define PRIVATE_KEY_SEED_PATH 0x80504b53  // "PKS".encode("ascii").hex()
 
@@ -32,6 +34,9 @@ typedef struct config_t {
     uint8_t pin[16];
     uint8_t pinSet;
     uint8_t pinRetries;
+#ifdef HAVE_RK_SUPPORT_SETTING
+    uint8_t rk_enabled;
+#endif
 } config_t;
 
 extern config_t const N_u2f_real;
@@ -46,5 +51,10 @@ void config_process_ctap2_reset(void);
 void config_set_ctap2_pin(uint8_t *pin);
 void config_decrease_ctap2_pin_retry_counter(void);
 void config_reset_ctap2_pin_retry_counter(void);
+
+#ifdef HAVE_RK_SUPPORT_SETTING
+void config_set_rk_enabled(bool enabled);
+bool config_get_rk_enabled(void);
+#endif
 
 #endif

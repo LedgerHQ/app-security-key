@@ -7,14 +7,73 @@ from fido2.webauthn import AttestedCredentialData
 from client import TESTS_SPECULOS_DIR
 from utils import generate_random_bytes, generate_make_credentials_params
 from utils import generate_get_assertion_params
+from utils import HAVE_RK_SUPPORT_SETTING
+
+from ragger.navigator import NavInsID
+
+
+@pytest.mark.skipif(not HAVE_RK_SUPPORT_SETTING,
+                    reason="settings not enable")
+def test_option_rk_disabled(client):
+    info = client.ctap2.info
+    assert not info.options["rk"]
+
+    client_data_hash, rp, user, key_params = generate_make_credentials_params()
+    options = {"rk": True}
+
+    with pytest.raises(CtapError) as e:
+        client.ctap2.make_credential(client_data_hash,
+                                     rp,
+                                     user,
+                                     key_params,
+                                     options=options,
+                                     user_accept=None)
+    assert e.value.code == CtapError.ERR.UNSUPPORTED_OPTION
+
+
+def enable_rk_option(client):
+    info = client.ctap2.info
+    if info.options["rk"]:
+        return
+
+    if not HAVE_RK_SUPPORT_SETTING:
+        raise ValueError("rk and setting not enabled")
+
+    instructions = [
+        # Enter in the settings
+        NavInsID.RIGHT_CLICK,
+        NavInsID.RIGHT_CLICK,
+        NavInsID.BOTH_CLICK,
+
+        # Enable and skip "Enabling" message
+        NavInsID.BOTH_CLICK,
+        NavInsID.RIGHT_CLICK,
+        NavInsID.RIGHT_CLICK,
+        NavInsID.RIGHT_CLICK,
+        NavInsID.RIGHT_CLICK,
+        NavInsID.RIGHT_CLICK,
+        NavInsID.BOTH_CLICK,
+
+        # Leave settings
+        NavInsID.RIGHT_CLICK,
+        NavInsID.BOTH_CLICK
+    ]
+    client.navigator.navigate(instructions,
+                              screen_change_before_first_instruction=False)
+
+    client.ctap2._info = client.ctap2.get_info()
 
 
 def test_option_rk_enabled(client):
+    enable_rk_option(client)
+
     info = client.ctap2.info
     assert info.options["rk"]
 
 
 def test_option_rk_make_cred_exclude_refused(client, test_name):
+    enable_rk_option(client)
+
     compare_args = (TESTS_SPECULOS_DIR, test_name)
     # Spec says that:
     # If the excludeList parameter is present and contains a credential ID that
@@ -62,6 +121,8 @@ def test_option_rk_make_cred_exclude_refused(client, test_name):
 
 
 def test_option_rk_get_assertion(client, test_name):
+    enable_rk_option(client)
+
     client_data_hash, rp, user1, key_params = generate_make_credentials_params(ref=1)
     _, _, user2, key_params = generate_make_credentials_params(ref=2)
     _, _, user3, key_params = generate_make_credentials_params(ref=3)
@@ -115,11 +176,17 @@ def test_option_rk_get_assertion(client, test_name):
 
     client_data_hash = generate_random_bytes(32)
     with pytest.raises(CtapError) as e:
-        client.ctap2.get_assertion(rp["id"], client_data_hash)
+        client.ctap2.get_assertion(rp["id"], client_data_hash, login_type="none")
     assert e.value.code == CtapError.ERR.NO_CREDENTIALS
 
 
+@pytest.mark.skipif(
+    "--fast" in sys.argv,
+    reason="running in fast mode",
+)
 def test_option_rk_key_store_full(client):
+    enable_rk_option(client)
+
     # Check that at some point KEY_STORE_FULL error is returned
     with pytest.raises(CtapError) as e:
         for _ in range(30):
@@ -144,6 +211,8 @@ def test_option_rk_key_store_full(client):
     reason="running in fast mode",
 )
 def test_option_rk_overwrite_get_assertion(client, test_name):
+    enable_rk_option(client)
+
     # Make a first "user1" credential
     client_data_hash, rp, user1, key_params = generate_make_credentials_params(ref=1)
     user1["name"] = "user1"

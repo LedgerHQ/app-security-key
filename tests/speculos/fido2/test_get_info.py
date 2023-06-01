@@ -1,5 +1,6 @@
 from hashlib import sha256
 from fido2.ctap2.base import Ctap2, Info
+from utils import HAVE_RK_SUPPORT_SETTING
 
 
 def test_get_info(client):
@@ -49,7 +50,11 @@ def test_get_info_options(client):
     info = client.ctap2.info
 
     # Specified options with fix value
-    assert info.options["rk"]
+    if HAVE_RK_SUPPORT_SETTING:
+        assert not info.options["rk"]
+    else:
+        assert info.options["rk"]
+
     assert info.options["up"]
     assert info.options["uv"]
     assert "clientPin" in info.options

@@ -6,6 +6,7 @@ from ragger.navigator import NavInsID
 
 from client import TESTS_SPECULOS_DIR
 from utils import generate_random_bytes, fido_known_appid
+from utils import HAVE_RK_SUPPORT_SETTING
 
 
 def test_u2f_screens_idle(client, test_name):
@@ -18,6 +19,10 @@ def test_u2f_screens_idle(client, test_name):
     instructions.append(NavInsID.RIGHT_CLICK)
     # Screen 1 -> 2
     instructions.append(NavInsID.RIGHT_CLICK)
+
+    if HAVE_RK_SUPPORT_SETTING:
+        # Screen 2 -> 3
+        instructions.append(NavInsID.RIGHT_CLICK)
 
     client.navigator.navigate_and_compare(TESTS_SPECULOS_DIR, test_name, instructions,
                                           screen_change_before_first_instruction=False)

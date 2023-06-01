@@ -25,13 +25,9 @@
 // First step resets as fast as possible to please Windows
 
 UX_STEP_CB(ux_ctap2_reset_flow_0_step,
-           pbb,
+           pb,
            ctap2_reset_confirm(),
-           {
-               &C_icon_eye,
-               "Token Reset",
-               "FIDO 2",
-           });
+           {&C_icon_eye, "Reset credentials"});
 
 UX_STEP_NOCB(ux_ctap2_reset_flow_1_step,
              bnnn_paging,
@@ -62,8 +58,7 @@ UX_FLOW(ux_ctap2_reset_flow,
         &ux_ctap2_reset_flow_0_step,
         &ux_ctap2_reset_flow_1_step,
         &ux_ctap2_reset_flow_2_step,
-        &ux_ctap2_reset_flow_3_step,
-        FLOW_LOOP);
+        &ux_ctap2_reset_flow_3_step);
 
 void ctap2_reset_ux(void) {
     // reserve a display stack slot if none yet

@@ -82,6 +82,12 @@ void config_init(void) {
         tmp8 = 0;
         nvm_write((void *) &N_u2f.pinSet, (void *) &tmp8, sizeof(uint8_t));
 
+#ifdef HAVE_RK_SUPPORT_SETTING
+        // Initialize rk_enable value: Disabled by default
+        tmp8 = 0;
+        nvm_write((void *) &N_u2f.rk_enabled, (void *) &tmp8, sizeof(uint8_t));
+#endif
+
         tmp8 = 1;
         nvm_write((void *) &N_u2f.initialized, (void *) &tmp8, sizeof(uint8_t));
     } else {
@@ -104,14 +110,16 @@ uint8_t config_increase_and_get_authentification_counter(uint8_t *buffer) {
 }
 
 void config_process_ctap2_reset(void) {
+#ifndef HAVE_NO_RESET_GENERATION_INCREMENT
     uint32_t resetGeneration = N_u2f.resetGeneration + 1;
-    uint8_t pinSet = 0;
 
     nvm_write((void *) &N_u2f.resetGeneration, (void *) &resetGeneration, sizeof(uint32_t));
 
     // Update keys derived from seed
     derive_and_store_keys(N_u2f.resetGeneration);
+#endif
 
+    uint8_t pinSet = 0;
     nvm_write((void *) &N_u2f.pinSet, (void *) &pinSet, sizeof(uint8_t));
 
     ctap2_client_pin_reset_ctx();
@@ -141,3 +149,14 @@ void config_reset_ctap2_pin_retry_counter(void) {
     uint8_t tmp = CTAP2_PIN_RETRIES;
     nvm_write((void *) &N_u2f.pinRetries, (void *) &tmp, sizeof(uint8_t));
 }
+
+#ifdef HAVE_RK_SUPPORT_SETTING
+void config_set_rk_enabled(bool enabled) {
+    uint8_t tmp8 = enabled ? 1 : 0;
+    nvm_write((void *) &N_u2f.rk_enabled, (void *) &tmp8, sizeof(uint8_t));
+}
+
+bool config_get_rk_enabled(void) {
+    return N_u2f.rk_enabled == 1;
+}
+#endif

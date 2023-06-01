@@ -56,16 +56,16 @@ static void ctap2_ux_display_user_assertion(void) {
     PRINTF("hash %s\n", verifyHash);
 }
 
-UX_STEP_CB(ux_ctap2_get_assertion_flow_0_step,
+UX_STEP_CB(ux_ctap2_get_assertion_flow_accept_step,
            pbb,
            ctap2_get_assertion_confirm(),
            {
                &C_icon_validate_14,
-               "Login",
-               "FIDO 2",
+               "Approve",
+               "login request",
            });
 
-UX_STEP_NOCB_INIT(ux_ctap2_get_assertion_flow_1_step,
+UX_STEP_NOCB_INIT(ux_ctap2_get_assertion_flow_domain_step,
                   bnnn_paging,
                   ctap2_ux_display_rp_assertion(),
                   {
@@ -73,39 +73,36 @@ UX_STEP_NOCB_INIT(ux_ctap2_get_assertion_flow_1_step,
                       .text = (char *) verifyHash,
                   });
 
-UX_STEP_NOCB_INIT(ux_ctap2_get_assertion_flow_2_step,
+UX_STEP_NOCB_INIT(ux_ctap2_get_assertion_flow_user_step,
                   bnnn_paging,
                   ctap2_ux_display_user_assertion(),
                   {
                       .title = "User",
                       .text = (char *) verifyHash,
                   });
-UX_STEP_CB(ux_ctap2_get_assertion_flow_3_step,
+
+UX_STEP_CB(ux_ctap2_get_assertion_flow_refuse_step,
            pbb,
            ctap2_get_assertion_user_cancel(),
-           {
-               &C_icon_crossmark,
-               "Abort",
-               "login",
-           });
+           {&C_icon_crossmark, "Reject", "login request"});
 
 UX_FLOW(ux_ctap2_get_assertion_flow,
-        &ux_ctap2_get_assertion_flow_0_step,
-        &ux_ctap2_get_assertion_flow_1_step,
-        &ux_ctap2_get_assertion_flow_2_step,
-        &ux_ctap2_get_assertion_flow_3_step,
-        FLOW_LOOP);
+        &ux_ctap2_get_assertion_flow_accept_step,
+        &ux_ctap2_get_assertion_flow_domain_step,
+        &ux_ctap2_get_assertion_flow_user_step,
+        &ux_ctap2_get_assertion_flow_accept_step,
+        &ux_ctap2_get_assertion_flow_refuse_step);
 
 // Extra steps and flow if there are multiple credentials
-UX_STEP_NOCB(ux_ctap2_get_assertion_multiple_flow_0_step,
+UX_STEP_NOCB(ux_ctap2_get_assertion_multiple_flow_first_step,
              pbb,
              {
                  &C_icon_people,
-                 "Login multi",
-                 "FIDO 2",
+                 "Log in with",
+                 "chosen credential",
              });
 
-UX_STEP_NOCB_INIT(ux_ctap2_get_assertion_multiple_flow_2_step,
+UX_STEP_NOCB_INIT(ux_ctap2_get_assertion_multiple_flow_user_step,
                   bnnn_paging,
                   ctap2_ux_display_user_assertion(),
                   {
@@ -113,92 +110,67 @@ UX_STEP_NOCB_INIT(ux_ctap2_get_assertion_multiple_flow_2_step,
                       .text = (char *) verifyHash,
                   });
 
-UX_STEP_CB(ux_ctap2_get_assertion_multiple_flow_3_step,
+UX_STEP_CB(ux_ctap2_get_assertion_multiple_flow_next_user_step,
            pbb,
            ctap2_ux_multiple_next(),
-           {
-               &C_icon_people,
-               "Next",
-               "User",
-           });
-
-UX_STEP_CB(ux_ctap2_get_assertion_multiple_flow_4_step,
-           pbb,
-           ctap2_get_assertion_confirm(),
-           {
-               &C_icon_validate_14,
-               "Confirm",
-               "login",
-           });
+           {&C_icon_people, "Show next", "credential"});
 
 UX_FLOW(ux_ctap2_get_assertion_multiple_flow,
-        &ux_ctap2_get_assertion_multiple_flow_0_step,
-        &ux_ctap2_get_assertion_flow_1_step,
-        &ux_ctap2_get_assertion_multiple_flow_2_step,
-        &ux_ctap2_get_assertion_multiple_flow_3_step,
-        &ux_ctap2_get_assertion_multiple_flow_4_step,
-        &ux_ctap2_get_assertion_flow_3_step,
-        FLOW_LOOP);
+        &ux_ctap2_get_assertion_multiple_flow_first_step,
+        &ux_ctap2_get_assertion_flow_domain_step,
+        &ux_ctap2_get_assertion_multiple_flow_user_step,
+        &ux_ctap2_get_assertion_multiple_flow_next_user_step,
+        &ux_ctap2_get_assertion_flow_accept_step,
+        &ux_ctap2_get_assertion_flow_refuse_step);
 
 // Extra steps if a text is associated to the TX for single assertion
-UX_STEP_NOCB(ux_ctap2_get_assertion_text_flow_0_step,
-             pbb,
+
+UX_STEP_NOCB(ux_ctap2_get_assertion_text_flow_first_step,
+             pbn,
              {
                  &C_icon_certificate,
-                 "Login",
-                 "FIDO 2",
+                 "Log in",
+                 "with text",
              });
 
-UX_STEP_NOCB(ux_ctap2_get_assertion_text_flow_1_step,
+UX_STEP_NOCB(ux_ctap2_get_assertion_text_flow_text_step,
              bnnn_paging,
              {.title = "Message", .text = NULL});
 
-UX_STEP_CB(ux_ctap2_get_assertion_text_flow_3_step,
-           pbb,
-           ctap2_get_assertion_confirm(),
-           {
-               &C_icon_validate_14,
-               "Confirm",
-               "login",
-           });
-
 UX_FLOW(ux_ctap2_get_assertion_text_flow,
-        &ux_ctap2_get_assertion_text_flow_0_step,
-        &ux_ctap2_get_assertion_text_flow_1_step,
-        &ux_ctap2_get_assertion_flow_1_step,
-        &ux_ctap2_get_assertion_flow_2_step,
-        &ux_ctap2_get_assertion_text_flow_3_step,
-        &ux_ctap2_get_assertion_flow_3_step,
-        FLOW_LOOP);
+        &ux_ctap2_get_assertion_text_flow_first_step,
+        &ux_ctap2_get_assertion_text_flow_text_step,
+        &ux_ctap2_get_assertion_flow_domain_step,
+        &ux_ctap2_get_assertion_flow_user_step,
+        &ux_ctap2_get_assertion_flow_refuse_step,
+        &ux_ctap2_get_assertion_flow_accept_step);
 
 // Extra steps if a text is associated to the TX for multiple assertion
-UX_STEP_NOCB(ux_ctap2_get_assertion_multiple_text_flow_0_step,
-             pbb,
+UX_STEP_NOCB(ux_ctap2_get_assertion_multiple_text_flow_first_step,
+             pnn,
              {
                  &C_icon_certificate,
-                 "Login multi",
-                 "FIDO 2",
+                 "Log in with text",
+                 "and chosen credential",
              });
 
 UX_FLOW(ux_ctap2_get_assertion_multiple_text_flow,
-        &ux_ctap2_get_assertion_multiple_text_flow_0_step,
-        &ux_ctap2_get_assertion_text_flow_1_step,
-        &ux_ctap2_get_assertion_flow_1_step,
-        &ux_ctap2_get_assertion_multiple_flow_2_step,
-        &ux_ctap2_get_assertion_multiple_flow_3_step,
-        &ux_ctap2_get_assertion_multiple_flow_4_step,
-        &ux_ctap2_get_assertion_flow_3_step,
-        FLOW_LOOP);
+        &ux_ctap2_get_assertion_multiple_text_flow_first_step,
+        &ux_ctap2_get_assertion_text_flow_text_step,
+        &ux_ctap2_get_assertion_flow_domain_step,
+        &ux_ctap2_get_assertion_multiple_flow_user_step,
+        &ux_ctap2_get_assertion_multiple_flow_next_user_step,
+        &ux_ctap2_get_assertion_flow_refuse_step,
+        &ux_ctap2_get_assertion_flow_accept_step);
 
 // Dedicated flow to get user presence confirmation if no account is registered
-UX_STEP_CB(ux_ctap2_no_assertion_flow_0_step,
-           pbb,
-           ctap2_get_assertion_no_assertion_confirm(),
-           {
-               &C_icon_validate_14,
-               "No account",
-               "registered",
-           });
+UX_STEP_NOCB(ux_ctap2_no_assertion_flow_0_step,
+             pnn,
+             {
+                 &C_icon_warning,
+                 "No credential found",
+                 "for this domain",
+             });
 
 UX_STEP_NOCB_INIT(ux_ctap2_no_assertion_flow_1_step,
                   bnnn_paging,
@@ -208,10 +180,15 @@ UX_STEP_NOCB_INIT(ux_ctap2_no_assertion_flow_1_step,
                       .text = (char *) verifyHash,
                   });
 
+UX_STEP_CB(ux_ctap2_no_assertion_flow_2_step,
+           pb,
+           ctap2_get_assertion_no_assertion_confirm(),
+           {&C_icon_back_x, "Close"});
+
 UX_FLOW(ux_ctap2_no_assertion_flow,
         &ux_ctap2_no_assertion_flow_0_step,
         &ux_ctap2_no_assertion_flow_1_step,
-        FLOW_LOOP);
+        &ux_ctap2_no_assertion_flow_2_step);
 
 static void get_next_multiple_flow_state(void) {
     ctap2_assert_data_t *ctap2AssertData = globals_get_ctap2_assert_data();
@@ -225,11 +202,19 @@ static void get_next_multiple_flow_state(void) {
 }
 
 static void ctap2_ux_multiple_next(void) {
+    ctap2_assert_data_t *ctap2AssertData = globals_get_ctap2_assert_data();
+
     PRINTF("ctap2_ux_multiple_next\n");
     get_next_multiple_flow_state();
-    ux_flow_init(0,
-                 ux_ctap2_get_assertion_multiple_flow,
-                 &ux_ctap2_get_assertion_multiple_flow_2_step);
+    if (ctap2AssertData->txAuthMessage != NULL) {
+        ux_flow_init(0,
+                     ux_ctap2_get_assertion_multiple_text_flow,
+                     &ux_ctap2_get_assertion_multiple_flow_user_step);
+    } else {
+        ux_flow_init(0,
+                     ux_ctap2_get_assertion_multiple_flow,
+                     &ux_ctap2_get_assertion_multiple_flow_user_step);
+    }
 }
 
 void ctap2_get_assertion_ux(ctap2_ux_state_t state) {
