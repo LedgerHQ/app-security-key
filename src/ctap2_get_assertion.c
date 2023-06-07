@@ -149,6 +149,8 @@ static int process_getAssert_authnr_allowList(cbipDecoder_t *decoder, cbipItem_t
     cbipItem_t tmpItem;
     int arrayLen;
     int status;
+    uint8_t *prevCredId = NULL;
+    uint32_t prevCredIdLen = 0;
 
     ctap2AssertData->allowListPresent = 0;
     ctap2AssertData->availableCredentials = 0;
@@ -172,6 +174,28 @@ static int process_getAssert_authnr_allowList(cbipDecoder_t *decoder, cbipItem_t
                 continue;
             } else if (status != ERROR_NONE) {
                 return status;
+            }
+
+            /* Weird behavior seen on Safari on MacOs, allowList entries are duplicated.
+             * seen order is: 1, 2, ..., n, 1', 2', ..., n'.
+             * In order to improve user experience while this might be fix in Safari side,
+             * we decided to filter out the duplicate in a specific scenario:
+             * - they are only 2 credentials in the allowList
+             * - the first and second credentials are valid and are exactly the same.
+             */
+            if (arrayLen == 2) {
+                if (i == 0) {
+                    // Backup credId and credIdLen before parsing next credential
+                    prevCredId = ctap2AssertData->credId;
+                    prevCredIdLen = ctap2AssertData->credIdLen;
+                } else {
+                    if ((ctap2AssertData->availableCredentials == 1) &&
+                        (ctap2AssertData->credIdLen == prevCredIdLen) &&
+                        (memcmp(ctap2AssertData->credId, prevCredId, prevCredIdLen) == 0)) {
+                        // Just ignore this duplicate credential
+                        continue;
+                    }
+                }
             }
 
             PRINTF("Valid candidate %d\n", i);
