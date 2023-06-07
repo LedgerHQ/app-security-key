@@ -255,6 +255,9 @@ class LedgerCtap2(Ctap2):
                     # Screen 2 -> 3
                     instructions += self.get_user_screen_instructions(user)
 
+                    # Screen 3 -> 4
+                    instructions.append(NavInsID.RIGHT_CLICK)
+
                     # Validate
                     instructions.append(NavInsID.BOTH_CLICK)
 
@@ -264,12 +267,9 @@ class LedgerCtap2(Ctap2):
                 # Screen 2 -> 3
                 instructions += self.get_user_screen_instructions(check_users[0])
 
-                # Go to "Confirm Login"
-                # Screen 3 -> 4
-                instructions.append(NavInsID.RIGHT_CLICK)
-
                 if not user_accept:
                     # Go to step 5
+                    instructions.append(NavInsID.RIGHT_CLICK)
                     instructions.append(NavInsID.RIGHT_CLICK)
 
                 # Validate
@@ -374,13 +374,14 @@ class LedgerCtap2(Ctap2):
             instructions += self.get_user_screen_instructions(check_users[0])
 
             if login_type == "multi":
-                # Skip "Next user" screen
-                # Screen 3 -> 4
-                instructions.append(NavInsID.RIGHT_CLICK)
-
-            if user_accept:
-                # Go to "Accept" screen
-                instructions.append(NavInsID.RIGHT_CLICK)
+                if not user_accept:
+                    # Go to step 5
+                    instructions.append(NavInsID.RIGHT_CLICK)
+                    instructions.append(NavInsID.RIGHT_CLICK)
+            else:
+                if not user_accept:
+                    # Screen 3 -> 4
+                    instructions.append(NavInsID.RIGHT_CLICK)
 
             # Validate
             instructions.append(NavInsID.BOTH_CLICK)

@@ -95,11 +95,11 @@ UX_FLOW(ux_ctap2_get_assertion_flow,
 
 // Extra steps and flow if there are multiple credentials
 UX_STEP_NOCB(ux_ctap2_get_assertion_multiple_flow_first_step,
-             pbb,
+             pnn,
              {
                  &C_icon_people,
-                 "Log in with",
-                 "chosen credential",
+                 "Select user",
+                 "to log in",
              });
 
 UX_STEP_NOCB_INIT(ux_ctap2_get_assertion_multiple_flow_user_step,
@@ -111,22 +111,22 @@ UX_STEP_NOCB_INIT(ux_ctap2_get_assertion_multiple_flow_user_step,
                   });
 
 UX_STEP_CB(ux_ctap2_get_assertion_multiple_flow_next_user_step,
-           pbb,
+           pb,
            ctap2_ux_multiple_next(),
-           {&C_icon_people, "Show next", "credential"});
+           {&C_icon_people, "Next user"});
 
 UX_FLOW(ux_ctap2_get_assertion_multiple_flow,
         &ux_ctap2_get_assertion_multiple_flow_first_step,
         &ux_ctap2_get_assertion_flow_domain_step,
         &ux_ctap2_get_assertion_multiple_flow_user_step,
-        &ux_ctap2_get_assertion_multiple_flow_next_user_step,
         &ux_ctap2_get_assertion_flow_accept_step,
+        &ux_ctap2_get_assertion_multiple_flow_next_user_step,
         &ux_ctap2_get_assertion_flow_refuse_step);
 
 // Extra steps if a text is associated to the TX for single assertion
 
 UX_STEP_NOCB(ux_ctap2_get_assertion_text_flow_first_step,
-             pbn,
+             pnn,
              {
                  &C_icon_certificate,
                  "Log in",
@@ -142,16 +142,16 @@ UX_FLOW(ux_ctap2_get_assertion_text_flow,
         &ux_ctap2_get_assertion_text_flow_text_step,
         &ux_ctap2_get_assertion_flow_domain_step,
         &ux_ctap2_get_assertion_flow_user_step,
-        &ux_ctap2_get_assertion_flow_refuse_step,
-        &ux_ctap2_get_assertion_flow_accept_step);
+        &ux_ctap2_get_assertion_flow_accept_step,
+        &ux_ctap2_get_assertion_flow_refuse_step);
 
 // Extra steps if a text is associated to the TX for multiple assertion
 UX_STEP_NOCB(ux_ctap2_get_assertion_multiple_text_flow_first_step,
              pnn,
              {
                  &C_icon_certificate,
-                 "Log in with text",
-                 "and chosen credential",
+                 "Select user and",
+                 "log in with text",
              });
 
 UX_FLOW(ux_ctap2_get_assertion_multiple_text_flow,
@@ -159,9 +159,9 @@ UX_FLOW(ux_ctap2_get_assertion_multiple_text_flow,
         &ux_ctap2_get_assertion_text_flow_text_step,
         &ux_ctap2_get_assertion_flow_domain_step,
         &ux_ctap2_get_assertion_multiple_flow_user_step,
+        &ux_ctap2_get_assertion_flow_accept_step,
         &ux_ctap2_get_assertion_multiple_flow_next_user_step,
-        &ux_ctap2_get_assertion_flow_refuse_step,
-        &ux_ctap2_get_assertion_flow_accept_step);
+        &ux_ctap2_get_assertion_flow_refuse_step);
 
 // Dedicated flow to get user presence confirmation if no account is registered
 UX_STEP_NOCB(ux_ctap2_no_assertion_flow_0_step,
