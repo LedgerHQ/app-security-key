@@ -331,6 +331,21 @@ def test_get_assertion_bad_allow_list(client):
     assert e.value.code == CtapError.ERR.CBOR_UNEXPECTED_TYPE
 
 
+def test_get_assertion_duplicate_allow_list_entries(client, test_name):
+    compare_args = (TESTS_SPECULOS_DIR, test_name)
+    rp, credential_data, user = generate_get_assertion_params(client, ref=0)
+
+    client_data_hash = generate_random_bytes(32)
+    allow_list = [{"id": credential_data.credential_id, "type": "public-key"}] * 2
+    assertion = client.ctap2.get_assertion(rp["id"], client_data_hash,
+                                           allow_list,
+                                           check_users=[user],
+                                           check_screens="full",
+                                           compare_args=compare_args)
+
+    assertion.verify(client_data_hash, credential_data.public_key)
+
+
 # Todo add tests with
 # - Validation of request:
 #   - CBOR fields errors: missing / bad type / bad length...

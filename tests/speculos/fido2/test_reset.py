@@ -5,6 +5,7 @@ from fido2.ctap import CtapError
 
 from client import TESTS_SPECULOS_DIR
 from utils import generate_random_bytes, generate_get_assertion_params
+from utils import HAVE_NO_RESET_GENERATION_INCREMENT
 
 
 def test_reset(client, test_name):
@@ -28,7 +29,7 @@ def test_reset(client, test_name):
                                    compare_args=compare_args)
             assert e.value.code == CtapError.ERR.OPERATION_DENIED
 
-            # Validate the credential is still present by getting an assertion
+            # Validate the credential is still valid by getting an assertion
             client_data_hash = generate_random_bytes(32)
             allow_list = [{"id": credential_data.credential_id, "type": "public-key"}]
             client.ctap2.get_assertion(rp["id"], client_data_hash, allow_list)
@@ -37,12 +38,18 @@ def test_reset(client, test_name):
             client.ctap2.reset(validate_step=validate_step, check_screens="full",
                                compare_args=compare_args)
 
-            # Validate the credential is not present by getting an assertion
             client_data_hash = generate_random_bytes(32)
             allow_list = [{"id": credential_data.credential_id, "type": "public-key"}]
-            with pytest.raises(CtapError) as e:
+            if HAVE_NO_RESET_GENERATION_INCREMENT:
+                # Validate the credential is still valid by getting an assertion
+                # ResetGeneration increment is disabled to avoid the UX hurdle when the app
+                # is reinstalled. This means credential are not revocated.
                 client.ctap2.get_assertion(rp["id"], client_data_hash, allow_list)
-            assert e.value.code == CtapError.ERR.NO_CREDENTIALS
+            else:
+                # Validate the credential is not valid anymore by getting an assertion
+                with pytest.raises(CtapError) as e:
+                    client.ctap2.get_assertion(rp["id"], client_data_hash, allow_list)
+                assert e.value.code == CtapError.ERR.NO_CREDENTIALS
 
 
 def test_reset_cancel(client, test_name):

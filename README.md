@@ -59,6 +59,7 @@ Due to OS constraints, this Security Key App as some limitations:
   - If the user chooses to uninstall it from Ledger Live
   - If the user chooses to update the app to a new available version
   - If the user updates the OS version
-* Following FIDO2 spec, credentials can be revoked, but the revocation mechanism is based on a counter that - as discoverable credentials - will be wiped upon app deletion.
+  That is why they are not enabled by default, and should be manually enabled in the settings. See HAVE_RK_SUPPORT_SETTING section on the Makefile for more explanations.
+* Following FIDO2 spec, there should be a way to revoked credentials. A revocation mechanism has been implemented based on a counter that - as discoverable credentials - will be wiped upon app deletion. therefore, in order to avoid weird issue on user side, this counter as been disabled. See HAVE_NO_RESET_GENERATION_INCREMENT section on the Makefile for more explanations.
 
 Please look at the dedicated section at the end of [this blog post](https://blog.ledger.com/security-key/) for more detailed explanations.

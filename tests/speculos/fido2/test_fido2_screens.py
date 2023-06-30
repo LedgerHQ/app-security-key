@@ -6,6 +6,60 @@ from fido2.webauthn import AttestedCredentialData
 from client import TESTS_SPECULOS_DIR
 from utils import generate_random_bytes
 from utils import generate_make_credentials_params
+from utils import HAVE_RK_SUPPORT_SETTING
+
+from ragger.navigator import NavInsID
+
+
+@pytest.mark.skipif(not HAVE_RK_SUPPORT_SETTING,
+                    reason="settings not enable")
+def test_fido_screens_settings(client, test_name):
+    instructions = []
+    # Screen 0 -> 1
+    instructions.append(NavInsID.RIGHT_CLICK)
+    # Screen 1 -> 2
+    instructions.append(NavInsID.RIGHT_CLICK)
+    # enter settings
+    instructions.append(NavInsID.BOTH_CLICK)
+
+    # Enable and check "Enabling" warning message
+    instructions.append(NavInsID.BOTH_CLICK)
+    # Screen 0 -> 1
+    instructions.append(NavInsID.RIGHT_CLICK)
+    # Screen 1 -> 2
+    instructions.append(NavInsID.RIGHT_CLICK)
+    # Screen 2 -> 3
+    instructions.append(NavInsID.RIGHT_CLICK)
+    # Screen 3 -> 4
+    instructions.append(NavInsID.RIGHT_CLICK)
+    # Screen 4 -> 5
+    instructions.append(NavInsID.RIGHT_CLICK)
+    # Confirm
+    instructions.append(NavInsID.BOTH_CLICK)
+
+    # Disable and check "Disabling" warning message
+    instructions.append(NavInsID.BOTH_CLICK)
+    # Screen 0 -> 1
+    instructions.append(NavInsID.RIGHT_CLICK)
+    # Screen 1 -> 2
+    instructions.append(NavInsID.RIGHT_CLICK)
+    # Screen 2 -> 3
+    instructions.append(NavInsID.RIGHT_CLICK)
+    # Screen 3 -> 4
+    instructions.append(NavInsID.RIGHT_CLICK)
+    # Screen 4 -> 3
+    instructions.append(NavInsID.LEFT_CLICK)
+    # Approve
+    instructions.append(NavInsID.BOTH_CLICK)
+
+    # leave settings
+    # Screen 0 -> 1
+    instructions.append(NavInsID.RIGHT_CLICK)
+    # confirm
+    instructions.append(NavInsID.BOTH_CLICK)
+
+    client.navigator.navigate_and_compare(TESTS_SPECULOS_DIR, test_name, instructions,
+                                          screen_change_before_first_instruction=False)
 
 
 def register_then_assert(client, test_name, user, options):
