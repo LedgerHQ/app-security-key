@@ -100,7 +100,10 @@ void app_main() {
 
     io_init();
 
-    config_init();
+    if (config_init() != 0) {
+        PRINTF("=> config_init failure\n");
+        return;
+    }
     rk_storage_init();
     ctap2UxState = CTAP2_UX_STATE_NONE;
     ctap2_client_pin_reset_ctx();
