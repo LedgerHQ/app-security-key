@@ -182,7 +182,7 @@ UX_STEP_NOCB_INIT(ux_ctap2_no_assertion_flow_1_step,
 
 UX_STEP_CB(ux_ctap2_no_assertion_flow_2_step,
            pb,
-           ctap2_get_assertion_no_assertion_confirm(),
+           ctap2_get_assertion_confirm(),
            {&C_icon_back_x, "Close"});
 
 UX_FLOW(ux_ctap2_no_assertion_flow,

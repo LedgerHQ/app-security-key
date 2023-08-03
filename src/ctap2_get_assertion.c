@@ -396,49 +396,38 @@ void ctap2_get_assertion_handle(u2f_service_t *service,
         goto exit;
     }
 
-    // Look for a potential rk entry if no allow list was provided
-    if (!ctap2AssertData->allowListPresent) {
-        ctap2AssertData->availableCredentials = rk_storage_count(ctap2AssertData->rpIdHash);
-        if (ctap2AssertData->availableCredentials == 0) {
-            // No credential, prompt the user to handle the error
-            PRINTF("No resident credentials\n");
-            ctap2_get_assertion_ux(CTAP2_UX_STATE_NO_ASSERTION);
-        } else if (ctap2AssertData->availableCredentials == 1) {
-            // Single resident credential, go through the usual flow
-            PRINTF("Single resident credential\n");
-            status = rk_storage_find_youngest(ctap2AssertData->rpIdHash,
-                                              NULL,
-                                              &ctap2AssertData->nonce,
-                                              &ctap2AssertData->credential,
-                                              &ctap2AssertData->credentialLen);
-            if (status == RK_NOT_FOUND) {
-                // This can theoretically never happen.
-                // But still, if it does, fall back to the "No resident credentials" case
-                ctap2_get_assertion_ux(CTAP2_UX_STATE_NO_ASSERTION);
-            } else {
-                if (ctap2AssertData->userPresenceRequired || ctap2AssertData->pinRequired) {
-                    ctap2_get_assertion_ux(CTAP2_UX_STATE_GET_ASSERTION);
-                } else {
-                    *immediateReply = true;
+    if (!ctap2AssertData->userPresenceRequired && !ctap2AssertData->pinRequired) {
+        // No up nor uv required, skip UX and reply immediately
+        *immediateReply = true;
+    } else {
+        // Look for a potential rk entry if no allow list was provided
+        if (!ctap2AssertData->allowListPresent) {
+            ctap2AssertData->availableCredentials = rk_storage_count(ctap2AssertData->rpIdHash);
+            if (ctap2AssertData->availableCredentials == 1) {
+                // Single resident credential load it to go through the usual flow
+                PRINTF("Single resident credential\n");
+                status = rk_storage_find_youngest(ctap2AssertData->rpIdHash,
+                                                  NULL,
+                                                  &ctap2AssertData->nonce,
+                                                  &ctap2AssertData->credential,
+                                                  &ctap2AssertData->credentialLen);
+                if (status == RK_NOT_FOUND) {
+                    // This can theoretically never happen.
+                    // But still, if it does, fall back to the "No resident credentials" case
+                    ctap2AssertData->availableCredentials = 0;
                 }
             }
-        } else {
-            // Multiple resident credentials, go through the multiple credentials flow
-            ctap2_get_assertion_ux(CTAP2_UX_STATE_MULTIPLE_ASSERTION);
         }
-    } else {
+
         if (ctap2AssertData->availableCredentials == 0) {
             ctap2_get_assertion_ux(CTAP2_UX_STATE_NO_ASSERTION);
         } else if (ctap2AssertData->availableCredentials > 1) {
-            // DEVIATION from FIDO2.0 spec "select any applicable credential and proceed".
-            // We always ask the user.
+            // DEVIATION from FIDO2.0 spec in case of allowList presence:
+            // "select any applicable credential and proceed".
+            // We always ask the user to choose.
             ctap2_get_assertion_ux(CTAP2_UX_STATE_MULTIPLE_ASSERTION);
         } else {
-            if (ctap2AssertData->userPresenceRequired || ctap2AssertData->pinRequired) {
-                ctap2_get_assertion_ux(CTAP2_UX_STATE_GET_ASSERTION);
-            } else {
-                *immediateReply = true;
-            }
+            ctap2_get_assertion_ux(CTAP2_UX_STATE_GET_ASSERTION);
         }
     }
     status = 0;
@@ -887,6 +876,12 @@ void ctap2_get_assertion_confirm() {
 
     ctap2_send_keepalive_processing();
 
+    // Return immediately in case there is no available credentials
+    if (ctap2AssertData->availableCredentials == 0) {
+        send_cbor_error(&G_io_u2f, ERROR_NO_CREDENTIALS);
+        return;
+    }
+
     // Restore the original last char in the CBOR buffer if a TX Auth was displayed
     if (ctap2AssertData->txAuthMessage != NULL) {
         ctap2AssertData->txAuthMessage[ctap2AssertData->txAuthLength] = ctap2AssertData->txAuthLast;
@@ -947,11 +942,5 @@ exit:
 void ctap2_get_assertion_user_cancel() {
     ctap2UxState = CTAP2_UX_STATE_NONE;
     send_cbor_error(&G_io_u2f, ERROR_OPERATION_DENIED);
-    ui_idle();
-}
-
-void ctap2_get_assertion_no_assertion_confirm() {
-    ctap2UxState = CTAP2_UX_STATE_NONE;
-    send_cbor_error(&G_io_u2f, ERROR_NO_CREDENTIALS);
     ui_idle();
 }

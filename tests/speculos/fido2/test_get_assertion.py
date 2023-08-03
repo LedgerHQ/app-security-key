@@ -144,6 +144,27 @@ def test_get_assertion_no_credentials(client, test_name):
     assert e.value.code == CtapError.ERR.NO_CREDENTIALS
 
 
+def test_get_assertion_no_credentials_no_up(client, test_name):
+    options = {"up": False}
+    client_data_hash, rp, _user, _key_params = generate_make_credentials_params(ref=0)
+
+    # Try without allow_list
+    with pytest.raises(CtapError) as e:
+        client.ctap2.get_assertion(rp["id"], client_data_hash,
+                                   options=options,
+                                   user_accept=None)
+    assert e.value.code == CtapError.ERR.NO_CREDENTIALS
+
+    # Try with unknown credential in allow_list
+    client_data_hash, _rp, _user, _key_params = generate_make_credentials_params()
+    allow_list = [{"id": generate_random_bytes(32), "type": "public-key"}]
+    with pytest.raises(CtapError) as e:
+        client.ctap2.get_assertion(rp["id"], client_data_hash, allow_list,
+                                   options=options,
+                                   user_accept=None)
+    assert e.value.code == CtapError.ERR.NO_CREDENTIALS
+
+
 def test_get_assertion_wrong_id(client, test_name):
     compare_args = (TESTS_SPECULOS_DIR, test_name)
     rp, credential_data, _user = generate_get_assertion_params(client, ref=0)

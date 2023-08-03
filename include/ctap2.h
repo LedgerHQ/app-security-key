@@ -211,7 +211,6 @@ void ctap2_get_assertion_ux(ctap2_ux_state_t state);
 void ctap2_get_assertion_next_credential_ux_helper(void);
 void ctap2_get_assertion_confirm(void);
 void ctap2_get_assertion_user_cancel(void);
-void ctap2_get_assertion_no_assertion_confirm(void);
 
 void ctap2_reset_ux(void);
 void ctap2_reset_confirm(void);
