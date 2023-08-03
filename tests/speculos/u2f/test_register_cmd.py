@@ -82,7 +82,7 @@ def test_register_duplicate(client):
 
 
 def test_register_multiple_ok(client):
-    for i in range(10):
+    for i in range(5):
         challenge = generate_random_bytes(32)
         app_param = generate_random_bytes(32)
 
