@@ -137,7 +137,6 @@ void ctap2_make_credential_ux(void) {
         ux_stack_push();
     }
     ctap2UxState = CTAP2_UX_STATE_MAKE_CRED;
-    ctap2Proxy.uiStarted = true;
 
     G_ux.externalText = NULL;
     ux_flow_init(0,

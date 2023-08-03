@@ -25,6 +25,6 @@ typedef struct u2f_data_t {
     uint8_t nonce[CREDENTIAL_NONCE_SIZE];
 } u2f_data_t;
 
-void handleApdu(unsigned char *flags, unsigned short *tx, unsigned short length);
+int u2f_handle_apdu(uint8_t *rx, int length);
 
 #endif

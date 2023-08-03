@@ -21,11 +21,15 @@
 #include "os.h"
 #include "os_io_seproxyhal.h"
 #include "u2f_processing.h"
+#include "io.h"
 
 #include "ctap2.h"
 #include "cbip_helper.h"
 #include "globals.h"
 #include "fido_known_apps.h"
+#include "ui_shared.h"
+
+#define SW_NO_ERROR 0x9000
 
 #define RPID_FILTER      "webctap."
 #define RPID_FILTER_SIZE (sizeof(RPID_FILTER) - 1)
@@ -58,14 +62,7 @@ void ctap2_ux_get_rpid(const char *rpId, uint32_t rpIdLen, uint8_t *rpIdHash) {
 
 void send_cbor_error(u2f_service_t *service, uint8_t error) {
     if (CMD_IS_OVER_U2F_CMD) {
-        G_io_apdu_buffer[0] = error;
-        G_io_apdu_buffer[1] = 0x90;
-        G_io_apdu_buffer[2] = 0x00;
-        if (ctap2Proxy.uiStarted) {
-            io_exchange(CHANNEL_APDU | IO_RETURN_AFTER_TX, 3);
-        } else {
-            ctap2Proxy.length = 3;
-        }
+        io_send_response_pointer((uint8_t *) &error, 1, SW_NO_ERROR);
     } else {
         u2f_message_reply(service, CTAP2_CMD_CBOR, (uint8_t *) &error, 1);
     }
@@ -73,13 +70,7 @@ void send_cbor_error(u2f_service_t *service, uint8_t error) {
 
 void send_cbor_response(u2f_service_t *service, uint32_t length) {
     if (CMD_IS_OVER_U2F_CMD) {
-        G_io_apdu_buffer[length] = 0x90;
-        G_io_apdu_buffer[length + 1] = 0x00;
-        if (ctap2Proxy.uiStarted) {
-            io_exchange(CHANNEL_APDU | IO_RETURN_AFTER_TX, length + 2);
-        } else {
-            ctap2Proxy.length = length + 2;
-        }
+        io_send_response_pointer(G_io_apdu_buffer, length, SW_NO_ERROR);
     } else {
         u2f_message_reply(service, CTAP2_CMD_CBOR, G_io_apdu_buffer, length);
     }
@@ -173,6 +164,7 @@ void ctap2_handle_cmd_cancel(u2f_service_t *service, uint8_t *buffer, uint16_t l
         PRINTF("Cancel pending UI\n");
 
         ctap2UxState = CTAP2_UX_STATE_CANCELLED;
+        ui_idle();
         send_cbor_error(service, ERROR_KEEPALIVE_CANCEL);
     }
 }

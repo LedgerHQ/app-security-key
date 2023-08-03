@@ -179,11 +179,6 @@ typedef enum ctap2_ux_state_e {
     CTAP2_UX_STATE_CANCELLED = 0xff
 } ctap2_ux_state_t;
 
-typedef struct ctap2_proxy_s {
-    bool uiStarted;
-    uint32_t length;
-} ctap2_proxy_t;
-
 bool ctap2_check_rpid_filter(const char *rpId, uint32_t rpIdLen);
 void ctap2_ux_get_rpid(const char *rpId, uint32_t rpIdLen, uint8_t *rpIdHash);
 void send_cbor_error(u2f_service_t *service, uint8_t error);

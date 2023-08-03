@@ -228,7 +228,6 @@ void ctap2_get_assertion_ux(ctap2_ux_state_t state) {
     if (G_ux.stack_count == 0) {
         ux_stack_push();
     }
-    ctap2Proxy.uiStarted = true;
 
     ctap2UxState = state;
 
