@@ -178,9 +178,9 @@ bool ctap2_client_pin_verify(int protocol,
     } else {
         cx_hmac_sha256_t hmac;
 
-        cx_hmac_sha256_init(&hmac, key, keyLen);  // Can use
-        cx_hmac((cx_hmac_t *) &hmac, 0, msg, msgLength, NULL, 0);
-        cx_hmac((cx_hmac_t *) &hmac, CX_LAST, msg2, msg2Len, hmacValue, CX_SHA256_SIZE);
+        cx_hmac_sha256_init_no_throw(&hmac, key, keyLen);
+        cx_hmac_no_throw((cx_hmac_t *) &hmac, 0, msg, msgLength, NULL, 0);
+        cx_hmac_no_throw((cx_hmac_t *) &hmac, CX_LAST, msg2, msg2Len, hmacValue, CX_SHA256_SIZE);
     }
 
     if (!crypto_compare(signature, hmacValue, signatureLength)) {
