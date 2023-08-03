@@ -32,8 +32,8 @@ PATH_APP_LOAD_PARAMS = "5722689'"  # int("WRA".encode("ascii").hex(), 16)
 PATH_APP_LOAD_PARAMS += "5262163'"  # int("PKS".encode("ascii").hex(), 16)
 
 APPVERSION_M=1
-APPVERSION_N=1
-APPVERSION_P=1
+APPVERSION_N=2
+APPVERSION_P=0
 APPVERSION=$(APPVERSION_M).$(APPVERSION_N).$(APPVERSION_P)
 
 ICON_NANOX=icons/icon_security_key.gif
