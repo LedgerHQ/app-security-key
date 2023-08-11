@@ -242,10 +242,10 @@ class TestClient:
 
     def start(self):
         try:
-            hid_dev = LedgerCtapHidConnection(self.USB_transport,
-                                              self.debug)
+            self.hid_dev = LedgerCtapHidConnection(self.USB_transport,
+                                                   self.debug)
             descriptor = HidDescriptor("sim", 0, 0, 64, 64, "speculos", "0000")
-            self.dev = LedgerCtapHidDevice(descriptor, hid_dev,
+            self.dev = LedgerCtapHidDevice(descriptor, self.hid_dev,
                                            self.USB_transport, self.debug)
 
             self.ctap1 = LedgerCtap1(self.dev, self.model, self.navigator,
