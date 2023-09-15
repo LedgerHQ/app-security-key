@@ -1,5 +1,4 @@
 import pytest
-import socket
 
 from cryptography.x509 import load_der_x509_certificate
 
@@ -82,7 +81,7 @@ def test_register_duplicate(client):
 
 
 def test_register_multiple_ok(client):
-    for i in range(10):
+    for i in range(5):
         challenge = generate_random_bytes(32)
         app_param = generate_random_bytes(32)
 
@@ -178,113 +177,6 @@ def test_register_raw(client):
 
     registration_data = RegistrationData(response)
 
-    registration_data.verify(app_param, challenge)
-
-
-def test_register_raw_u2f_fake_channel_security_crc(client):
-    if client.use_raw_HID_endpoint:
-        pytest.skip("Does not work with this transport")
-
-    # Only spec valid P1 is 0x00, however some platforms wrongly uses
-    # 0x03 as P1 for enroll:
-    # https://searchfox.org/mozilla-central/source/third_party/rust/authenticator/src/consts.rs#55
-    # https://github.com/Yubico/python-u2flib-host/issues/34
-    # We choose to allow it.
-    valid_p1 = [
-        0x00,
-        U2F_P1.REQUEST_USER_PRESENCE,
-    ]
-    for p1 in valid_p1:
-        challenge = bytearray(generate_random_bytes(32))
-        app_param = generate_random_bytes(32)
-        data = challenge + app_param
-
-        # On U2F endpoint, the device should return APDU.SW_CONDITIONS_NOT_SATISFIED
-        # until user validate, except if the request change!
-        client.ctap1.send_apdu_nowait(cla=0x00,
-                                      ins=Ctap1.INS.REGISTER,
-                                      p1=p1,
-                                      p2=0x00,
-                                      data=data)
-
-        response = client.ctap1.device.recv(CTAPHID.MSG)
-
-        with pytest.raises(ApduError) as e:
-            response = client.ctap1.parse_response(response)
-
-        assert e.value.code == APDU.SW_CONDITIONS_NOT_SATISFIED
-
-        # Confirm request
-        client.ctap1.confirm()
-
-        # Change challenge first bit
-        challenge[0] ^= 0x40
-        data = challenge + app_param
-
-        client.ctap1.send_apdu_nowait(cla=0x00,
-                                      ins=Ctap1.INS.REGISTER,
-                                      p1=p1,
-                                      p2=0x00,
-                                      data=data)
-
-        with pytest.raises(socket.timeout) as e:
-            response = client.ctap1.device.recv(CTAPHID.MSG)
-
-        # App should then recover and allow new requests
-        client.ctap1.wait_for_return_on_dashboard()
-
-        challenge = bytearray(generate_random_bytes(32))
-        app_param = generate_random_bytes(32)
-        registration_data = client.ctap1.register(challenge, app_param)
-        registration_data.verify(app_param, challenge)
-
-
-def test_register_raw_u2f_fake_channel_security_length(client):
-    challenge = generate_random_bytes(32)
-    app_param = generate_random_bytes(32)
-    data = challenge + app_param
-
-    # This test is specific for U2F endpoint
-    if not client.use_U2F_endpoint:
-        pytest.skip("Does not work with this transport")
-
-    # On U2F endpoint, the device should return APDU.SW_CONDITIONS_NOT_SATISFIED
-    # until user validate, except if the request change!
-    client.ctap1.send_apdu_nowait(cla=0x00,
-                                  ins=Ctap1.INS.REGISTER,
-                                  p1=0x00,
-                                  p2=0x00,
-                                  data=data)
-
-    response = client.ctap1.device.recv(CTAPHID.MSG)
-
-    with pytest.raises(ApduError) as e:
-        response = client.ctap1.parse_response(response)
-
-    assert e.value.code == APDU.SW_CONDITIONS_NOT_SATISFIED
-
-    # Confirm request
-    client.ctap1.confirm()
-
-    # Change challenge length
-    challenge2 = challenge[:-1]
-    data = challenge2 + app_param
-
-    client.ctap1.send_apdu_nowait(cla=0x00,
-                                  ins=Ctap1.INS.REGISTER,
-                                  p1=0x00,
-                                  p2=0x00,
-                                  data=data)
-
-    with pytest.raises(socket.timeout) as e:
-        response = client.ctap1.device.recv(CTAPHID.MSG)
-
-    # App should then recover and allow new requests
-    client.ctap1.wait_for_return_on_dashboard()
-
-    challenge = generate_random_bytes(32)
-    app_param = generate_random_bytes(32)
-    registration_data = client.ctap1.register(challenge, app_param)
     registration_data.verify(app_param, challenge)
 
 

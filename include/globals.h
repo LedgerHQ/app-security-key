@@ -47,7 +47,6 @@ typedef struct shared_ctx_s {
 
 extern shared_ctx_t shared_ctx;
 extern ctap2_ux_state_t ctap2UxState;
-extern ctap2_proxy_t ctap2Proxy;
 
 static inline u2f_data_t *globals_get_u2f_data(void) {
     return &shared_ctx.u.u2fData;

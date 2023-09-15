@@ -55,8 +55,8 @@ void crypto_compute_sha256(const uint8_t *in1,
     cx_sha256_t hash;
 
     cx_sha256_init(&hash);
-    cx_hash(&hash.header, 0, in1, in1_len, NULL, 0);
-    cx_hash(&hash.header, CX_LAST, in2, in2_len, out, CX_SHA256_SIZE);
+    cx_hash_no_throw(&hash.header, 0, in1, in1_len, NULL, 0);
+    cx_hash_no_throw(&hash.header, CX_LAST, in2, in2_len, out, CX_SHA256_SIZE);
 }
 
 int crypto_generate_private_key(const uint8_t *nonce,

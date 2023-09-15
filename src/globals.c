@@ -25,4 +25,3 @@ char verifyHash[65];
 
 shared_ctx_t shared_ctx;
 ctap2_ux_state_t ctap2UxState;
-ctap2_proxy_t ctap2Proxy;

@@ -179,11 +179,6 @@ typedef enum ctap2_ux_state_e {
     CTAP2_UX_STATE_CANCELLED = 0xff
 } ctap2_ux_state_t;
 
-typedef struct ctap2_proxy_s {
-    bool uiStarted;
-    uint32_t length;
-} ctap2_proxy_t;
-
 bool ctap2_check_rpid_filter(const char *rpId, uint32_t rpIdLen);
 void ctap2_ux_get_rpid(const char *rpId, uint32_t rpIdLen, uint8_t *rpIdHash);
 void send_cbor_error(u2f_service_t *service, uint8_t error);
@@ -211,7 +206,6 @@ void ctap2_get_assertion_ux(ctap2_ux_state_t state);
 void ctap2_get_assertion_next_credential_ux_helper(void);
 void ctap2_get_assertion_confirm(void);
 void ctap2_get_assertion_user_cancel(void);
-void ctap2_get_assertion_no_assertion_confirm(void);
 
 void ctap2_reset_ux(void);
 void ctap2_reset_confirm(void);

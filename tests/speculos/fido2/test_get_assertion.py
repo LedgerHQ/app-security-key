@@ -144,6 +144,27 @@ def test_get_assertion_no_credentials(client, test_name):
     assert e.value.code == CtapError.ERR.NO_CREDENTIALS
 
 
+def test_get_assertion_no_credentials_no_up(client, test_name):
+    options = {"up": False}
+    client_data_hash, rp, _user, _key_params = generate_make_credentials_params(ref=0)
+
+    # Try without allow_list
+    with pytest.raises(CtapError) as e:
+        client.ctap2.get_assertion(rp["id"], client_data_hash,
+                                   options=options,
+                                   user_accept=None)
+    assert e.value.code == CtapError.ERR.NO_CREDENTIALS
+
+    # Try with unknown credential in allow_list
+    client_data_hash, _rp, _user, _key_params = generate_make_credentials_params()
+    allow_list = [{"id": generate_random_bytes(32), "type": "public-key"}]
+    with pytest.raises(CtapError) as e:
+        client.ctap2.get_assertion(rp["id"], client_data_hash, allow_list,
+                                   options=options,
+                                   user_accept=None)
+    assert e.value.code == CtapError.ERR.NO_CREDENTIALS
+
+
 def test_get_assertion_wrong_id(client, test_name):
     compare_args = (TESTS_SPECULOS_DIR, test_name)
     rp, credential_data, _user = generate_get_assertion_params(client, ref=0)
@@ -342,6 +363,43 @@ def test_get_assertion_duplicate_allow_list_entries(client, test_name):
                                            check_users=[user],
                                            check_screens="full",
                                            compare_args=compare_args)
+
+    assertion.verify(client_data_hash, credential_data.public_key)
+
+
+def test_get_assertion_retrocompat(client):
+    # Make sure that app update will still works with previously generated
+    # key handles and public key already shared with some Relying Party
+    credential_data_raw_hex = "58b44d0b0a7cf33afd48f7153c871352"
+    credential_data_raw_hex += "0059022363d64e399b805bbc4cfe2600"
+    credential_data_raw_hex += "84d80df32145a6f7adda491249fc742e"
+    credential_data_raw_hex += "9dec78f4f45060ec450e7af01e4167c7"
+    credential_data_raw_hex += "539b1df5da0355230fa94b7f7ea34a8b"
+    credential_data_raw_hex += "14e2b565960f183a9cb33aafa11a23fa"
+    credential_data_raw_hex += "bafe399a758dbdcb4dfaa8a501020326"
+    credential_data_raw_hex += "2001215820aae619de9564ae171df2f0"
+    credential_data_raw_hex += "de25f513e1cb80d17433fb3cf84ca5c8"
+    credential_data_raw_hex += "16bfd4bd9e22582089199cc93633d93a"
+    credential_data_raw_hex += "c3275a46a33f9266eee0a14f66c154e7"
+    credential_data_raw_hex += "802677f5eb1cbdcf"
+    credential_data_raw = bytearray.fromhex(credential_data_raw_hex)
+
+    user_id_hex = "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f"
+
+    user = {
+        'id': bytearray.fromhex(user_id_hex),
+        'name': 'My user name'
+    }
+
+    rp_id = "webctap.myservice.com"
+
+    credential_data = AttestedCredentialData(credential_data_raw)
+
+    client_data_hash = generate_random_bytes(32)
+    allow_list = [{"id": credential_data.credential_id, "type": "public-key"}] * 2
+    assertion = client.ctap2.get_assertion(rp_id, client_data_hash,
+                                           allow_list,
+                                           check_users=[user])
 
     assertion.verify(client_data_hash, credential_data.public_key)
 

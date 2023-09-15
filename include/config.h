@@ -43,7 +43,7 @@ extern config_t const N_u2f_real;
 
 #define N_u2f (*(volatile config_t *) PIC(&N_u2f_real))
 
-void config_init(void);
+int config_init(void);
 
 uint8_t config_increase_and_get_authentification_counter(uint8_t *buffer);
 

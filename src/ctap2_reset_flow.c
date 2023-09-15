@@ -66,7 +66,6 @@ void ctap2_reset_ux(void) {
         ux_stack_push();
     }
     ctap2UxState = CTAP2_UX_STATE_RESET;
-    ctap2Proxy.uiStarted = true;
 
     G_ux.externalText = NULL;
     ux_flow_init(0, ux_ctap2_reset_flow, NULL);
