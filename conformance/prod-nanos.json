@@ -17,8 +17,7 @@
   ],
   "publicKeyAlgAndEncodings": ["cose"],
   "attestationTypes": [
-    "basic_full",
-    "basic_surrogate"
+    "basic_full"
   ],
   "userVerificationDetails": [
     [{
