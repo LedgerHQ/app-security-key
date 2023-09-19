@@ -40,6 +40,15 @@
       }
     ],
     [{
+        "userVerificationMethod": "passcode_internal",
+        "caDesc": {
+          "base": 10,
+          "minLength": 4,
+          "maxRetries": 3
+        }
+      }
+    ],
+    [{
         "userVerificationMethod": "presence_internal"
       },
       {
