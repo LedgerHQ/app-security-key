@@ -1,5 +1,4 @@
 import pytest
-import sys
 
 from fido2.ctap import CtapError
 
@@ -9,11 +8,8 @@ from utils import HAVE_NO_RESET_GENERATION_INCREMENT
 
 
 def test_reset(client, test_name):
-    for validate_step in [0, 2, 3]:
-        if validate_step == 2 and "--fast" in sys.argv:
-            # Skip additional step on fast mode
-            continue
-        compare_args = (TESTS_SPECULOS_DIR, test_name + "/" + str(validate_step))
+    for user_accept in [True, False]:
+        compare_args = (TESTS_SPECULOS_DIR, test_name + "/" + str(user_accept))
 
         # Create a credential
         rp, credential_data, _ = generate_get_assertion_params(client)
@@ -23,9 +19,9 @@ def test_reset(client, test_name):
         allow_list = [{"id": credential_data.credential_id, "type": "public-key"}]
         client.ctap2.get_assertion(rp["id"], client_data_hash, allow_list)
 
-        if validate_step == 3:  # Abort
+        if not user_accept:  # Abort
             with pytest.raises(CtapError) as e:
-                client.ctap2.reset(validate_step=validate_step, check_screens="full",
+                client.ctap2.reset(user_accept=user_accept, check_screens=True,
                                    compare_args=compare_args)
             assert e.value.code == CtapError.ERR.OPERATION_DENIED
 
@@ -35,7 +31,7 @@ def test_reset(client, test_name):
             client.ctap2.get_assertion(rp["id"], client_data_hash, allow_list)
 
         else:  # Confirm
-            client.ctap2.reset(validate_step=validate_step, check_screens="full",
+            client.ctap2.reset(user_accept=user_accept, check_screens=True,
                                compare_args=compare_args)
 
             client_data_hash = generate_random_bytes(32)
@@ -59,6 +55,6 @@ def test_reset_cancel(client, test_name):
     compare_args = (TESTS_SPECULOS_DIR, test_name)
 
     with pytest.raises(CtapError) as e:
-        client.ctap2.reset(check_screens="full", check_cancel=True,
-                           compare_args=compare_args)
+        client.ctap2.reset(check_screens=True, check_cancel=True,
+                           user_accept=None, compare_args=compare_args)
     assert e.value.code == CtapError.ERR.KEEPALIVE_CANCEL

@@ -143,3 +143,34 @@ fido_known_app = {
     "demo.yubico.com": "demo.yubico.com",
 }
 fido_known_appid = {get_rp_id_hash(x): y for x, y in fido_known_app.items()}
+
+
+def navigate(navigator,
+             user_accept,
+             check_screens,
+             check_cancel,
+             compare_args,
+             text,
+             nav_ins,
+             val_ins):
+
+    if check_screens:
+        assert compare_args
+        root, test_name = compare_args
+    else:
+        root, test_name = None, None
+
+    if user_accept is not None:
+        # Over U2F endpoint (but not over HID) the device needs the
+        # response to be retrieved before continuing the UX flow.
+        navigator.navigate_until_text_and_compare(
+            nav_ins,
+            val_ins,
+            text,
+            root,
+            test_name,
+            screen_change_after_last_instruction=False)
+
+    elif check_cancel:
+        navigator.navigate([nav_ins],
+                           screen_change_after_last_instruction=False)

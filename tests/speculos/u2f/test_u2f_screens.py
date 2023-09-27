@@ -19,9 +19,11 @@ def test_u2f_screens_idle(client, test_name):
     instructions.append(NavInsID.RIGHT_CLICK)
     # Screen 1 -> 2
     instructions.append(NavInsID.RIGHT_CLICK)
+    # Screen 2 -> 3
+    instructions.append(NavInsID.RIGHT_CLICK)
 
     if HAVE_RK_SUPPORT_SETTING:
-        # Screen 2 -> 3
+        # Screen 3 -> 4
         instructions.append(NavInsID.RIGHT_CLICK)
 
     client.navigator.navigate_and_compare(TESTS_SPECULOS_DIR, test_name, instructions,

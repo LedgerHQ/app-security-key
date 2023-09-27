@@ -27,6 +27,7 @@
 
 extern char verifyHash[65];
 extern char verifyName[20];
+extern char rpID[65];
 
 extern u2f_service_t G_io_u2f;
 

@@ -440,17 +440,20 @@ exit:
     return;
 }
 
-void ctap2_get_assertion_next_credential_ux_helper(void) {
+void ctap2_get_assertion_credential_idx(uint16_t idx) {
     ctap2_assert_data_t *ctap2AssertData = globals_get_ctap2_assert_data();
     int status;
 
     while (1) {
+        if (ctap2AssertData->currentCredentialIndex == idx) {
+            return;
+        }
+
         if (!ctap2AssertData->allowListPresent) {
-            if (ctap2AssertData->currentCredentialIndex == ctap2AssertData->availableCredentials) {
+            if (ctap2AssertData->currentCredentialIndex > idx) {
                 ctap2AssertData->currentCredentialIndex = 0;
                 ctap2AssertData->multipleFlowData.rk.minAge = 0;
             }
-            ctap2AssertData->currentCredentialIndex++;
 
             // Find the next entry in rk
             status = rk_storage_find_youngest(ctap2AssertData->rpIdHash,
@@ -460,15 +463,17 @@ void ctap2_get_assertion_next_credential_ux_helper(void) {
                                               &ctap2AssertData->credentialLen);
             if (status <= 0) {
                 // Should not happen, just continue a credential will be picked eventually
-                continue;
+                PRINTF("Unexpected failure rk\n");
             }
-            break;
+
+            ctap2AssertData->currentCredentialIndex++;
+            continue;
         } else {
             cbipDecoder_t decoder;
             cbip_decoder_init(&decoder, ctap2AssertData->buffer, CUSTOM_IO_APDU_BUFFER_SIZE);
 
-            if (ctap2AssertData->multipleFlowData.allowList.currentCredential ==
-                ctap2AssertData->multipleFlowData.allowList.credentialsNumber) {
+            if (ctap2AssertData->multipleFlowData.allowList.currentCredential == 0 ||
+                ctap2AssertData->currentCredentialIndex > idx) {
                 cbipItem_t mapItem;
                 cbip_first(&decoder, &mapItem);
                 status =
@@ -478,11 +483,8 @@ void ctap2_get_assertion_next_credential_ux_helper(void) {
                                        NULL,
                                        &ctap2AssertData->multipleFlowData.allowList.credentialItem,
                                        cbipArray);
-                if (status == CBIPH_STATUS_FOUND) {
-                    ctap2AssertData->multipleFlowData.allowList.credentialsNumber =
-                        ctap2AssertData->multipleFlowData.allowList.credentialItem.value;
-                } else {
-                    ctap2AssertData->multipleFlowData.allowList.credentialsNumber = 0;
+                if (status != CBIPH_STATUS_FOUND) {
+                    PRINTF("Unexpected failure allowlist\n");
                 }
 
                 ctap2AssertData->multipleFlowData.allowList.currentCredential = 0;
@@ -509,9 +511,8 @@ void ctap2_get_assertion_next_credential_ux_helper(void) {
                 continue;
             }
 
-            // Process the item to display
             ctap2AssertData->currentCredentialIndex++;
-            break;
+            continue;
         }
     }
 }
@@ -855,7 +856,7 @@ static int sign_and_build_getAssert_authData(uint8_t *authData,
     return encoder.offset;
 }
 
-void ctap2_get_assertion_confirm() {
+void ctap2_get_assertion_confirm(uint16_t idx) {
     ctap2_assert_data_t *ctap2AssertData = globals_get_ctap2_assert_data();
     int status;
     uint32_t dataLen;
@@ -863,7 +864,7 @@ void ctap2_get_assertion_confirm() {
 
     ctap2UxState = CTAP2_UX_STATE_NONE;
 
-    PRINTF("ctap2_get_assertion_confirm\n");
+    PRINTF("ctap2_get_assertion_confirm %d\n", idx);
 
     ctap2_send_keepalive_processing();
 
@@ -888,6 +889,7 @@ void ctap2_get_assertion_confirm() {
     }
 
     // Retrieve needed data from credential
+    ctap2_get_assertion_credential_idx(idx);
     status = credential_decode(&credData,
                                ctap2AssertData->credential,
                                ctap2AssertData->credentialLen,

@@ -42,24 +42,6 @@ bool ctap2_check_rpid_filter(const char *rpId, uint32_t rpIdLen) {
     }
 }
 
-void ctap2_ux_get_rpid(const char *rpId, uint32_t rpIdLen, uint8_t *rpIdHash) {
-    const char *knownApp;
-
-    PRINTF("rpIdHash %.*H\n", CX_SHA256_SIZE, rpIdHash);
-
-    knownApp = fido_match_known_appid(rpIdHash);
-    if (knownApp != NULL) {
-        PRINTF("Known app %s\n", knownApp);
-        strncpy(verifyHash, knownApp, sizeof(verifyHash));
-    } else {
-        PRINTF("Unknown app\n");
-        // TODO show that rp.id is truncated if necessary
-        snprintf(verifyHash, sizeof(verifyHash), "%.*s", rpIdLen, rpId);
-    }
-    // Should not be necessary, but sanitize anyway
-    verifyHash[sizeof(verifyHash) - 1] = '\0';
-}
-
 void send_cbor_error(u2f_service_t *service, uint8_t error) {
     if (CMD_IS_OVER_U2F_CMD) {
         io_send_response_pointer((uint8_t *) &error, 1, SW_NO_ERROR);
@@ -134,7 +116,7 @@ void ctap2_handle_cmd_cbor(u2f_service_t *service, uint8_t *buffer, uint16_t len
             bool immediateReply;
             ctap2_get_assertion_handle(service, buffer + 1, length - 1, &immediateReply);
             if (immediateReply) {
-                ctap2_get_assertion_confirm();
+                ctap2_get_assertion_confirm(1);
             }
         } break;
         case CBOR_GET_NEXT_ASSERTION:

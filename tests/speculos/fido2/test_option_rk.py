@@ -43,6 +43,7 @@ def enable_rk_option(client):
         # Enter in the settings
         NavInsID.RIGHT_CLICK,
         NavInsID.RIGHT_CLICK,
+        NavInsID.RIGHT_CLICK,
         NavInsID.BOTH_CLICK,
 
         # Enable and skip "Enabling" message

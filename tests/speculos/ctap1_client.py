@@ -7,7 +7,7 @@ from ragger.navigator import NavInsID
 from fido2.ctap1 import Ctap1, ApduError, RegistrationData, SignatureData
 from fido2.hid import CTAPHID
 
-from utils import prepare_apdu
+from utils import prepare_apdu, navigate
 
 
 class APDU(IntEnum):
@@ -90,47 +90,27 @@ class LedgerCtap1(Ctap1):
         data = client_param + app_param
         self.send_apdu_nowait(ins=Ctap1.INS.REGISTER, data=data)
 
-        instructions = []
-        if user_accept and check_screens is None:
-            # Validate blindly
-            instructions.append(NavInsID.BOTH_CLICK)
-        elif user_accept is not None:
-            # check_screens == None only supported when user accept
-            assert check_screens in ["full", "fast"]
+        text = None
+        nav_ins = None
+        val_ins = None
 
-            # Screen 0 -> 1
-            instructions.append(NavInsID.RIGHT_CLICK)
+        if self.model.startswith("nano"):
+            nav_ins = NavInsID.RIGHT_CLICK
+            val_ins = [NavInsID.BOTH_CLICK]
+            if user_accept is not None:
+                if user_accept:
+                    text = "Register"
+                else:
+                    text = "Abort"
 
-            # Screen 1 -> 2
-            if self.model == "nanos":
-                instructions += [NavInsID.RIGHT_CLICK] * 4
-            else:
-                instructions += [NavInsID.RIGHT_CLICK] * 2
-
-            if check_screens == "full":
-                # Screen 2 -> 0
-                instructions.append(NavInsID.RIGHT_CLICK)
-
-                # Screen 0 -> 2
-                instructions.append(NavInsID.LEFT_CLICK)
-
-            if user_accept:
-                # Screen 2 -> 0
-                instructions.append(NavInsID.RIGHT_CLICK)
-
-            # Validate
-            instructions.append(NavInsID.BOTH_CLICK)
-
-        if check_screens:
-            assert compare_args
-            root, test_name = compare_args
-            # Over U2F endpoint (but not over HID) the device needs the
-            # response to be retrieved before continuing the UX flow.
-            self.navigator.navigate_and_compare(root, test_name, instructions,
-                                                screen_change_after_last_instruction=False)
-        elif instructions:
-            self.navigator.navigate(instructions,
-                                    screen_change_after_last_instruction=False)
+        navigate(self.navigator,
+                 user_accept,
+                 check_screens,
+                 False,  # Never check cancel
+                 compare_args,
+                 text,
+                 nav_ins,
+                 val_ins)
 
         response = self.device.recv(CTAPHID.MSG)
         try:
@@ -166,48 +146,27 @@ class LedgerCtap1(Ctap1):
         p1 = U2F_P1.CHECK_IS_REGISTERED if check_only else U2F_P1.REQUEST_USER_PRESENCE
         self.send_apdu_nowait(ins=Ctap1.INS.AUTHENTICATE, p1=p1, data=data)
 
-        instructions = []
-        if user_accept and check_screens is None:
-            # Validate blindly
-            instructions.append(NavInsID.BOTH_CLICK)
+        text = None
+        nav_ins = None
+        val_ins = None
 
-        elif user_accept is not None:
-            # check_screens == None only supported when user accept
-            assert check_screens in ["full", "fast"]
+        if self.model.startswith("nano"):
+            nav_ins = NavInsID.RIGHT_CLICK
+            val_ins = [NavInsID.BOTH_CLICK]
+            if user_accept is not None:
+                if user_accept:
+                    text = "Login"
+                else:
+                    text = "Abort"
 
-            # Screen 0 -> 1
-            instructions.append(NavInsID.RIGHT_CLICK)
-
-            # Screen 1 -> 2
-            if self.model == "nanos":
-                instructions += [NavInsID.RIGHT_CLICK] * 4
-            else:
-                instructions += [NavInsID.RIGHT_CLICK] * 2
-
-            if check_screens == "full":
-                # Screen 2 -> 0
-                instructions.append(NavInsID.RIGHT_CLICK)
-
-                # Screen 0 -> 2
-                instructions.append(NavInsID.LEFT_CLICK)
-
-            if user_accept:
-                # Screen 2 -> 0
-                instructions.append(NavInsID.RIGHT_CLICK)
-
-            # Validate
-            instructions.append(NavInsID.BOTH_CLICK)
-
-        if check_screens:
-            assert compare_args
-            root, test_name = compare_args
-            # Over U2F endpoint (but not over HID) the device needs the
-            # response to be retrieved before continuing the UX flow.
-            self.navigator.navigate_and_compare(root, test_name, instructions,
-                                                screen_change_after_last_instruction=False)
-        elif instructions:
-            self.navigator.navigate(instructions,
-                                    screen_change_after_last_instruction=False)
+        navigate(self.navigator,
+                 user_accept,
+                 check_screens,
+                 False,  # Never check cancel
+                 compare_args,
+                 text,
+                 nav_ins,
+                 val_ins)
 
         response = self.device.recv(CTAPHID.MSG)
         try:
