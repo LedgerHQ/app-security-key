@@ -2,7 +2,7 @@ import struct
 
 from typing import Mapping
 
-from ragger.navigator import NavInsID
+from ragger.navigator import NavInsID, NavIns
 
 from fido2 import cbor
 from fido2.ctap import CtapError
@@ -35,11 +35,21 @@ class LedgerCtap2(Ctap2):
         super().__init__(device)
 
     def confirm(self):
-        instructions = [NavInsID.BOTH_CLICK]
+        if self.model == "stax":
+            instructions = [NavInsID.USE_CASE_CHOICE_CONFIRM]
+        else:
+            instructions = [NavInsID.BOTH_CLICK]
         self.navigator.navigate(instructions,
                                 screen_change_after_last_instruction=False)
 
     def wait_for_return_on_dashboard(self):
+        if self.model == "stax":
+            # On Stax tap on the center to dismiss the status message faster
+            # Ignore if there is nothing that happen (probably already on home screen),
+            # which is expected for flow without status (reset)
+            self.navigator.navigate([NavInsID.USE_CASE_STATUS_DISMISS],
+                                    screen_change_after_last_instruction=False)
+
         self.navigator._backend.wait_for_home_screen()
 
     def send_cbor_nowait(self, cmd, data=None, *, event=None, on_keepalive=None):
@@ -134,6 +144,12 @@ class LedgerCtap2(Ctap2):
                     text = "Don't register"
                 else:
                     text = "Register$"
+        elif self.model == "stax":
+            if user_accept is not None:
+                if not user_accept:
+                    val_ins = [NavInsID.USE_CASE_CHOICE_REJECT]
+                else:
+                    val_ins = [NavInsID.USE_CASE_CHOICE_CONFIRM]
 
         navigate(self.navigator,
                  user_accept,
@@ -208,6 +224,21 @@ class LedgerCtap2(Ctap2):
                         text = "Log in"
                     else:
                         text = "Reject"
+        elif self.model == "stax":
+            if user_accept is not None:
+                if login_type == "none":
+                    val_ins = [NavInsID.TAPPABLE_CENTER_TAP]
+
+                if not user_accept:
+                    val_ins = [NavInsID.USE_CASE_CHOICE_REJECT]
+                else:
+                    if login_type == "multi" and select_user_idx != 1:
+                        assert select_user_idx <= 5
+                        val_ins = [NavIns(NavInsID.TOUCH, (200, 350)),
+                                   NavIns(NavInsID.TOUCH, (200, 40 + 90 * select_user_idx)),
+                                   NavInsID.USE_CASE_CHOICE_CONFIRM]
+                    else:
+                        val_ins = [NavInsID.USE_CASE_CHOICE_CONFIRM]
 
         navigate(self.navigator,
                  user_accept,
@@ -251,6 +282,12 @@ class LedgerCtap2(Ctap2):
                     text = "Yes, delete"
                 else:
                     text = "No, don't delete"
+        elif self.model == "stax":
+            if user_accept is not None:
+                if not user_accept:
+                    val_ins = [NavInsID.USE_CASE_CHOICE_REJECT]
+                else:
+                    val_ins = [NavInsID.USE_CASE_CHOICE_CONFIRM]
 
         navigate(self.navigator,
                  user_accept,

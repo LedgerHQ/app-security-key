@@ -32,7 +32,7 @@ pytest_plugins = ("ragger.conftest.base_conftest", )
 
 BACKENDS = ["speculos"]
 
-DEVICES = ["nanox", "nanosp", "all"]
+DEVICES = ["nanox", "nanosp", "stax", "all"]
 
 
 def pytest_addoption(parser):

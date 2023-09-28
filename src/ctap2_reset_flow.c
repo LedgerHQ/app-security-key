@@ -21,6 +21,19 @@
 
 #include "ctap2.h"
 #include "globals.h"
+#include "ui_shared.h"
+
+static void ctap_ux_on_user_action(bool confirm) {
+    ctap2UxState = CTAP2_UX_STATE_NONE;
+
+    if (confirm) {
+        ctap2_reset_confirm();
+        ui_idle();
+    } else {
+        ctap2_reset_cancel();
+        ui_idle();
+    }
+}
 
 #if defined(HAVE_BAGL)
 
@@ -34,12 +47,12 @@ UX_STEP_NOCB(ux_ctap2_reset_flow_0_step,
 
 UX_STEP_CB(ux_ctap2_reset_flow_1_step,
            pb,
-           ctap2_reset_confirm(),
+           ctap_ux_on_user_action(true),
            {&C_icon_validate_14, "Yes, delete"});
 
 UX_STEP_CB(ux_ctap2_reset_flow_2_step,
            pb,
-           ctap2_reset_cancel(),
+           ctap_ux_on_user_action(false),
            {
                &C_icon_crossmark,
                "No, don't delete",
@@ -54,6 +67,24 @@ void ctap2_reset_ux(void) {
     ctap2UxState = CTAP2_UX_STATE_RESET;
 
     ux_flow_init(0, ux_ctap2_reset_flow, NULL);
+}
+
+#elif defined(HAVE_NBGL)
+#include "nbgl_use_case.h"
+
+void ctap2_reset_ux(void) {
+    ctap2UxState = CTAP2_UX_STATE_RESET;
+
+    io_seproxyhal_play_tune(TUNE_LOOK_AT_ME);
+
+    nbgl_useCaseChoice(&C_warning64px,
+                       "Delete saved login\n"
+                       "details for all\n"
+                       "websites?\n",
+                       NULL,
+                       "Yes, delete",
+                       "No, don't delete",
+                       ctap_ux_on_user_action);
 }
 
 #endif

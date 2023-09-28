@@ -830,13 +830,9 @@ void ctap2_get_assertion_confirm(uint16_t idx) {
     uint32_t dataLen;
     credential_data_t credData;
 
-    ctap2UxState = CTAP2_UX_STATE_NONE;
-
     PRINTF("ctap2_get_assertion_confirm %d\n", idx);
 
     ctap2_send_keepalive_processing();
-
-    ui_idle();
 
     // Perform User Verification if required
     if (ctap2AssertData->pinRequired) {
@@ -905,7 +901,5 @@ exit:
 }
 
 void ctap2_get_assertion_user_cancel() {
-    ctap2UxState = CTAP2_UX_STATE_NONE;
     send_cbor_error(&G_io_u2f, ERROR_OPERATION_DENIED);
-    ui_idle();
 }

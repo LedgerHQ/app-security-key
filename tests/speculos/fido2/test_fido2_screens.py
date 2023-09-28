@@ -8,45 +8,64 @@ from utils import generate_random_bytes
 from utils import generate_make_credentials_params
 from utils import HAVE_RK_SUPPORT_SETTING
 
-from ragger.navigator import NavInsID
+from ragger.navigator import NavInsID, NavIns
 
 
 @pytest.mark.skipif(not HAVE_RK_SUPPORT_SETTING,
                     reason="settings not enable")
 def test_fido_screens_settings(client, test_name):
-    instructions = []
-    # Screen 0 -> 1
-    instructions.append(NavInsID.RIGHT_CLICK)
-    # Screen 1 -> 2
-    instructions.append(NavInsID.RIGHT_CLICK)
-    # Screen 2 -> 3
-    instructions.append(NavInsID.RIGHT_CLICK)
-    # enter settings
-    instructions.append(NavInsID.BOTH_CLICK)
 
-    # Enable and check "Enabling" warning message
-    instructions.append(NavInsID.BOTH_CLICK)
-    # Screen 0 -> 1
-    instructions.append(NavInsID.RIGHT_CLICK)
-    # Screen 1 -> 2
-    instructions.append(NavInsID.RIGHT_CLICK)
-    # Screen 2 -> 3
-    instructions.append(NavInsID.RIGHT_CLICK)
-    # Screen 3 -> 4
-    instructions.append(NavInsID.RIGHT_CLICK)
-    # Screen 4 -> 5
-    instructions.append(NavInsID.RIGHT_CLICK)
-    # Confirm
-    instructions.append(NavInsID.BOTH_CLICK)
+    if client.model.startswith("nano"):
+        instructions = []
+        # Screen 0 -> 1
+        instructions.append(NavInsID.RIGHT_CLICK)
+        # Screen 1 -> 2
+        instructions.append(NavInsID.RIGHT_CLICK)
+        # Screen 2 -> 3
+        instructions.append(NavInsID.RIGHT_CLICK)
+        # enter settings
+        instructions.append(NavInsID.BOTH_CLICK)
 
-    # Disable
-    instructions.append(NavInsID.BOTH_CLICK)
+        # Enable and check "Enabling" warning message
+        instructions.append(NavInsID.BOTH_CLICK)
+        # Screen 0 -> 1
+        instructions.append(NavInsID.RIGHT_CLICK)
+        # Screen 1 -> 2
+        instructions.append(NavInsID.RIGHT_CLICK)
+        # Screen 2 -> 3
+        instructions.append(NavInsID.RIGHT_CLICK)
+        # Screen 3 -> 4
+        instructions.append(NavInsID.RIGHT_CLICK)
+        # Screen 4 -> 5
+        instructions.append(NavInsID.RIGHT_CLICK)
+        # Confirm
+        instructions.append(NavInsID.BOTH_CLICK)
 
-    # leave settings
-    # Screen 0 -> 1
-    instructions.append(NavInsID.RIGHT_CLICK)
-    # confirm
-    instructions.append(NavInsID.BOTH_CLICK)
+        # Disable
+        instructions.append(NavInsID.BOTH_CLICK)
+
+        # leave settings
+        # Screen 0 -> 1
+        instructions.append(NavInsID.RIGHT_CLICK)
+        # confirm
+        instructions.append(NavInsID.BOTH_CLICK)
+    else:
+        instructions = [
+            # Enter in the settings
+            NavInsID.USE_CASE_HOME_SETTINGS,
+            NavInsID.USE_CASE_SETTINGS_NEXT,
+
+            # Enable and skip "Enabling" message
+            NavIns(NavInsID.CHOICE_CHOOSE, (1,)),
+            NavInsID.USE_CASE_CHOICE_CONFIRM,
+            NavInsID.USE_CASE_STATUS_DISMISS,
+
+            # Disable
+            NavIns(NavInsID.CHOICE_CHOOSE, (1,)),
+
+            # Leave settings
+            NavInsID.USE_CASE_SETTINGS_MULTI_PAGE_EXIT,
+        ]
 
     client.navigator.navigate_and_compare(TESTS_SPECULOS_DIR, test_name, instructions,
                                           screen_change_before_first_instruction=False)
