@@ -66,18 +66,8 @@ void ctap2_send_keepalive_processing() {
 }
 
 void performBuiltInUv(void) {
-    bolos_ux_params_t params = {.ux_id = BOLOS_UX_VALIDATE_PIN};
-
-    io_seproxyhal_io_heartbeat();
-
-    // Request user to enter his device PIN.
-    // This function doesn't return until the correct PIN is entered.
-    // If the user enter 3 wrong PIN, the device is reset to factory:
-    // - Current running app is terminated
-    // - All apps are removed
-    // - Seed is deleted
-    os_ux_blocking(&params);
-    PRINTF("Pin validated\n");
+    PRINTF("performBuiltInUv\n");
+    // No-op as the user is verified through the session PIN.
 }
 
 #define CBOR_MAKE_CREDENTIAL    0x01
