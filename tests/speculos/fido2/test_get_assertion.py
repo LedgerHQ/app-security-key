@@ -226,7 +226,7 @@ def test_get_assertion_allow_list(client, test_name):
     allow_list.append({"id": credential_data.credential_id, "type": "public-key"})
 
     # Register 3 users for a known RP
-    for idx in range(3):
+    for idx in range(1, 4):
         client_data_hash, _, user, key_params = generate_make_credentials_params(ref=idx)
         attestation = client.ctap2.make_credential(client_data_hash,
                                                    rp,
@@ -248,9 +248,10 @@ def test_get_assertion_allow_list(client, test_name):
                                            user_accept=True,
                                            check_users=registered_users,
                                            check_screens="full",
-                                           compare_args=compare_args)
+                                           compare_args=compare_args,
+                                           select_user_idx=3)
 
-    credential_data = users_credential_data[0]
+    credential_data = users_credential_data[2]
     assertion.verify(client_data_hash, credential_data.public_key)
 
     with pytest.raises(InvalidSignature):

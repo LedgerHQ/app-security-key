@@ -11,8 +11,7 @@ from fido2.ctap2.base import Ctap2, args, AttestationResponse, AssertionResponse
 from fido2.hid import CTAPHID
 
 from ctap1_client import APDU
-from utils import get_rp_id_hash, fido_known_appid, prepare_apdu
-from screen_size_utils import get_message_nb_screen
+from utils import prepare_apdu, navigate
 
 
 class LedgerCtap2(Ctap2):
@@ -100,24 +99,6 @@ class LedgerCtap2(Ctap2):
             return decoded
         raise TypeError("Decoded value of wrong type")
 
-    def get_user_screen_instructions(self, user):
-        if "displayName" in user:
-            nb = get_message_nb_screen(self.model, user["displayName"][:64])
-        elif "name" in user:
-            nb = get_message_nb_screen(self.model, user["name"][:64])
-        elif "id" in user:
-            nb = get_message_nb_screen(self.model, user["id"].hex().upper()[:64])
-
-        return [NavInsID.RIGHT_CLICK] * nb
-
-    def get_domain_screen_instructions(self, rp_id):
-        rp_id_hash = get_rp_id_hash(rp_id)
-        if rp_id_hash in fido_known_appid:
-            nb = get_message_nb_screen(self.model, fido_known_appid[rp_id_hash])
-        else:
-            nb = get_message_nb_screen(self.model, rp_id)
-        return [NavInsID.RIGHT_CLICK] * nb
-
     def make_credential(self, client_data_hash, rp, user, key_params,
                         exclude_list=None, extensions=None, options=None,
                         pin_uv_param=None, pin_uv_protocol=None,
@@ -141,52 +122,27 @@ class LedgerCtap2(Ctap2):
         ctap_hid_cmd = self.send_cbor_nowait(cmd, data, event=event,
                                              on_keepalive=on_keepalive)
 
-        rk = False
-        if options and options.get("rk", False):
-            rk = True
+        text = None
+        nav_ins = None
+        val_ins = None
 
-        instructions = []
-        if user_accept is not None:
-            if rk:
-                # Check resident key extra step 0bis content
-                # Screen 0 -> 0bis
-                instructions.append(NavInsID.RIGHT_CLICK)
+        if self.model.startswith("nano"):
+            nav_ins = NavInsID.RIGHT_CLICK
+            val_ins = [NavInsID.BOTH_CLICK]
+            if user_accept is not None:
+                if not user_accept:
+                    text = "Don't register"
+                else:
+                    text = "Register$"
 
-            # Screen 0 -> 1
-            instructions.append(NavInsID.RIGHT_CLICK)
-
-            # Screen 1 -> 2
-            instructions += self.get_domain_screen_instructions(rp["id"])
-
-            # Screen 2 -> 3
-            instructions += self.get_user_screen_instructions(user)
-
-            if rk:
-                if user_accept:
-                    # Screen 3 -> 4
-                    instructions.append(NavInsID.RIGHT_CLICK)
-
-            elif not user_accept:
-                # Screen 3 -> 4
-                instructions.append(NavInsID.RIGHT_CLICK)
-
-            # Validate
-            instructions.append(NavInsID.BOTH_CLICK)
-
-        elif check_cancel:
-            # Screen 0 -> 1
-            instructions.append(NavInsID.RIGHT_CLICK)
-
-        if check_screens:
-            assert compare_args
-            root, test_name = compare_args
-            # Over U2F endpoint (but not over HID) the device needs the
-            # response to be retrieved before continuing the UX flow.
-            self.navigator.navigate_and_compare(root, test_name, instructions,
-                                                screen_change_after_last_instruction=False)
-        elif instructions:
-            self.navigator.navigate(instructions,
-                                    screen_change_after_last_instruction=False)
+        navigate(self.navigator,
+                 user_accept,
+                 check_screens,
+                 check_cancel,
+                 compare_args,
+                 text,
+                 nav_ins,
+                 val_ins)
 
         if check_cancel:
             # Send a cancel command
@@ -205,7 +161,8 @@ class LedgerCtap2(Ctap2):
                       extensions=None, options=None, pin_uv_param=None,
                       pin_uv_protocol=None, *, event=None, on_keepalive=None,
                       login_type="simple", user_accept=True, check_users=None,
-                      check_screens=None, check_cancel=False, compare_args=None):
+                      check_screens=None, check_cancel=False, compare_args=None,
+                      select_user_idx=1):
         # Refresh navigator screen content reference
         self.navigator._backend.get_current_screen_content()
 
@@ -225,90 +182,43 @@ class LedgerCtap2(Ctap2):
         ctap_hid_cmd = self.send_cbor_nowait(cmd, data, event=event,
                                              on_keepalive=on_keepalive)
 
-        instructions = []
-        if user_accept and check_screens is None and login_type not in ["none", "multi"]:
-            # Validate blindly
-            instructions.append(NavInsID.BOTH_CLICK)
+        text = None
+        nav_ins = None
+        val_ins = None
 
-        elif user_accept is not None:
-            if login_type == "none":
-                # Screen 0 -> 1
-                instructions.append(NavInsID.RIGHT_CLICK)
+        if self.model.startswith("nano"):
+            nav_ins = NavInsID.RIGHT_CLICK
+            val_ins = [NavInsID.BOTH_CLICK]
+            if user_accept is not None:
+                if login_type == "none":
+                    text = "Close"
 
-                # Screen 1 -> 2
-                instructions += self.get_domain_screen_instructions(rp_id)
+                elif login_type == "multi":
+                    if check_users and len(check_users) == 1:
+                        raise ValueError("Found 1 user while expecting multiple")
 
-                # Validate
-                instructions.append(NavInsID.BOTH_CLICK)
+                    if user_accept:
+                        text = f"Log in user {select_user_idx}/"
+                    else:
+                        text = "Reject"
 
-            elif login_type == "multi":
-                if len(check_users) == 1:
-                    raise ValueError("Found 1 user while expecting multiple")
+                else:
+                    if check_users and len(check_users) != 1:
+                        raise ValueError("Found multiple users while expecting 1")
 
-                # Screen 0 -> 1
-                instructions.append(NavInsID.RIGHT_CLICK)
+                    if user_accept:
+                        text = "Log in"
+                    else:
+                        text = "Reject"
 
-                # Screen 1 -> 2
-                instructions += self.get_domain_screen_instructions(rp_id)
-
-                for user in check_users:
-                    # Screen 2 -> 3
-                    instructions += self.get_user_screen_instructions(user)
-
-                    # Screen 3 -> 4
-                    instructions.append(NavInsID.RIGHT_CLICK)
-
-                    # Validate
-                    instructions.append(NavInsID.BOTH_CLICK)
-
-                    # Upon confirmation, the flow is update with the next user
-                    # and restarts at screen 2 presenting user data
-
-                # Screen 2 -> 3
-                instructions += self.get_user_screen_instructions(check_users[0])
-
-                if not user_accept:
-                    # Go to step 5
-                    instructions.append(NavInsID.RIGHT_CLICK)
-                    instructions.append(NavInsID.RIGHT_CLICK)
-
-                # Validate
-                instructions.append(NavInsID.BOTH_CLICK)
-
-            else:
-                if len(check_users) != 1:
-                    raise ValueError("Found multiple users while expecting 1")
-
-                # Screen 0 -> 1
-                instructions.append(NavInsID.RIGHT_CLICK)
-
-                # Screen 1 -> 2
-                instructions += self.get_domain_screen_instructions(rp_id)
-
-                # Screen 2 -> 3
-                instructions += self.get_user_screen_instructions(check_users[0])
-
-                if not user_accept:
-                    # Screen 3 -> 4
-                    instructions.append(NavInsID.RIGHT_CLICK)
-
-                # Validate
-                instructions.append(NavInsID.BOTH_CLICK)
-
-        elif check_cancel:
-            # Screen 0 -> 1
-            instructions.append(NavInsID.RIGHT_CLICK)
-
-        if check_screens:
-            assert compare_args
-            root, test_name = compare_args
-            # Over U2F endpoint (but not over HID) the device needs the
-            # response to be retrieved before continuing the UX flow.
-            self.navigator.navigate_and_compare(root, test_name, instructions,
-                                                screen_change_after_last_instruction=False)
-        elif instructions:
-            self.navigator.navigate(instructions,
-                                    screen_change_after_last_instruction=False)
+        navigate(self.navigator,
+                 user_accept,
+                 check_screens,
+                 check_cancel,
+                 compare_args,
+                 text,
+                 nav_ins,
+                 val_ins)
 
         if check_cancel:
             # Send a cancel command
@@ -333,7 +243,7 @@ class LedgerCtap2(Ctap2):
                                         extensions=None, options=None, pin_uv_param=None,
                                         pin_uv_protocol=None, *, event=None, on_keepalive=None,
                                         login_type="simple", user_accept=True, check_users=None,
-                                        compare_args=None):
+                                        compare_args=None, select_user_idx=1):
         # Refresh navigator screen content reference
         self.navigator._backend.get_current_screen_content()
 
@@ -357,41 +267,40 @@ class LedgerCtap2(Ctap2):
         ctap_hid_cmd = self.send_cbor_nowait(cmd, data, event=event,
                                              on_keepalive=on_keepalive)
 
-        instructions = []
-        if user_accept is not None:
+        text = None
+        nav_ins = None
+        val_ins = None
 
-            # Screen 0 -> text_flow_0
-            instructions.append(NavInsID.RIGHT_CLICK)
+        if self.model.startswith("nano"):
+            nav_ins = NavInsID.RIGHT_CLICK
+            val_ins = [NavInsID.BOTH_CLICK]
+            if user_accept is not None:
+                if login_type == "multi":
+                    if check_users and len(check_users) == 1:
+                        raise ValueError("Found 1 user while expecting multiple")
 
-            # Screen text_flow_0 -> 1
-            nb = get_message_nb_screen(self.model, extensions["txAuthSimple"])
-            instructions += [NavInsID.RIGHT_CLICK] * nb
+                    if user_accept:
+                        text = f"Log in user {select_user_idx}/"
+                    else:
+                        text = "Reject"
 
-            # Screen 1 -> 2
-            instructions += self.get_domain_screen_instructions(rp_id)
+                else:
+                    if check_users and len(check_users) != 1:
+                        raise ValueError("Found multiple users while expecting 1")
 
-            # Screen 2 -> 3
-            instructions += self.get_user_screen_instructions(check_users[0])
+                    if user_accept:
+                        text = "Log in"
+                    else:
+                        text = "Reject"
 
-            if login_type == "multi":
-                if not user_accept:
-                    # Go to step 5
-                    instructions.append(NavInsID.RIGHT_CLICK)
-                    instructions.append(NavInsID.RIGHT_CLICK)
-            else:
-                if not user_accept:
-                    # Screen 3 -> 4
-                    instructions.append(NavInsID.RIGHT_CLICK)
-
-            # Validate
-            instructions.append(NavInsID.BOTH_CLICK)
-
-        assert compare_args
-        root, test_name = compare_args
-        # Over U2F endpoint (but not over HID) the device needs the
-        # response to be retrieved before continuing the UX flow.
-        self.navigator.navigate_and_compare(root, test_name, instructions,
-                                            screen_change_after_last_instruction=False)
+        navigate(self.navigator,
+                 user_accept,
+                 True,  # Always check screen
+                 False,  # Never check cancel
+                 compare_args,
+                 text,
+                 nav_ins,
+                 val_ins)
 
         response = self.device.recv(ctap_hid_cmd)
 
@@ -408,42 +317,35 @@ class LedgerCtap2(Ctap2):
 
         return AssertionResponse.from_dict(response)
 
-    def reset(self, *, event=None, on_keepalive=None, validate_step=0,
-              check_screens=None, check_cancel=False, compare_args=None):
+    def reset(self, *, event=None, on_keepalive=None, user_accept=True,
+              check_screens=False, check_cancel=False, compare_args=None):
         # Refresh navigator screen content reference
         self.navigator._backend.get_current_screen_content()
 
         ctap_hid_cmd = self.send_cbor_nowait(Ctap2.CMD.RESET, event=event,
                                              on_keepalive=on_keepalive)
 
-        instructions = []
-        if validate_step != 3 and check_screens is None:
-            # Validate blindly
-            instructions.append(NavInsID.BOTH_CLICK)
+        text = None
+        nav_ins = None
+        val_ins = None
 
-        elif check_cancel:
-            # Screen 0 -> 1
-            instructions.append(NavInsID.RIGHT_CLICK)
+        if self.model.startswith("nano"):
+            nav_ins = NavInsID.RIGHT_CLICK
+            val_ins = [NavInsID.BOTH_CLICK]
+            if user_accept is not None:
+                if user_accept:
+                    text = "Yes, delete"
+                else:
+                    text = "No, don't delete"
 
-        else:
-            # check_screens == None only supported when user accept
-            assert check_screens in ["full", "fast"]
-
-            instructions += [NavInsID.RIGHT_CLICK] * validate_step
-
-            # Confirm
-            instructions.append(NavInsID.BOTH_CLICK)
-
-        if check_screens:
-            assert compare_args
-            root, test_name = compare_args
-            # Over U2F endpoint (but not over HID) the device needs the
-            # response to be retrieved before continuing the UX flow.
-            self.navigator.navigate_and_compare(root, test_name, instructions,
-                                                screen_change_after_last_instruction=False)
-        elif instructions:
-            self.navigator.navigate(instructions,
-                                    screen_change_after_last_instruction=False)
+        navigate(self.navigator,
+                 user_accept,
+                 check_screens,
+                 check_cancel,
+                 compare_args,
+                 text,
+                 nav_ins,
+                 val_ins)
 
         if check_cancel:
             # Send a cancel command

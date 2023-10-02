@@ -19,6 +19,8 @@ def test_fido_screens_settings(client, test_name):
     instructions.append(NavInsID.RIGHT_CLICK)
     # Screen 1 -> 2
     instructions.append(NavInsID.RIGHT_CLICK)
+    # Screen 2 -> 3
+    instructions.append(NavInsID.RIGHT_CLICK)
     # enter settings
     instructions.append(NavInsID.BOTH_CLICK)
 
@@ -37,19 +39,7 @@ def test_fido_screens_settings(client, test_name):
     # Confirm
     instructions.append(NavInsID.BOTH_CLICK)
 
-    # Disable and check "Disabling" warning message
-    instructions.append(NavInsID.BOTH_CLICK)
-    # Screen 0 -> 1
-    instructions.append(NavInsID.RIGHT_CLICK)
-    # Screen 1 -> 2
-    instructions.append(NavInsID.RIGHT_CLICK)
-    # Screen 2 -> 3
-    instructions.append(NavInsID.RIGHT_CLICK)
-    # Screen 3 -> 4
-    instructions.append(NavInsID.RIGHT_CLICK)
-    # Screen 4 -> 3
-    instructions.append(NavInsID.LEFT_CLICK)
-    # Approve
+    # Disable
     instructions.append(NavInsID.BOTH_CLICK)
 
     # leave settings

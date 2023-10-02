@@ -24,19 +24,9 @@
 #include "ctap2.h"
 #include "globals.h"
 
-static void ctap2_ux_display_rp(void) {
+static void ctap2_ux_get_display_user(void) {
     ctap2_register_data_t *ctap2RegisterData = globals_get_ctap2_register_data();
 
-    PRINTF("ctap2_ux_display_rp\n");
-    ctap2_ux_get_rpid(ctap2RegisterData->rpId,
-                      ctap2RegisterData->rpIdLen,
-                      ctap2RegisterData->rpIdHash);
-}
-
-static void ctap2_ux_display_user(void) {
-    ctap2_register_data_t *ctap2RegisterData = globals_get_ctap2_register_data();
-
-    PRINTF("ctap2_ux_display_user\n");
     if (ctap2RegisterData->userStr) {
         uint8_t nameLength = MIN(ctap2RegisterData->userStrLen, sizeof(verifyHash) - 1);
 
@@ -52,42 +42,29 @@ static void ctap2_ux_display_user(void) {
     }
 }
 
+#if defined(HAVE_BAGL)
+
 UX_STEP_NOCB(ux_ctap2_make_cred_flow_first_step,
              pnn,
              {
                  &C_icon_security_key,
                  "Register new",
-                 "credential",
+                 "account",
              });
 
-UX_STEP_NOCB(ux_ctap2_make_cred_resident_flow_first_step,
-             pbn,
+UX_STEP_NOCB(ux_ctap2_make_cred_flow_domain_step,
+             bnnn_paging,
              {
-                 &C_icon_warning,
-                 "Warning",
-                 "Resident key",
+                 .title = "Website",
+                 .text = rpID,
              });
 
-UX_STEP_NOCB(
-    ux_ctap2_make_cred_resident_flow_warning_step,
-    nnnn,
-    {"You are about to", "register a credential", "that will be lost upon", "app or OS update."});
-
-UX_STEP_NOCB_INIT(ux_ctap2_make_cred_flow_domain_step,
-                  bnnn_paging,
-                  ctap2_ux_display_rp(),
-                  {
-                      .title = "Domain",
-                      .text = (char *) verifyHash,
-                  });
-
-UX_STEP_NOCB_INIT(ux_ctap2_make_cred_flow_user_step,
-                  bnnn_paging,
-                  ctap2_ux_display_user(),
-                  {
-                      .title = "User",
-                      .text = (char *) verifyHash,
-                  });
+UX_STEP_NOCB(ux_ctap2_make_cred_flow_user_step,
+             bnnn_paging,
+             {
+                 .title = "User ID",
+                 .text = verifyHash,
+             });
 
 UX_STEP_CB(ux_ctap2_make_cred_flow_accept_step,
            pb,
@@ -122,25 +99,32 @@ UX_FLOW(ux_ctap2_make_cred_flow,
         &ux_ctap2_make_cred_flow_refuse_step);
 
 UX_FLOW(ux_ctap2_make_cred_resident_flow,
-        &ux_ctap2_make_cred_resident_flow_first_step,
-        &ux_ctap2_make_cred_resident_flow_warning_step,
+        &ux_ctap2_make_cred_flow_first_step,
         &ux_ctap2_make_cred_flow_domain_step,
         &ux_ctap2_make_cred_flow_user_step,
-        &ux_ctap2_make_cred_flow_refuse_step,
-        &ux_ctap2_make_cred_resident_flow_accept_step);
+        &ux_ctap2_make_cred_resident_flow_accept_step,
+        &ux_ctap2_make_cred_flow_refuse_step);
+
+#endif
 
 void ctap2_make_credential_ux(void) {
     ctap2_register_data_t *ctap2RegisterData = globals_get_ctap2_register_data();
 
-    // reserve a display stack slot if none yet
-    if (G_ux.stack_count == 0) {
-        ux_stack_push();
-    }
     ctap2UxState = CTAP2_UX_STATE_MAKE_CRED;
 
+    // TODO show that rp.id is truncated if necessary
+    uint8_t len = MIN(sizeof(rpID) - 1, ctap2RegisterData->rpIdLen);
+    memcpy(rpID, ctap2RegisterData->rpId, len);
+    rpID[len] = '\0';
+    PRINTF("rpId %s\n", rpID);
+
+    ctap2_ux_get_display_user();
+
+#if defined(HAVE_BAGL)
     G_ux.externalText = NULL;
     ux_flow_init(0,
                  (ctap2RegisterData->residentKey ? ux_ctap2_make_cred_resident_flow
                                                  : ux_ctap2_make_cred_flow),
                  NULL);
+#endif
 }
