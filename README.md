@@ -50,7 +50,9 @@ See dedicated `README.md` in tests `directory`.
 
 ## Known limitations
 
-On Linux and Mac, Firefox support only U2F but not CTAP2, see [corresponding tracker](https://bugzilla.mozilla.org/show_bug.cgi?id=1530370).
+- On Firefox on Linux, Nano S Plus is missing in snap udev rules.
+- There are some instabilities on Safari on MacOS, it's recommended to use another browser.
+- Android support on FIDO2 for external security key is not available yet. It should be starting with Google Play services v23.35
 
 Due to OS constraints, this Security Key App as some limitations:
 
@@ -62,4 +64,4 @@ Due to OS constraints, this Security Key App as some limitations:
   That is why they are not enabled by default, and should be manually enabled in the settings. See HAVE_RK_SUPPORT_SETTING section on the Makefile for more explanations.
 * Following FIDO2 spec, there should be a way to revoked credentials. A revocation mechanism has been implemented based on a counter that - as discoverable credentials - will be wiped upon app deletion. therefore, in order to avoid weird issue on user side, this counter as been disabled. See HAVE_NO_RESET_GENERATION_INCREMENT section on the Makefile for more explanations.
 
-Please look at the dedicated section at the end of [this blog post](https://blog.ledger.com/security-key/) for more detailed explanations.
+Please look at the dedicated section at the end of [this blog post](https://www.ledger.com/blog/strengthen-the-security-of-your-accounts-with-webauthn) for more detailed explanations.
