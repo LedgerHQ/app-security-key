@@ -53,7 +53,6 @@ UX_FLOW(ux_ctap2_reset_flow,
 void ctap2_reset_ux(void) {
     ctap2UxState = CTAP2_UX_STATE_RESET;
 
-    G_ux.externalText = NULL;
     ux_flow_init(0, ux_ctap2_reset_flow, NULL);
 }
 

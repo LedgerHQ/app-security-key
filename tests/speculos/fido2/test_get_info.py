@@ -23,8 +23,7 @@ def test_get_info_extensions(client):
     info = client.ctap2.info
 
     assert "hmac-secret" in info.extensions
-    assert "txAuthSimple" in info.extensions
-    assert len(info.extensions) == 2
+    assert len(info.extensions) == 1
 
 
 def test_get_info_aaguid(client):

@@ -121,7 +121,6 @@ void ctap2_make_credential_ux(void) {
     ctap2_ux_get_display_user();
 
 #if defined(HAVE_BAGL)
-    G_ux.externalText = NULL;
     ux_flow_init(0,
                  (ctap2RegisterData->residentKey ? ux_ctap2_make_cred_resident_flow
                                                  : ux_ctap2_make_cred_flow),

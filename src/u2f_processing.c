@@ -482,7 +482,6 @@ static void u2f_prompt_user_presence(bool enroll, uint8_t *applicationParameter)
         strlcpy(verifyName, name, sizeof(verifyName));
     }
 
-    G_ux.externalText = NULL;
     if (enroll) {
         ux_flow_init(0, ux_register_flow, NULL);
     } else {

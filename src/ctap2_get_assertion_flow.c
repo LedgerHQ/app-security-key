@@ -178,46 +178,6 @@ UX_FLOW(ux_ctap2_get_assertion_multiple_flow,
         &ux_ctap2_get_assertion_multiple_right_border,
         &ux_ctap2_get_assertion_flow_refuse_step);
 
-// Extra steps if a text is associated to the TX for single assertion
-
-UX_STEP_NOCB(ux_ctap2_get_assertion_text_flow_first_step,
-             pnn,
-             {
-                 &C_icon_certificate,
-                 "Review login",
-                 "request with text",
-             });
-
-UX_STEP_NOCB(ux_ctap2_get_assertion_text_flow_text_step,
-             bnnn_paging,
-             {.title = "Message", .text = NULL});
-
-UX_FLOW(ux_ctap2_get_assertion_text_flow,
-        &ux_ctap2_get_assertion_text_flow_first_step,
-        &ux_ctap2_get_assertion_text_flow_text_step,
-        &ux_ctap2_get_assertion_flow_domain_step,
-        &ux_ctap2_get_assertion_flow_user_step,
-        &ux_ctap2_get_assertion_flow_accept_step,
-        &ux_ctap2_get_assertion_flow_refuse_step);
-
-// Extra steps if a text is associated to the TX for multiple assertion
-UX_STEP_NOCB(ux_ctap2_get_assertion_multiple_text_flow_first_step,
-             pnn,
-             {
-                 &C_icon_certificate,
-                 "Select user and",
-                 "log in with text",
-             });
-
-UX_FLOW(ux_ctap2_get_assertion_multiple_text_flow,
-        &ux_ctap2_get_assertion_multiple_text_flow_first_step,
-        &ux_ctap2_get_assertion_text_flow_text_step,
-        &ux_ctap2_get_assertion_flow_domain_step,
-        &ux_ctap2_get_assertion_multiple_left_border,
-        &ux_ctap2_get_assertion_multiple_user_border,
-        &ux_ctap2_get_assertion_multiple_right_border,
-        &ux_ctap2_get_assertion_flow_refuse_step);
-
 // Dedicated flow to get user presence confirmation if no account is registered
 UX_STEP_NOCB(ux_ctap2_no_assertion_flow_0_step,
              pnn,
@@ -266,29 +226,13 @@ void ctap2_get_assertion_ux(ctap2_ux_state_t state) {
     ux_step = 0;
     ux_step_count = ctap2AssertData->availableCredentials;
 
-    if (ctap2AssertData->txAuthMessage != NULL) {
-        ctap2AssertData->txAuthLast = ctap2AssertData->txAuthMessage[ctap2AssertData->txAuthLength];
-        ctap2AssertData->txAuthMessage[ctap2AssertData->txAuthLength] = '\0';
-        G_ux.externalText = ctap2AssertData->txAuthMessage;
-    } else {
-        G_ux.externalText = NULL;
-    }
-
     switch (state) {
         case CTAP2_UX_STATE_GET_ASSERTION: {
-            if (ctap2AssertData->txAuthMessage != NULL) {
-                ux_flow_init(0, ux_ctap2_get_assertion_text_flow, NULL);
-            } else {
-                ux_flow_init(0, ux_ctap2_get_assertion_flow, NULL);
-            }
+            ux_flow_init(0, ux_ctap2_get_assertion_flow, NULL);
             break;
         }
         case CTAP2_UX_STATE_MULTIPLE_ASSERTION: {
-            if (ctap2AssertData->txAuthMessage != NULL) {
-                ux_flow_init(0, ux_ctap2_get_assertion_multiple_text_flow, NULL);
-            } else {
-                ux_flow_init(0, ux_ctap2_get_assertion_multiple_flow, NULL);
-            }
+            ux_flow_init(0, ux_ctap2_get_assertion_multiple_flow, NULL);
             break;
         }
         default: {

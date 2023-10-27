@@ -151,7 +151,6 @@ void ui_idle(void) {
     if (G_ux.stack_count == 0) {
         ux_stack_push();
     }
-    G_ux.externalText = NULL;
     ux_flow_init(0, ux_idle_flow, NULL);
 }
 

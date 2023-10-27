@@ -59,9 +59,8 @@ void ctap2_get_info_handle(u2f_service_t *service, uint8_t *buffer, uint16_t len
     // extensions (0x02)
 
     cbip_add_int(&encoder, TAG_EXTENSIONS);
-    cbip_add_array_header(&encoder, 2);
+    cbip_add_array_header(&encoder, 1);
     cbip_add_string(&encoder, EXTENSION_HMAC_SECRET, sizeof(EXTENSION_HMAC_SECRET) - 1);
-    cbip_add_string(&encoder, EXTENSION_TX_AUTH_SIMPLE, sizeof(EXTENSION_TX_AUTH_SIMPLE) - 1);
 
     // AAGUID (0x03)
 
