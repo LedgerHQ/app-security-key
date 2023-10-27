@@ -26,8 +26,9 @@
 #include "credential.h"
 #include "ctap2.h"
 
-#define ROLE_PRIVATE_KEY     0
-#define ROLE_CRED_RANDOM_KEY 1
+#define ROLE_PRIVATE_KEY           0
+#define ROLE_CRED_RANDOM_KEY_UV    1
+#define ROLE_CRED_RANDOM_KEY_NO_UV 2
 
 bool crypto_compare(const uint8_t *a, const uint8_t *b, uint16_t length) {
     uint16_t given_length = length;
@@ -104,12 +105,16 @@ int crypto_generate_public_key(cx_ecfp_private_key_t *private_key,
     return app_public_key.W_len;
 }
 
-void crypto_generate_credRandom_key(const uint8_t *nonce, uint8_t *credRandom) {
+void crypto_generate_credRandom_key(const uint8_t *nonce, uint8_t *credRandom, bool with_uv) {
     uint8_t extended_nonce[32];
 
     // credRandomKey = SHA256((1 << 128 | nonce) || privateKeySeed)
     memset(extended_nonce, 0, sizeof(extended_nonce));
-    extended_nonce[15] = ROLE_CRED_RANDOM_KEY;
+    if (with_uv) {
+        extended_nonce[15] = ROLE_CRED_RANDOM_KEY_UV;
+    } else {
+        extended_nonce[15] = ROLE_CRED_RANDOM_KEY_NO_UV;
+    }
     memcpy(extended_nonce + 16, nonce, CREDENTIAL_NONCE_SIZE);
     crypto_compute_sha256(extended_nonce,
                           sizeof(extended_nonce),

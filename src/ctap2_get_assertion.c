@@ -656,7 +656,9 @@ static int build_getAssert_authData(uint8_t *buffer, uint32_t bufferLength, uint
             uint8_t *salt = NULL;
             uint32_t saltLength = 0;
 
-            crypto_generate_credRandom_key(ctap2AssertData->nonce, credRandom);
+            crypto_generate_credRandom_key(ctap2AssertData->nonce,
+                                           credRandom,
+                                           ctap2AssertData->pinRequired);
 
             status = compute_getAssert_hmacSecret_output(&salt, &saltLength, credRandom);
             if (status != ERROR_NONE) {
