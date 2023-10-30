@@ -20,6 +20,7 @@
 
 #include "os.h"
 #include "ux.h"
+#include "format.h"
 
 #include "ctap2.h"
 #include "globals.h"
@@ -33,12 +34,9 @@ static void ctap2_ux_get_display_user(void) {
         memcpy(verifyHash, ctap2RegisterData->userStr, nameLength);
         verifyHash[nameLength] = '\0';
     } else {
-        snprintf(verifyHash,
-                 sizeof(verifyHash),
-                 "%.*H",
-                 ctap2RegisterData->userIdLen,
-                 ctap2RegisterData->userId);
-        verifyHash[sizeof(verifyHash) - 1] = '\0';
+        uint8_t nameLength = MIN(ctap2RegisterData->userIdLen, (sizeof(verifyHash) - 1) / 2);
+
+        format_hex(ctap2RegisterData->userId, nameLength, verifyHash, sizeof(verifyHash));
     }
 }
 

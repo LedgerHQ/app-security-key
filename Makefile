@@ -133,9 +133,6 @@ DEFINES += HAVE_DEBUG_THROWS
 # Compiler #
 ##############
 
-# Remove warning on custom snprintf implementation usage
-CFLAGS += -Wno-format-invalid-specifier -Wno-format-extra-args
-
 # Application source files
 APP_SOURCE_PATH  += src src-cbor
 SDK_SOURCE_PATH  += lib_u2f

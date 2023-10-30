@@ -23,6 +23,7 @@
 #include "cx.h"
 #include "ux.h"
 #include "io.h"
+#include "format.h"
 
 #include "u2f_processing.h"
 #include "u2f_service.h"
@@ -474,7 +475,7 @@ UX_FLOW(ux_login_flow,
 static void u2f_prompt_user_presence(bool enroll, uint8_t *applicationParameter) {
     UX_WAKE_UP();
 
-    snprintf(verifyHash, sizeof(verifyHash), "%.*H", 32, applicationParameter);
+    format_hex(applicationParameter, 32, verifyHash, sizeof(verifyHash));
     strcpy(verifyName, "Unknown");
 
     const char *name = fido_match_known_appid(applicationParameter);

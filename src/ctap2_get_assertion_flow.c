@@ -20,6 +20,7 @@
 
 #include "os.h"
 #include "ux.h"
+#include "format.h"
 
 #include "ctap2.h"
 #include "credential.h"
@@ -43,9 +44,10 @@ static void ctap2_ux_display_user_assertion(void) {
         memcpy(verifyHash, credData.userStr, nameLength);
         verifyHash[nameLength] = '\0';
     } else {
-        snprintf(verifyHash, sizeof(verifyHash), "%.*H", credData.userIdLen, credData.userId);
-        verifyHash[sizeof(verifyHash) - 1] = '\0';
-        nameLength = MIN(credData.userIdLen * 2, sizeof(verifyHash) - 1);
+        nameLength = MIN(credData.userIdLen, (sizeof(verifyHash) - 1) / 2);
+
+        format_hex(credData.userId, nameLength, verifyHash, sizeof(verifyHash));
+        nameLength = nameLength * 2;
     }
 
     if (nameLength > 32) {
