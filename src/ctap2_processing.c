@@ -132,11 +132,20 @@ void ctap2_handle_cmd_cancel(u2f_service_t *service, uint8_t *buffer, uint16_t l
     UNUSED(length);
 
     PRINTF("ctap2_cmd_cancel %d\n", ctap2UxState);
-    if ((ctap2UxState != CTAP2_UX_STATE_NONE) && (ctap2UxState != CTAP2_UX_STATE_CANCELLED)) {
+    if (ctap2UxState != CTAP2_UX_STATE_NONE) {
         PRINTF("Cancel pending UI\n");
 
-        ctap2UxState = CTAP2_UX_STATE_CANCELLED;
-        ui_idle();
+        ctap2UxState = CTAP2_UX_STATE_NONE;
+
+        // Answer as fast as possible as Chrome expect a fast answer and in case
+        // it didn't comes fast enough, it won't be sent back if the user
+        // eventually choose again this authenticator.
         send_cbor_error(service, ERROR_KEEPALIVE_CANCEL);
+
+#ifdef HAVE_BAGL
+        ux_stack_pop();
+        ux_stack_push();
+#endif
+        ui_idle();
     }
 }

@@ -167,7 +167,6 @@ typedef enum ctap2_ux_state_e {
     CTAP2_UX_STATE_MULTIPLE_ASSERTION,
     CTAP2_UX_STATE_NO_ASSERTION,
     CTAP2_UX_STATE_RESET,
-    CTAP2_UX_STATE_CANCELLED = 0xff
 } ctap2_ux_state_t;
 
 bool ctap2_check_rpid_filter(const char *rpId, uint32_t rpIdLen);
