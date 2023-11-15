@@ -159,7 +159,6 @@ static int process_getAssert_authnr_allowList(cbipDecoder_t *decoder, cbipItem_t
     arrayLen = tmpItem.value;
     if ((status == CBIPH_STATUS_FOUND) && (arrayLen > 0)) {
         ctap2AssertData->allowListPresent = 1;
-        ctap2AssertData->singleCredential = (arrayLen == 1);
 
         for (int i = 0; i < arrayLen; i++) {
             if (i == 0) {
@@ -732,10 +731,7 @@ static int sign_and_build_getAssert_authData(uint8_t *authData,
 
     ctap2_send_keepalive_processing();
 
-    mapSize = 2;
-    if (ctap2AssertData->singleCredential == 0) {
-        mapSize++;
-    }
+    mapSize = 3;
     if (credData->residentKey) {
         mapSize++;
     }
@@ -744,7 +740,7 @@ static int sign_and_build_getAssert_authData(uint8_t *authData,
 
     cbip_add_map_header(&encoder, mapSize);
 
-    if (ctap2AssertData->singleCredential == 0) {
+    {
         // Rewrap credentials then encoded in the CBOR response
         // This could be optimized but this would means bypassing the
         // cbip_add_byte_string helper and the encoder.

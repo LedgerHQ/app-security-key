@@ -168,8 +168,6 @@ class LedgerCtap2(Ctap2):
 
         assert login_type in ["simple", "multi", "none"]
 
-        TAG_RESP_CREDENTIAL = 0x01
-
         cmd = Ctap2.CMD.GET_ASSERTION
         data = args(rp_id,
                     client_data_hash,
@@ -230,12 +228,6 @@ class LedgerCtap2(Ctap2):
             self.wait_for_return_on_dashboard()
 
         response = self.parse_response(response)
-
-        if allow_list and len(allow_list) == 1 and TAG_RESP_CREDENTIAL not in response:
-            # Credential may be omitted if the allowList has exactly one Credential.
-            # But AssertionResponse() class doesn't support it.
-            # So we are patching it here by adding the credential in the response.
-            response[1] = allow_list[0]
 
         return AssertionResponse.from_dict(response)
 

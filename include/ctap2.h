@@ -150,7 +150,6 @@ typedef struct ctap2_assert_data_s {
     uint8_t
         clientPinAuthenticated;    // set if a standard FIDO client PIN authentication was performed
     uint8_t userPresenceRequired;  // set if up is set
-    uint8_t singleCredential;      // set if a single credential was provided in the allow list
     uint8_t extensions;            // extensions flags as a bitmask
 
     uint8_t allowListPresent;
