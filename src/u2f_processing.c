@@ -23,6 +23,7 @@
 #include "cx.h"
 #include "ux.h"
 #include "io.h"
+#include "format.h"
 
 #include "u2f_processing.h"
 #include "u2f_service.h"
@@ -399,6 +400,8 @@ static int u2f_process_user_presence_confirmed(void) {
 /*             U2F UX Flows               */
 /******************************************/
 
+#if defined(HAVE_BAGL)
+
 static unsigned int u2f_callback_cancel(void) {
     io_send_sw(SW_PROPRIETARY_INTERNAL);
     ui_idle();
@@ -471,10 +474,46 @@ UX_FLOW(ux_login_flow,
         &ux_login_flow_2_step,
         FLOW_LOOP);
 
+#elif defined(HAVE_NBGL)
+
+#include "nbgl_use_case.h"
+
+#define NB_OF_PAIRS 2
+static const nbgl_layoutTagValue_t pairs[NB_OF_PAIRS] = {{
+                                                             .item = "Website",
+                                                             .value = verifyName,
+                                                         },
+                                                         {
+                                                             .item = "Website ID",
+                                                             .value = verifyHash,
+                                                         }};
+
+static void on_register_choice(bool confirm) {
+    if (confirm) {
+        u2f_process_user_presence_confirmed();
+        app_nbgl_status("Registration details\nsent", true, ui_idle, TUNE_SUCCESS);
+    } else {
+        io_send_sw(SW_PROPRIETARY_INTERNAL);
+        app_nbgl_status("Registration cancelled", false, ui_idle, NBGL_NO_TUNE);
+    }
+}
+
+static void on_login_choice(bool confirm) {
+    if (confirm) {
+        u2f_process_user_presence_confirmed();
+        app_nbgl_status("Login request signed", true, ui_idle, TUNE_SUCCESS);
+    } else {
+        io_send_sw(SW_PROPRIETARY_INTERNAL);
+        app_nbgl_status("Log in cancelled", false, ui_idle, NBGL_NO_TUNE);
+    }
+}
+
+#endif
+
 static void u2f_prompt_user_presence(bool enroll, uint8_t *applicationParameter) {
     UX_WAKE_UP();
 
-    snprintf(verifyHash, sizeof(verifyHash), "%.*H", 32, applicationParameter);
+    format_hex(applicationParameter, 32, verifyHash, sizeof(verifyHash));
     strcpy(verifyName, "Unknown");
 
     const char *name = fido_match_known_appid(applicationParameter);
@@ -482,12 +521,19 @@ static void u2f_prompt_user_presence(bool enroll, uint8_t *applicationParameter)
         strlcpy(verifyName, name, sizeof(verifyName));
     }
 
-    G_ux.externalText = NULL;
+#if defined(HAVE_BAGL)
     if (enroll) {
         ux_flow_init(0, ux_register_flow, NULL);
     } else {
         ux_flow_init(0, ux_login_flow, NULL);
     }
+#elif defined(HAVE_NBGL)
+    if (enroll) {
+        app_nbgl_start_review(NB_OF_PAIRS, pairs, "Register", on_register_choice, NULL);
+    } else {
+        app_nbgl_start_review(NB_OF_PAIRS, pairs, "Login", on_login_choice, NULL);
+    }
+#endif
 }
 
 /******************************************/

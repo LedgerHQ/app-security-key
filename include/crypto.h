@@ -51,7 +51,7 @@ int crypto_generate_public_key(cx_ecfp_private_key_t *private_key,
 /**
  * Generate credRandom key from nonce.
  */
-void crypto_generate_credRandom_key(const uint8_t *nonce, uint8_t *credRandom);
+void crypto_generate_credRandom_key(const uint8_t *nonce, uint8_t *credRandom, bool with_uv);
 
 /**
  * Sign data_hash with private_key and store it in signature.

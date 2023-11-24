@@ -21,7 +21,7 @@ endif
 include $(BOLOS_SDK)/Makefile.defines
 
 $(info TARGET_NAME=$(TARGET_NAME))
-ifneq ($(TARGET_NAME),$(filter $(TARGET_NAME),TARGET_NANOX TARGET_NANOS2))
+ifneq ($(TARGET_NAME),$(filter $(TARGET_NAME),TARGET_NANOX TARGET_NANOS2 TARGET_STAX))
 $(error Environment variable TARGET_NAME is not valid or not supported)
 endif
 
@@ -32,12 +32,13 @@ PATH_APP_LOAD_PARAMS = "5722689'"  # int("WRA".encode("ascii").hex(), 16)
 PATH_APP_LOAD_PARAMS += "5262163'"  # int("PKS".encode("ascii").hex(), 16)
 
 APPVERSION_M=1
-APPVERSION_N=3
+APPVERSION_N=4
 APPVERSION_P=0
 APPVERSION=$(APPVERSION_M).$(APPVERSION_N).$(APPVERSION_P)
 
 ICON_NANOX=icons/icon_security_key.gif
 ICON_NANOSP=icons/icon_security_key.gif
+ICON_STAX=icons/icon_security_key_stax.gif
 
 ################
 # Attestations #
@@ -132,9 +133,6 @@ DEFINES += HAVE_DEBUG_THROWS
 ##############
 # Compiler #
 ##############
-
-# Remove warning on custom snprintf implementation usage
-CFLAGS += -Wno-format-invalid-specifier -Wno-format-extra-args
 
 # Application source files
 APP_SOURCE_PATH  += src src-cbor

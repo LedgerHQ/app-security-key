@@ -33,17 +33,12 @@ void ctap2_reset_handle(u2f_service_t *service, uint8_t *buffer, uint16_t length
 }
 
 void ctap2_reset_confirm() {
-    ctap2UxState = CTAP2_UX_STATE_NONE;
-
     config_process_ctap2_reset();
 
     G_io_apdu_buffer[0] = ERROR_NONE;
     send_cbor_response(&G_io_u2f, 1);
-    ui_idle();
 }
 
 void ctap2_reset_cancel() {
-    ctap2UxState = CTAP2_UX_STATE_NONE;
     send_cbor_error(&G_io_u2f, ERROR_OPERATION_DENIED);
-    ui_idle();
 }

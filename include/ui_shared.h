@@ -21,4 +21,21 @@
 
 void ui_idle();
 
+#ifdef HAVE_NBGL
+
+#include "nbgl_use_case.h"
+#include "nbgl_layout.h"
+
+void app_nbgl_start_review(uint8_t nb_pairs,
+                           const nbgl_layoutTagValue_t *pairs,
+                           const char *confirm_text,
+                           nbgl_choiceCallback_t on_choice,
+                           nbgl_callback_t on_select);
+
+void app_nbgl_status(const char *message,
+                     bool is_success,
+                     nbgl_callback_t on_quit,
+                     tune_index_e tune);
+#endif
+
 #endif

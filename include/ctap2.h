@@ -30,7 +30,6 @@
 
 #include "cbip_decode.h"
 #include "extension_hmac_secret.h"
-#include "extension_txAuthSimple.h"
 
 #define RP_ID_HASH_SIZE             CX_SHA256_SIZE
 #define CRED_RANDOM_SIZE            32
@@ -86,8 +85,7 @@
 
 #define PIN_PROTOCOL_VERSION_V1 1
 
-#define FLAG_EXTENSION_HMAC_SECRET    0x01
-#define FLAG_EXTENSION_TX_AUTH_SIMPLE 0x02
+#define FLAG_EXTENSION_HMAC_SECRET 0x01
 
 // Helper to detect if CTAP2_CBOR_CMD command is proxyied over U2F_CMD
 // - CTAP2 calls that are CTAP2_CMD_CBOR commands:
@@ -152,7 +150,6 @@ typedef struct ctap2_assert_data_s {
     uint8_t
         clientPinAuthenticated;    // set if a standard FIDO client PIN authentication was performed
     uint8_t userPresenceRequired;  // set if up is set
-    uint8_t singleCredential;      // set if a single credential was provided in the allow list
     uint8_t extensions;            // extensions flags as a bitmask
 
     uint8_t allowListPresent;
@@ -161,11 +158,6 @@ typedef struct ctap2_assert_data_s {
     // Multiple flow data
     uint16_t currentCredentialIndex;
     ctap2_assert_multiple_flow_data_t multipleFlowData;
-
-    char *txAuthMessage;    // pointer to the TX Auth message or NULL
-    uint32_t txAuthLength;  // length of the TX Auth message
-    char
-        txAuthLast;  // last character of the txAuth CBOR field overwritten by a '\0' when displayed
 } ctap2_assert_data_t;
 
 typedef enum ctap2_ux_state_e {
@@ -175,7 +167,6 @@ typedef enum ctap2_ux_state_e {
     CTAP2_UX_STATE_MULTIPLE_ASSERTION,
     CTAP2_UX_STATE_NO_ASSERTION,
     CTAP2_UX_STATE_RESET,
-    CTAP2_UX_STATE_CANCELLED = 0xff
 } ctap2_ux_state_t;
 
 bool ctap2_check_rpid_filter(const char *rpId, uint32_t rpIdLen);

@@ -31,7 +31,7 @@ static void app_quit(void) {
 
 static void display_warning();
 static void display_settings();
-static void toogle_settings();
+static void toggle_settings();
 
 UX_STEP_NOCB(ux_settings_enabling_flow_warning_step,
              bn_paging,
@@ -59,7 +59,7 @@ UX_STEP_CB(ux_settings_warning_flow_cancel_step,
 
 UX_STEP_CB(ux_settings_enabling_flow_confirm_step,
            pbb,
-           toogle_settings(),
+           toggle_settings(),
            {
                &C_icon_validate_14,
                "Enable",
@@ -75,7 +75,7 @@ static void display_warning() {
     ux_flow_init(0, ux_settings_enabling_flow, NULL);
 }
 
-static void toogle_settings() {
+static void toggle_settings() {
     if (config_get_rk_enabled()) {
         config_set_rk_enabled(false);
     } else {
@@ -84,7 +84,7 @@ static void toogle_settings() {
     display_settings();
 }
 
-UX_STEP_CB(ux_settings_flow_1_enabled_step, bn, toogle_settings(), {"Resident keys", "Enabled"});
+UX_STEP_CB(ux_settings_flow_1_enabled_step, bn, toggle_settings(), {"Resident keys", "Enabled"});
 
 UX_STEP_CB(ux_settings_flow_1_disabled_step, bn, display_warning(), {"Resident keys", "Disabled"});
 
@@ -151,8 +151,259 @@ void ui_idle(void) {
     if (G_ux.stack_count == 0) {
         ux_stack_push();
     }
-    G_ux.externalText = NULL;
     ux_flow_init(0, ux_idle_flow, NULL);
+}
+
+#elif defined(HAVE_NBGL)
+
+#include "nbgl_use_case.h"
+#include "nbgl_page.h"
+#include "nbgl_layout.h"
+
+// 'About' menu
+
+static const char *const INFO_TYPES[] = {"Version", "Developer", "Copyright"};
+static const char *const INFO_CONTENTS[] = {APPVERSION, "Ledger", "(c) 2023 Ledger"};
+
+#ifdef HAVE_RK_SUPPORT_SETTING
+
+static nbgl_layoutSwitch_t toggle;
+static void ui_menu_settings_page(void);
+
+static void warning_choice(bool accept) {
+    if (accept) {
+        config_set_rk_enabled(true);
+        app_nbgl_status("Resident keys enabled", true, ui_menu_settings_page, NBGL_NO_TUNE);
+    } else {
+        ui_menu_settings_page();
+    }
+}
+
+static void settings_callback(int token, uint8_t index) {
+    UNUSED(index);
+    switch (token) {
+        case FIRST_USER_TOKEN:
+            if (config_get_rk_enabled()) {
+                config_set_rk_enabled(false);
+            } else {
+                nbgl_useCaseChoice(&C_warning64px,
+                                   "Enable resident keys?",
+                                   "Updating the OS or this app\n"
+                                   "will delete login info stored on\n"
+                                   "this device, causing login\n"
+                                   "issues.",
+                                   "Enable",
+                                   "Cancel",
+                                   warning_choice);
+            }
+            break;
+        default:
+            PRINTF("Should not happen!");
+            break;
+    }
+}
+#endif  // HAVE_RK_SUPPORT_SETTING
+
+static bool nav_callback(uint8_t page, nbgl_pageContent_t *content) {
+    if (page == 0) {
+        content->type = INFOS_LIST;
+        content->infosList.nbInfos = 3;
+        content->infosList.infoTypes = INFO_TYPES;
+        content->infosList.infoContents = INFO_CONTENTS;
+    }
+#ifdef HAVE_RK_SUPPORT_SETTING
+    else if (page == 1) {
+        toggle.text = "Resident keys";
+        toggle.subText =
+            "Stores login info on this\n"
+            "device's memory and lets you\n"
+            "login without username.\n\n"
+            "Caution: Updating the OS or\n"
+            "this app will delete the stored\n"
+            "login info, causing login issues\n"
+            "for connected accounts";
+        toggle.token = FIRST_USER_TOKEN;
+        toggle.tuneId = TUNE_TAP_CASUAL;
+        toggle.initState = config_get_rk_enabled();
+        content->type = SWITCHES_LIST;
+        content->switchesList.nbSwitches = 1;
+        content->switchesList.switches = &toggle;
+    } else {
+#endif  // HAVE_RK_SUPPORT_SETTING
+        return false;
+    }
+    return true;
+}
+
+static void ui_menu_settings(uint8_t init_page) {
+    nbgl_useCaseSettings(APPNAME,
+                         init_page,
+#ifdef HAVE_RK_SUPPORT_SETTING
+                         2,
+#else
+                         1,
+#endif
+                         false,
+                         ui_idle,
+                         nav_callback,
+                         settings_callback);
+}
+
+static void ui_menu_settings_home(void) {
+    ui_menu_settings(0);
+}
+
+static void ui_menu_settings_page(void) {
+    ui_menu_settings(1);
+}
+
+void ui_idle(void) {
+    nbgl_useCaseHome(APPNAME,
+                     &C_icon_security_key_64px,
+                     "Use this app for two-factor\nauthentication and\npassword-less log ins.",
+#ifdef HAVE_RK_SUPPORT_SETTING
+                     true,
+#else
+                     false,
+#endif
+                     ui_menu_settings_home,
+                     app_quit);
+}
+
+static nbgl_layout_t *layout;
+static nbgl_page_t *pageContext;
+static nbgl_choiceCallback_t onChoice;
+static nbgl_callback_t onSelect;
+static nbgl_callback_t onQuit;
+
+enum { TITLE_TOKEN = FIRST_USER_TOKEN, CHOICE_TOKEN, SELECT_TOKEN, QUIT_TOKEN };
+
+static void onActionCallback(int token, uint8_t index) {
+    if (token == CHOICE_TOKEN && onChoice != NULL) {
+        // Release the review layout.
+        nbgl_layoutRelease(layout);
+
+        onChoice(index == 0);
+    } else if (token == SELECT_TOKEN && onSelect != NULL) {
+        // Release the review layout.
+        nbgl_layoutRelease(layout);
+
+        onSelect();
+    } else if (token == QUIT_TOKEN && onQuit != NULL) {
+        // Release the review layout.
+        nbgl_layoutRelease(layout);
+
+        onQuit();
+    }
+}
+
+void app_nbgl_start_review(uint8_t nb_pairs,
+                           const nbgl_layoutTagValue_t *pairs,
+                           const char *confirm_text,
+                           nbgl_choiceCallback_t on_choice,
+                           nbgl_callback_t on_select) {
+    nbgl_layoutDescription_t layoutDescription;
+    onChoice = on_choice;
+    onSelect = on_select;
+
+    layoutDescription.modal = false;
+    layoutDescription.withLeftBorder = true;
+    layoutDescription.onActionCallback = onActionCallback;
+    layoutDescription.tapActionText = NULL;
+    layoutDescription.ticker.tickerCallback = NULL;
+
+    layout = nbgl_layoutGet(&layoutDescription);
+
+    nbgl_layoutBar_t bar;
+    bar.text = APPNAME;
+    bar.subText = NULL;
+    bar.iconRight = NULL;
+    bar.iconLeft = NULL;
+    bar.token = TITLE_TOKEN;
+    bar.centered = true;
+    bar.inactive = false;
+    bar.tuneId = NBGL_NO_TUNE;
+    nbgl_layoutAddTouchableBar(layout, &bar);
+    nbgl_layoutAddSeparationLine(layout);
+
+    const nbgl_layoutTagValueList_t tagValueList = {.nbPairs = nb_pairs,
+                                                    .pairs = pairs,
+                                                    .smallCaseForValue = false,
+                                                    .nbMaxLinesForValue = 0,
+                                                    .wrapping = false};
+
+    nbgl_layoutAddTagValueList(layout, &tagValueList);
+
+    if (onSelect) {
+        nbgl_layoutButton_t select_button_info = {.text = "Select another ID",
+                                                  .icon = NULL,
+                                                  .token = SELECT_TOKEN,
+                                                  .style = WHITE_BACKGROUND,
+                                                  .fittingContent = true,
+                                                  .onBottom = false,
+                                                  .tuneId = TUNE_TAP_CASUAL};
+
+        nbgl_layoutAddButton(layout, &select_button_info);
+    }
+
+    nbgl_layoutChoiceButtons_t choice_buttons_info = {.bottomText = "Cancel",
+                                                      .token = CHOICE_TOKEN,
+                                                      .topText = confirm_text,
+                                                      .style = ROUNDED_AND_FOOTER_STYLE,
+                                                      .tuneId = TUNE_TAP_CASUAL};
+    nbgl_layoutAddChoiceButtons(layout, &choice_buttons_info);
+
+    nbgl_layoutDraw(layout);
+
+    nbgl_refresh();
+}
+
+static void tickerCallback(void) {
+    nbgl_pageRelease(pageContext);
+    if (onQuit != NULL) {
+        onQuit();
+    }
+}
+
+void app_nbgl_status(const char *message,
+                     bool is_success,
+                     nbgl_callback_t on_quit,
+                     tune_index_e tune) {
+    if (tune != NBGL_NO_TUNE) {
+        io_seproxyhal_play_tune(tune);
+    }
+
+    nbgl_screenTickerConfiguration_t ticker = {
+        .tickerCallback = &tickerCallback,
+        .tickerIntervale = 0,  // not periodic
+        .tickerValue = 3000    // 3 seconds
+    };
+    onQuit = on_quit;
+
+    nbgl_pageInfoDescription_t info = {.bottomButtonStyle = NO_BUTTON_STYLE,
+                                       .footerText = NULL,
+                                       .centeredInfo.icon = &C_round_cross_64px,
+                                       .centeredInfo.offsetY = 0,
+                                       .centeredInfo.onTop = false,
+                                       .centeredInfo.style = LARGE_CASE_INFO,
+                                       .centeredInfo.text1 = message,
+                                       .centeredInfo.text2 = NULL,
+                                       .centeredInfo.text3 = NULL,
+                                       .tapActionText = "",
+                                       .tapActionToken = QUIT_TOKEN,
+                                       .topRightStyle = NO_BUTTON_STYLE,
+                                       .actionButtonText = NULL,
+                                       .tuneId = TUNE_TAP_CASUAL};
+
+    if (is_success) {
+        info.centeredInfo.icon = &C_round_check_64px;
+    } else {
+        info.centeredInfo.icon = &C_round_warning_64px;
+    }
+
+    pageContext = nbgl_pageDrawInfo(&onActionCallback, &ticker, &info);
+
+    nbgl_refresh();
 }
 
 #endif

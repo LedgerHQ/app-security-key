@@ -32,14 +32,7 @@
  * Override app_ticker_event_callback io_event() dummy implementation
  */
 void app_ticker_event_callback(void) {
-    if (ctap2UxState == CTAP2_UX_STATE_CANCELLED) {
-        ctap2UxState = CTAP2_UX_STATE_NONE;
-#ifdef HAVE_BAGL
-        ux_stack_pop();
-        ux_stack_push();
-#endif
-        ui_idle();
-    } else if (ctap2UxState != CTAP2_UX_STATE_NONE) {
+    if (ctap2UxState != CTAP2_UX_STATE_NONE) {
         u2f_transport_ctap2_send_keepalive(&G_io_u2f, KEEPALIVE_REASON_TUP_NEEDED);
     }
 }

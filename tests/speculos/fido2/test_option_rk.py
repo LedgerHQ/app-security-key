@@ -9,7 +9,7 @@ from utils import generate_random_bytes, generate_make_credentials_params
 from utils import generate_get_assertion_params
 from utils import HAVE_RK_SUPPORT_SETTING
 
-from ragger.navigator import NavInsID
+from ragger.navigator import NavInsID, NavIns
 
 
 @pytest.mark.skipif(not HAVE_RK_SUPPORT_SETTING,
@@ -39,26 +39,42 @@ def enable_rk_option(client):
     if not HAVE_RK_SUPPORT_SETTING:
         raise ValueError("rk and setting not enabled")
 
-    instructions = [
-        # Enter in the settings
-        NavInsID.RIGHT_CLICK,
-        NavInsID.RIGHT_CLICK,
-        NavInsID.RIGHT_CLICK,
-        NavInsID.BOTH_CLICK,
+    if client.model.startswith("nano"):
+        instructions = [
+            # Enter in the settings
+            NavInsID.RIGHT_CLICK,
+            NavInsID.RIGHT_CLICK,
+            NavInsID.RIGHT_CLICK,
+            NavInsID.BOTH_CLICK,
 
-        # Enable and skip "Enabling" message
-        NavInsID.BOTH_CLICK,
-        NavInsID.RIGHT_CLICK,
-        NavInsID.RIGHT_CLICK,
-        NavInsID.RIGHT_CLICK,
-        NavInsID.RIGHT_CLICK,
-        NavInsID.RIGHT_CLICK,
-        NavInsID.BOTH_CLICK,
+            # Enable and skip "Enabling" message
+            NavInsID.BOTH_CLICK,
+            NavInsID.RIGHT_CLICK,
+            NavInsID.RIGHT_CLICK,
+            NavInsID.RIGHT_CLICK,
+            NavInsID.RIGHT_CLICK,
+            NavInsID.RIGHT_CLICK,
+            NavInsID.BOTH_CLICK,
 
-        # Leave settings
-        NavInsID.RIGHT_CLICK,
-        NavInsID.BOTH_CLICK
-    ]
+            # Leave settings
+            NavInsID.RIGHT_CLICK,
+            NavInsID.BOTH_CLICK
+        ]
+    else:
+        instructions = [
+            # Enter in the settings
+            NavInsID.USE_CASE_HOME_SETTINGS,
+            NavInsID.USE_CASE_SETTINGS_NEXT,
+
+            # Enable and skip "Enabling" message
+            NavIns(NavInsID.CHOICE_CHOOSE, (1,)),
+            NavInsID.USE_CASE_CHOICE_CONFIRM,
+            NavInsID.USE_CASE_STATUS_DISMISS,
+
+            # Leave settings
+            NavInsID.USE_CASE_SETTINGS_MULTI_PAGE_EXIT,
+        ]
+
     client.navigator.navigate(instructions,
                               screen_change_before_first_instruction=False)
 

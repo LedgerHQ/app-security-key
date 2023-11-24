@@ -2,7 +2,7 @@ import struct
 
 from typing import Mapping
 
-from ragger.navigator import NavInsID
+from ragger.navigator import NavInsID, NavIns
 
 from fido2 import cbor
 from fido2.ctap import CtapError
@@ -35,11 +35,21 @@ class LedgerCtap2(Ctap2):
         super().__init__(device)
 
     def confirm(self):
-        instructions = [NavInsID.BOTH_CLICK]
+        if self.model == "stax":
+            instructions = [NavInsID.USE_CASE_CHOICE_CONFIRM]
+        else:
+            instructions = [NavInsID.BOTH_CLICK]
         self.navigator.navigate(instructions,
                                 screen_change_after_last_instruction=False)
 
     def wait_for_return_on_dashboard(self):
+        if self.model == "stax":
+            # On Stax tap on the center to dismiss the status message faster
+            # Ignore if there is nothing that happen (probably already on home screen),
+            # which is expected for flow without status (reset)
+            self.navigator.navigate([NavInsID.USE_CASE_STATUS_DISMISS],
+                                    screen_change_after_last_instruction=False)
+
         self.navigator._backend.wait_for_home_screen()
 
     def send_cbor_nowait(self, cmd, data=None, *, event=None, on_keepalive=None):
@@ -134,6 +144,12 @@ class LedgerCtap2(Ctap2):
                     text = "Don't register"
                 else:
                     text = "Register$"
+        elif self.model == "stax":
+            if user_accept is not None:
+                if not user_accept:
+                    val_ins = [NavInsID.USE_CASE_CHOICE_REJECT]
+                else:
+                    val_ins = [NavInsID.USE_CASE_CHOICE_CONFIRM]
 
         navigate(self.navigator,
                  user_accept,
@@ -167,8 +183,6 @@ class LedgerCtap2(Ctap2):
         self.navigator._backend.get_current_screen_content()
 
         assert login_type in ["simple", "multi", "none"]
-
-        TAG_RESP_CREDENTIAL = 0x01
 
         cmd = Ctap2.CMD.GET_ASSERTION
         data = args(rp_id,
@@ -210,6 +224,21 @@ class LedgerCtap2(Ctap2):
                         text = "Log in"
                     else:
                         text = "Reject"
+        elif self.model == "stax":
+            if user_accept is not None:
+                if login_type == "none":
+                    val_ins = [NavInsID.TAPPABLE_CENTER_TAP]
+
+                if not user_accept:
+                    val_ins = [NavInsID.USE_CASE_CHOICE_REJECT]
+                else:
+                    if login_type == "multi" and select_user_idx != 1:
+                        assert select_user_idx <= 5
+                        val_ins = [NavIns(NavInsID.TOUCH, (200, 350)),
+                                   NavIns(NavInsID.TOUCH, (200, 40 + 90 * select_user_idx)),
+                                   NavInsID.USE_CASE_CHOICE_CONFIRM]
+                    else:
+                        val_ins = [NavInsID.USE_CASE_CHOICE_CONFIRM]
 
         navigate(self.navigator,
                  user_accept,
@@ -230,90 +259,6 @@ class LedgerCtap2(Ctap2):
             self.wait_for_return_on_dashboard()
 
         response = self.parse_response(response)
-
-        if allow_list and len(allow_list) == 1 and TAG_RESP_CREDENTIAL not in response:
-            # Credential may be omitted if the allowList has exactly one Credential.
-            # But AssertionResponse() class doesn't support it.
-            # So we are patching it here by adding the credential in the response.
-            response[1] = allow_list[0]
-
-        return AssertionResponse.from_dict(response)
-
-    def get_assertion_with_txSimpleAuth(self, rp_id, client_data_hash, allow_list=None,
-                                        extensions=None, options=None, pin_uv_param=None,
-                                        pin_uv_protocol=None, *, event=None, on_keepalive=None,
-                                        login_type="simple", user_accept=True, check_users=None,
-                                        compare_args=None, select_user_idx=1):
-        # Refresh navigator screen content reference
-        self.navigator._backend.get_current_screen_content()
-
-        assert login_type in ["simple", "multi"]
-        """
-        Copy of get_assertion() to keep it simpler as the ux is different with txSimpleAuth
-        and we don't want to merge he two function as this will create a mess for a somehow
-        deprecated extension.
-        """
-        TAG_RESP_CREDENTIAL = 0x01
-
-        cmd = Ctap2.CMD.GET_ASSERTION
-        data = args(rp_id,
-                    client_data_hash,
-                    allow_list,
-                    extensions,
-                    options,
-                    pin_uv_param,
-                    pin_uv_protocol)
-
-        ctap_hid_cmd = self.send_cbor_nowait(cmd, data, event=event,
-                                             on_keepalive=on_keepalive)
-
-        text = None
-        nav_ins = None
-        val_ins = None
-
-        if self.model.startswith("nano"):
-            nav_ins = NavInsID.RIGHT_CLICK
-            val_ins = [NavInsID.BOTH_CLICK]
-            if user_accept is not None:
-                if login_type == "multi":
-                    if check_users and len(check_users) == 1:
-                        raise ValueError("Found 1 user while expecting multiple")
-
-                    if user_accept:
-                        text = f"Log in user {select_user_idx}/"
-                    else:
-                        text = "Reject"
-
-                else:
-                    if check_users and len(check_users) != 1:
-                        raise ValueError("Found multiple users while expecting 1")
-
-                    if user_accept:
-                        text = "Log in"
-                    else:
-                        text = "Reject"
-
-        navigate(self.navigator,
-                 user_accept,
-                 True,  # Always check screen
-                 False,  # Never check cancel
-                 compare_args,
-                 text,
-                 nav_ins,
-                 val_ins)
-
-        response = self.device.recv(ctap_hid_cmd)
-
-        if user_accept is not None:
-            self.wait_for_return_on_dashboard()
-
-        response = self.parse_response(response)
-
-        if allow_list and len(allow_list) == 1 and TAG_RESP_CREDENTIAL not in response:
-            # Credential may be omitted if the allowList has exactly one Credential.
-            # But AssertionResponse() class doesn't support it.
-            # So we are patching it here by adding the credential in the response.
-            response[1] = allow_list[0]
 
         return AssertionResponse.from_dict(response)
 
@@ -337,6 +282,12 @@ class LedgerCtap2(Ctap2):
                     text = "Yes, delete"
                 else:
                     text = "No, don't delete"
+        elif self.model == "stax":
+            if user_accept is not None:
+                if not user_accept:
+                    val_ins = [NavInsID.USE_CASE_CHOICE_REJECT]
+                else:
+                    val_ins = [NavInsID.USE_CASE_CHOICE_CONFIRM]
 
         navigate(self.navigator,
                  user_accept,
