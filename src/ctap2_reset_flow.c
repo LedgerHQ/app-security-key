@@ -21,53 +21,70 @@
 
 #include "ctap2.h"
 #include "globals.h"
+#include "ui_shared.h"
 
-// First step resets as fast as possible to please Windows
+static void ctap_ux_on_user_action(bool confirm) {
+    ctap2UxState = CTAP2_UX_STATE_NONE;
 
-UX_STEP_CB(ux_ctap2_reset_flow_0_step,
-           pb,
-           ctap2_reset_confirm(),
-           {&C_icon_eye, "Reset credentials"});
+    if (confirm) {
+        ctap2_reset_confirm();
+        ui_idle();
+    } else {
+        ctap2_reset_cancel();
+        ui_idle();
+    }
+}
 
-UX_STEP_NOCB(ux_ctap2_reset_flow_1_step,
-             bnnn_paging,
+#if defined(HAVE_BAGL)
+
+UX_STEP_NOCB(ux_ctap2_reset_flow_0_step,
+             pnn,
              {
-                 .title = "Warning",
-                 .text = "All credentials will be invalidated",
+                 &C_icon_warning,
+                 "Delete login details",
+                 "for all websites?",
              });
 
-UX_STEP_CB(ux_ctap2_reset_flow_2_step,
-           pbb,
-           ctap2_reset_confirm(),
-           {
-               &C_icon_validate_14,
-               "Confirm",
-               "reset",
-           });
+UX_STEP_CB(ux_ctap2_reset_flow_1_step,
+           pb,
+           ctap_ux_on_user_action(true),
+           {&C_icon_validate_14, "Yes, delete"});
 
-UX_STEP_CB(ux_ctap2_reset_flow_3_step,
-           pbb,
-           ctap2_reset_cancel(),
+UX_STEP_CB(ux_ctap2_reset_flow_2_step,
+           pb,
+           ctap_ux_on_user_action(false),
            {
                &C_icon_crossmark,
-               "Abort",
-               "reset",
+               "No, don't delete",
            });
 
 UX_FLOW(ux_ctap2_reset_flow,
         &ux_ctap2_reset_flow_0_step,
         &ux_ctap2_reset_flow_1_step,
-        &ux_ctap2_reset_flow_2_step,
-        &ux_ctap2_reset_flow_3_step);
+        &ux_ctap2_reset_flow_2_step);
 
 void ctap2_reset_ux(void) {
-    // reserve a display stack slot if none yet
-    if (G_ux.stack_count == 0) {
-        ux_stack_push();
-    }
     ctap2UxState = CTAP2_UX_STATE_RESET;
-    ctap2Proxy.uiStarted = true;
 
-    G_ux.externalText = NULL;
     ux_flow_init(0, ux_ctap2_reset_flow, NULL);
 }
+
+#elif defined(HAVE_NBGL)
+#include "nbgl_use_case.h"
+
+void ctap2_reset_ux(void) {
+    ctap2UxState = CTAP2_UX_STATE_RESET;
+
+    io_seproxyhal_play_tune(TUNE_LOOK_AT_ME);
+
+    nbgl_useCaseChoice(&C_warning64px,
+                       "Delete saved login\n"
+                       "details for all\n"
+                       "websites?\n",
+                       NULL,
+                       "Yes, delete",
+                       "No, don't delete",
+                       ctap_ux_on_user_action);
+}
+
+#endif

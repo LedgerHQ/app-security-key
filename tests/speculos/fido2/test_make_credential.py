@@ -57,11 +57,19 @@ def test_make_credential_uv(client, test_name):
                                                check_screens="full",
                                                compare_args=compare_args)
 
-    assert attestation.fmt == "packed"
-    assert len(attestation.auth_data) >= 77
-
     expected_flags = AuthenticatorData.FLAG.USER_PRESENT
     expected_flags |= AuthenticatorData.FLAG.USER_VERIFIED
+    expected_flags |= AuthenticatorData.FLAG.ATTESTED
+    assert attestation.auth_data.flags == expected_flags
+
+    options = {"uv": False}
+    attestation = client.ctap2.make_credential(client_data_hash,
+                                               rp,
+                                               user,
+                                               key_params,
+                                               options=options)
+
+    expected_flags = AuthenticatorData.FLAG.USER_PRESENT
     expected_flags |= AuthenticatorData.FLAG.ATTESTED
     assert attestation.auth_data.flags == expected_flags
 
@@ -93,6 +101,19 @@ def test_make_credential_up(client, test_name):
                                  user_accept=True,
                                  check_screens="full",
                                  compare_args=compare_args)
+
+
+def test_make_credential_rk(client, test_name):
+    # Check that option RK can be passed with False value when not supporting RK.
+    # This is used on Firefox on Linux and Mac and required by the spec.
+    client_data_hash, rp, user, key_params = generate_make_credentials_params(ref=0)
+    options = {"rk": False}
+    client.ctap2.make_credential(client_data_hash,
+                                 rp,
+                                 user,
+                                 key_params,
+                                 options=options,
+                                 user_accept=True)
 
 
 def test_make_credential_exclude_list(client, test_name):

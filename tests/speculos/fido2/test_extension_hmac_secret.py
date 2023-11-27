@@ -39,6 +39,18 @@ def test_extensions_hmac_secret(client):
 
     hmac_secret1 = hmac_ext.process_get_output(assertion)["hmacGetSecret"]
 
+    # Retrieve another assertion with same salt but with UV
+    options = {"uv": True}
+    assertion = client.ctap2.get_assertion(rp["id"], client_data_hash,
+                                           allow_list,
+                                           options=options,
+                                           extensions=extensions)
+
+    hmac_secret2 = hmac_ext.process_get_output(assertion)["hmacGetSecret"]
+
+    # Compare the outputs
+    assert hmac_secret1["output1"] != hmac_secret2["output1"]
+
     # Retrieve another assertion with two salts
     salt2 = generate_random_bytes(32)
     hmac_ext_data = hmac_ext.process_get_input({

@@ -20,78 +20,75 @@
 
 #include "os.h"
 #include "ux.h"
+#include "format.h"
 
 #include "ctap2.h"
 #include "globals.h"
+#include "ui_shared.h"
 
-static void ctap2_ux_display_rp(void) {
+static void ctap2_ux_get_display_user(void) {
     ctap2_register_data_t *ctap2RegisterData = globals_get_ctap2_register_data();
 
-    PRINTF("ctap2_ux_display_rp\n");
-    ctap2_ux_get_rpid(ctap2RegisterData->rpId,
-                      ctap2RegisterData->rpIdLen,
-                      ctap2RegisterData->rpIdHash);
-}
-
-static void ctap2_ux_display_user(void) {
-    ctap2_register_data_t *ctap2RegisterData = globals_get_ctap2_register_data();
-
-    PRINTF("ctap2_ux_display_user\n");
+    // TODO show that user.id is truncated if necessary
     if (ctap2RegisterData->userStr) {
         uint8_t nameLength = MIN(ctap2RegisterData->userStrLen, sizeof(verifyHash) - 1);
 
         memcpy(verifyHash, ctap2RegisterData->userStr, nameLength);
         verifyHash[nameLength] = '\0';
     } else {
-        snprintf(verifyHash,
-                 sizeof(verifyHash),
-                 "%.*H",
-                 ctap2RegisterData->userIdLen,
-                 ctap2RegisterData->userId);
-        verifyHash[sizeof(verifyHash) - 1] = '\0';
+        uint8_t nameLength = MIN(ctap2RegisterData->userIdLen, (sizeof(verifyHash) - 1) / 2);
+
+        format_hex(ctap2RegisterData->userId, nameLength, verifyHash, sizeof(verifyHash));
     }
 }
+
+static void ctap_ux_on_user_choice(bool confirm) {
+    ctap2UxState = CTAP2_UX_STATE_NONE;
+
+    if (confirm) {
+        ctap2_make_credential_confirm();
+#ifdef HAVE_NBGL
+        app_nbgl_status("Registration details\nsent", true, ui_idle, TUNE_SUCCESS);
+#else
+        ui_idle();
+#endif
+    } else {
+        ctap2_make_credential_user_cancel();
+#ifdef HAVE_NBGL
+        app_nbgl_status("Registration cancelled", false, ui_idle, NBGL_NO_TUNE);
+#else
+        ui_idle();
+#endif
+    }
+}
+
+#if defined(HAVE_BAGL)
 
 UX_STEP_NOCB(ux_ctap2_make_cred_flow_first_step,
              pnn,
              {
                  &C_icon_security_key,
                  "Register new",
-                 "credential",
+                 "account",
              });
 
-UX_STEP_NOCB(ux_ctap2_make_cred_resident_flow_first_step,
-             pbn,
+UX_STEP_NOCB(ux_ctap2_make_cred_flow_domain_step,
+             bnnn_paging,
              {
-                 &C_icon_warning,
-                 "Warning",
-                 "Resident key",
+                 .title = "Website",
+                 .text = rpID,
              });
 
-UX_STEP_NOCB(
-    ux_ctap2_make_cred_resident_flow_warning_step,
-    nnnn,
-    {"You are about to", "register a credential", "that will be lost upon", "app or OS update."});
-
-UX_STEP_NOCB_INIT(ux_ctap2_make_cred_flow_domain_step,
-                  bnnn_paging,
-                  ctap2_ux_display_rp(),
-                  {
-                      .title = "Domain",
-                      .text = (char *) verifyHash,
-                  });
-
-UX_STEP_NOCB_INIT(ux_ctap2_make_cred_flow_user_step,
-                  bnnn_paging,
-                  ctap2_ux_display_user(),
-                  {
-                      .title = "User",
-                      .text = (char *) verifyHash,
-                  });
+UX_STEP_NOCB(ux_ctap2_make_cred_flow_user_step,
+             bnnn_paging,
+             {
+                 .title = "User ID",
+                 .text = verifyHash,
+             });
 
 UX_STEP_CB(ux_ctap2_make_cred_flow_accept_step,
            pb,
-           ctap2_make_credential_confirm(),
+           ctap_ux_on_user_choice(true),
            {
                &C_icon_validate_14,
                "Register",
@@ -99,7 +96,7 @@ UX_STEP_CB(ux_ctap2_make_cred_flow_accept_step,
 
 UX_STEP_CB(ux_ctap2_make_cred_flow_refuse_step,
            pb,
-           ctap2_make_credential_user_cancel(),
+           ctap_ux_on_user_choice(false),
            {
                &C_icon_crossmark,
                "Don't register",
@@ -107,7 +104,7 @@ UX_STEP_CB(ux_ctap2_make_cred_flow_refuse_step,
 
 UX_STEP_CB(ux_ctap2_make_cred_resident_flow_accept_step,
            pbb,
-           ctap2_make_credential_confirm(),
+           ctap_ux_on_user_choice(true),
            {
                &C_icon_validate_14,
                "Register",
@@ -122,26 +119,58 @@ UX_FLOW(ux_ctap2_make_cred_flow,
         &ux_ctap2_make_cred_flow_refuse_step);
 
 UX_FLOW(ux_ctap2_make_cred_resident_flow,
-        &ux_ctap2_make_cred_resident_flow_first_step,
-        &ux_ctap2_make_cred_resident_flow_warning_step,
+        &ux_ctap2_make_cred_flow_first_step,
         &ux_ctap2_make_cred_flow_domain_step,
         &ux_ctap2_make_cred_flow_user_step,
-        &ux_ctap2_make_cred_flow_refuse_step,
-        &ux_ctap2_make_cred_resident_flow_accept_step);
+        &ux_ctap2_make_cred_resident_flow_accept_step,
+        &ux_ctap2_make_cred_flow_refuse_step);
+
+#elif defined(HAVE_NBGL)
+
+#include "nbgl_use_case.h"
+#include "nbgl_layout.h"
+
+#define NB_OF_PAIRS 2
+static const nbgl_layoutTagValue_t pairs[NB_OF_PAIRS] = {{
+                                                             .item = "Website",
+                                                             .value = rpID,
+                                                         },
+                                                         {
+                                                             .item = "User ID",
+                                                             .value = verifyHash,
+                                                         }};
+
+#endif
 
 void ctap2_make_credential_ux(void) {
     ctap2_register_data_t *ctap2RegisterData = globals_get_ctap2_register_data();
 
-    // reserve a display stack slot if none yet
-    if (G_ux.stack_count == 0) {
-        ux_stack_push();
-    }
     ctap2UxState = CTAP2_UX_STATE_MAKE_CRED;
-    ctap2Proxy.uiStarted = true;
 
-    G_ux.externalText = NULL;
+    // TODO show that rp.id is truncated if necessary
+    uint8_t len = MIN(sizeof(rpID) - 1, ctap2RegisterData->rpIdLen);
+    memcpy(rpID, ctap2RegisterData->rpId, len);
+    rpID[len] = '\0';
+    PRINTF("rpId %s\n", rpID);
+
+    ctap2_ux_get_display_user();
+
+#if defined(HAVE_BAGL)
     ux_flow_init(0,
                  (ctap2RegisterData->residentKey ? ux_ctap2_make_cred_resident_flow
                                                  : ux_ctap2_make_cred_flow),
                  NULL);
+#elif defined(HAVE_NBGL)
+    io_seproxyhal_play_tune(TUNE_LOOK_AT_ME);
+
+    if (ctap2RegisterData->residentKey) {
+        app_nbgl_start_review(NB_OF_PAIRS,
+                              pairs,
+                              "Register resident key",
+                              ctap_ux_on_user_choice,
+                              NULL);
+    } else {
+        app_nbgl_start_review(NB_OF_PAIRS, pairs, "Register", ctap_ux_on_user_choice, NULL);
+    }
+#endif
 }

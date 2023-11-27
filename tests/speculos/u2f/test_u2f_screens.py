@@ -9,20 +9,29 @@ from utils import generate_random_bytes, fido_known_appid
 from utils import HAVE_RK_SUPPORT_SETTING
 
 
-def test_u2f_screens_idle(client, test_name):
+def test_u2f_screens_idle(client, test_name, firmware):
     # Refresh navigator screen content reference
     time.sleep(0.1)
     client.navigator._backend.get_current_screen_content()
 
     instructions = []
-    # Screen 0 -> 1
-    instructions.append(NavInsID.RIGHT_CLICK)
-    # Screen 1 -> 2
-    instructions.append(NavInsID.RIGHT_CLICK)
-
-    if HAVE_RK_SUPPORT_SETTING:
+    if firmware.device.startswith("nano"):
+        # Screen 0 -> 1
+        instructions.append(NavInsID.RIGHT_CLICK)
+        # Screen 1 -> 2
+        instructions.append(NavInsID.RIGHT_CLICK)
         # Screen 2 -> 3
         instructions.append(NavInsID.RIGHT_CLICK)
+
+        if HAVE_RK_SUPPORT_SETTING:
+            # Screen 3 -> 4
+            instructions.append(NavInsID.RIGHT_CLICK)
+    else:
+        instructions = [
+            NavInsID.USE_CASE_HOME_SETTINGS,
+            NavInsID.USE_CASE_SETTINGS_NEXT,
+            NavInsID.USE_CASE_SETTINGS_MULTI_PAGE_EXIT
+        ]
 
     client.navigator.navigate_and_compare(TESTS_SPECULOS_DIR, test_name, instructions,
                                           screen_change_before_first_instruction=False)

@@ -159,7 +159,6 @@ static int process_getAssert_authnr_allowList(cbipDecoder_t *decoder, cbipItem_t
     arrayLen = tmpItem.value;
     if ((status == CBIPH_STATUS_FOUND) && (arrayLen > 0)) {
         ctap2AssertData->allowListPresent = 1;
-        ctap2AssertData->singleCredential = (arrayLen == 1);
 
         for (int i = 0; i < arrayLen; i++) {
             if (i == 0) {
@@ -227,21 +226,6 @@ static int process_getAssert_authnr_extensions(cbipDecoder_t *decoder, cbipItem_
             // All processing and check is done in ctap2_compute_hmacSecret_output()
             // when building the response
             ctap2AssertData->extensions |= FLAG_EXTENSION_HMAC_SECRET;
-        }
-
-        // Check txAuthSimple extension
-        if (cbiph_get_map_key_str_text(decoder,
-                                       &extensionsItem,
-                                       EXTENSION_TX_AUTH_SIMPLE,
-                                       &ctap2AssertData->txAuthMessage,
-                                       &ctap2AssertData->txAuthLength) == CBIPH_STATUS_FOUND) {
-            // Avoid displaying an empty string, just in case
-            if (ctap2AssertData->txAuthLength == 0) {
-                PRINTF("Invalid empty txAuthSimple\n");
-                return ERROR_INVALID_CBOR;
-            }
-            // TODO : check that the text is displayable
-            ctap2AssertData->extensions |= FLAG_EXTENSION_TX_AUTH_SIMPLE;
         }
     }
     return 0;
@@ -396,49 +380,38 @@ void ctap2_get_assertion_handle(u2f_service_t *service,
         goto exit;
     }
 
-    // Look for a potential rk entry if no allow list was provided
-    if (!ctap2AssertData->allowListPresent) {
-        ctap2AssertData->availableCredentials = rk_storage_count(ctap2AssertData->rpIdHash);
-        if (ctap2AssertData->availableCredentials == 0) {
-            // No credential, prompt the user to handle the error
-            PRINTF("No resident credentials\n");
-            ctap2_get_assertion_ux(CTAP2_UX_STATE_NO_ASSERTION);
-        } else if (ctap2AssertData->availableCredentials == 1) {
-            // Single resident credential, go through the usual flow
-            PRINTF("Single resident credential\n");
-            status = rk_storage_find_youngest(ctap2AssertData->rpIdHash,
-                                              NULL,
-                                              &ctap2AssertData->nonce,
-                                              &ctap2AssertData->credential,
-                                              &ctap2AssertData->credentialLen);
-            if (status == RK_NOT_FOUND) {
-                // This can theoretically never happen.
-                // But still, if it does, fall back to the "No resident credentials" case
-                ctap2_get_assertion_ux(CTAP2_UX_STATE_NO_ASSERTION);
-            } else {
-                if (ctap2AssertData->userPresenceRequired || ctap2AssertData->pinRequired) {
-                    ctap2_get_assertion_ux(CTAP2_UX_STATE_GET_ASSERTION);
-                } else {
-                    *immediateReply = true;
+    if (!ctap2AssertData->userPresenceRequired && !ctap2AssertData->pinRequired) {
+        // No up nor uv required, skip UX and reply immediately
+        *immediateReply = true;
+    } else {
+        // Look for a potential rk entry if no allow list was provided
+        if (!ctap2AssertData->allowListPresent) {
+            ctap2AssertData->availableCredentials = rk_storage_count(ctap2AssertData->rpIdHash);
+            if (ctap2AssertData->availableCredentials == 1) {
+                // Single resident credential load it to go through the usual flow
+                PRINTF("Single resident credential\n");
+                status = rk_storage_find_youngest(ctap2AssertData->rpIdHash,
+                                                  NULL,
+                                                  &ctap2AssertData->nonce,
+                                                  &ctap2AssertData->credential,
+                                                  &ctap2AssertData->credentialLen);
+                if (status == RK_NOT_FOUND) {
+                    // This can theoretically never happen.
+                    // But still, if it does, fall back to the "No resident credentials" case
+                    ctap2AssertData->availableCredentials = 0;
                 }
             }
-        } else {
-            // Multiple resident credentials, go through the multiple credentials flow
-            ctap2_get_assertion_ux(CTAP2_UX_STATE_MULTIPLE_ASSERTION);
         }
-    } else {
+
         if (ctap2AssertData->availableCredentials == 0) {
             ctap2_get_assertion_ux(CTAP2_UX_STATE_NO_ASSERTION);
         } else if (ctap2AssertData->availableCredentials > 1) {
-            // DEVIATION from FIDO2.0 spec "select any applicable credential and proceed".
-            // We always ask the user.
+            // DEVIATION from FIDO2.0 spec in case of allowList presence:
+            // "select any applicable credential and proceed".
+            // We always ask the user to choose.
             ctap2_get_assertion_ux(CTAP2_UX_STATE_MULTIPLE_ASSERTION);
         } else {
-            if (ctap2AssertData->userPresenceRequired || ctap2AssertData->pinRequired) {
-                ctap2_get_assertion_ux(CTAP2_UX_STATE_GET_ASSERTION);
-            } else {
-                *immediateReply = true;
-            }
+            ctap2_get_assertion_ux(CTAP2_UX_STATE_GET_ASSERTION);
         }
     }
     status = 0;
@@ -451,17 +424,20 @@ exit:
     return;
 }
 
-void ctap2_get_assertion_next_credential_ux_helper(void) {
+void ctap2_get_assertion_credential_idx(uint16_t idx) {
     ctap2_assert_data_t *ctap2AssertData = globals_get_ctap2_assert_data();
     int status;
 
     while (1) {
+        if (ctap2AssertData->currentCredentialIndex == idx) {
+            return;
+        }
+
         if (!ctap2AssertData->allowListPresent) {
-            if (ctap2AssertData->currentCredentialIndex == ctap2AssertData->availableCredentials) {
+            if (ctap2AssertData->currentCredentialIndex > idx) {
                 ctap2AssertData->currentCredentialIndex = 0;
                 ctap2AssertData->multipleFlowData.rk.minAge = 0;
             }
-            ctap2AssertData->currentCredentialIndex++;
 
             // Find the next entry in rk
             status = rk_storage_find_youngest(ctap2AssertData->rpIdHash,
@@ -471,15 +447,17 @@ void ctap2_get_assertion_next_credential_ux_helper(void) {
                                               &ctap2AssertData->credentialLen);
             if (status <= 0) {
                 // Should not happen, just continue a credential will be picked eventually
-                continue;
+                PRINTF("Unexpected failure rk\n");
             }
-            break;
+
+            ctap2AssertData->currentCredentialIndex++;
+            continue;
         } else {
             cbipDecoder_t decoder;
             cbip_decoder_init(&decoder, ctap2AssertData->buffer, CUSTOM_IO_APDU_BUFFER_SIZE);
 
-            if (ctap2AssertData->multipleFlowData.allowList.currentCredential ==
-                ctap2AssertData->multipleFlowData.allowList.credentialsNumber) {
+            if (ctap2AssertData->multipleFlowData.allowList.currentCredential == 0 ||
+                ctap2AssertData->currentCredentialIndex > idx) {
                 cbipItem_t mapItem;
                 cbip_first(&decoder, &mapItem);
                 status =
@@ -489,11 +467,8 @@ void ctap2_get_assertion_next_credential_ux_helper(void) {
                                        NULL,
                                        &ctap2AssertData->multipleFlowData.allowList.credentialItem,
                                        cbipArray);
-                if (status == CBIPH_STATUS_FOUND) {
-                    ctap2AssertData->multipleFlowData.allowList.credentialsNumber =
-                        ctap2AssertData->multipleFlowData.allowList.credentialItem.value;
-                } else {
-                    ctap2AssertData->multipleFlowData.allowList.credentialsNumber = 0;
+                if (status != CBIPH_STATUS_FOUND) {
+                    PRINTF("Unexpected failure allowlist\n");
                 }
 
                 ctap2AssertData->multipleFlowData.allowList.currentCredential = 0;
@@ -520,9 +495,8 @@ void ctap2_get_assertion_next_credential_ux_helper(void) {
                 continue;
             }
 
-            // Process the item to display
             ctap2AssertData->currentCredentialIndex++;
-            break;
+            continue;
         }
     }
 }
@@ -672,9 +646,6 @@ static int build_getAssert_authData(uint8_t *buffer, uint32_t bufferLength, uint
         if ((ctap2AssertData->extensions & FLAG_EXTENSION_HMAC_SECRET) != 0) {
             extensionsSize++;
         }
-        if ((ctap2AssertData->extensions & FLAG_EXTENSION_TX_AUTH_SIMPLE) != 0) {
-            extensionsSize++;
-        }
         cbip_encoder_init(&encoder, buffer + offset, bufferLength - offset);
         cbip_add_map_header(&encoder, extensionsSize);
 
@@ -684,25 +655,15 @@ static int build_getAssert_authData(uint8_t *buffer, uint32_t bufferLength, uint
             uint8_t *salt = NULL;
             uint32_t saltLength = 0;
 
-            crypto_generate_credRandom_key(ctap2AssertData->nonce, credRandom);
+            crypto_generate_credRandom_key(ctap2AssertData->nonce,
+                                           credRandom,
+                                           ctap2AssertData->pinRequired);
 
             status = compute_getAssert_hmacSecret_output(&salt, &saltLength, credRandom);
             if (status != ERROR_NONE) {
                 return status;
             }
             cbip_add_byte_string(&encoder, salt, saltLength);
-        }
-
-        if ((ctap2AssertData->extensions & FLAG_EXTENSION_TX_AUTH_SIMPLE) != 0) {
-            cbip_add_string(&encoder,
-                            EXTENSION_TX_AUTH_SIMPLE,
-                            sizeof(EXTENSION_TX_AUTH_SIMPLE) - 1);
-            if (ctap2AssertData->txAuthLength > MAX_TX_AUTH_SIMPLE_SIZE) {
-                ctap2AssertData->txAuthLength = 0;
-            }
-            cbip_add_string(&encoder,
-                            ctap2AssertData->txAuthMessage,
-                            ctap2AssertData->txAuthLength);
         }
 
         if (encoder.fault) {
@@ -770,10 +731,7 @@ static int sign_and_build_getAssert_authData(uint8_t *authData,
 
     ctap2_send_keepalive_processing();
 
-    mapSize = 2;
-    if (ctap2AssertData->singleCredential == 0) {
-        mapSize++;
-    }
+    mapSize = 3;
     if (credData->residentKey) {
         mapSize++;
     }
@@ -782,7 +740,7 @@ static int sign_and_build_getAssert_authData(uint8_t *authData,
 
     cbip_add_map_header(&encoder, mapSize);
 
-    if (ctap2AssertData->singleCredential == 0) {
+    {
         // Rewrap credentials then encoded in the CBOR response
         // This could be optimized but this would means bypassing the
         // cbip_add_byte_string helper and the encoder.
@@ -866,19 +824,15 @@ static int sign_and_build_getAssert_authData(uint8_t *authData,
     return encoder.offset;
 }
 
-void ctap2_get_assertion_confirm() {
+void ctap2_get_assertion_confirm(uint16_t idx) {
     ctap2_assert_data_t *ctap2AssertData = globals_get_ctap2_assert_data();
     int status;
     uint32_t dataLen;
     credential_data_t credData;
 
-    ctap2UxState = CTAP2_UX_STATE_NONE;
-
-    PRINTF("ctap2_get_assertion_confirm\n");
+    PRINTF("ctap2_get_assertion_confirm %d\n", idx);
 
     ctap2_send_keepalive_processing();
-
-    ui_idle();
 
     // Perform User Verification if required
     if (ctap2AssertData->pinRequired) {
@@ -887,12 +841,14 @@ void ctap2_get_assertion_confirm() {
 
     ctap2_send_keepalive_processing();
 
-    // Restore the original last char in the CBOR buffer if a TX Auth was displayed
-    if (ctap2AssertData->txAuthMessage != NULL) {
-        ctap2AssertData->txAuthMessage[ctap2AssertData->txAuthLength] = ctap2AssertData->txAuthLast;
+    // Return immediately in case there is no available credentials
+    if (ctap2AssertData->availableCredentials == 0) {
+        send_cbor_error(&G_io_u2f, ERROR_NO_CREDENTIALS);
+        return;
     }
 
     // Retrieve needed data from credential
+    ctap2_get_assertion_credential_idx(idx);
     status = credential_decode(&credData,
                                ctap2AssertData->credential,
                                ctap2AssertData->credentialLen,
@@ -945,13 +901,5 @@ exit:
 }
 
 void ctap2_get_assertion_user_cancel() {
-    ctap2UxState = CTAP2_UX_STATE_NONE;
     send_cbor_error(&G_io_u2f, ERROR_OPERATION_DENIED);
-    ui_idle();
-}
-
-void ctap2_get_assertion_no_assertion_confirm() {
-    ctap2UxState = CTAP2_UX_STATE_NONE;
-    send_cbor_error(&G_io_u2f, ERROR_NO_CREDENTIALS);
-    ui_idle();
 }

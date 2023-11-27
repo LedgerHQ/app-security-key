@@ -22,4 +22,4 @@ jobs:
     name: Call Ledger guidelines_enforcer
     uses: LedgerHQ/ledger-app-workflows/.github/workflows/reusable_guidelines_enforcer.yml@v1
     with:
-      run_for_devices: '["nanox", "nanosp"]'
+      run_for_devices: '["nanox", "nanosp", "stax"]'

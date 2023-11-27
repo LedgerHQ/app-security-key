@@ -21,11 +21,15 @@
 #include "os.h"
 #include "os_io_seproxyhal.h"
 #include "u2f_processing.h"
+#include "io.h"
 
 #include "ctap2.h"
 #include "cbip_helper.h"
 #include "globals.h"
 #include "fido_known_apps.h"
+#include "ui_shared.h"
+
+#define SW_NO_ERROR 0x9000
 
 #define RPID_FILTER      "webctap."
 #define RPID_FILTER_SIZE (sizeof(RPID_FILTER) - 1)
@@ -38,34 +42,9 @@ bool ctap2_check_rpid_filter(const char *rpId, uint32_t rpIdLen) {
     }
 }
 
-void ctap2_ux_get_rpid(const char *rpId, uint32_t rpIdLen, uint8_t *rpIdHash) {
-    const char *knownApp;
-
-    PRINTF("rpIdHash %.*H\n", CX_SHA256_SIZE, rpIdHash);
-
-    knownApp = fido_match_known_appid(rpIdHash);
-    if (knownApp != NULL) {
-        PRINTF("Known app %s\n", knownApp);
-        strncpy(verifyHash, knownApp, sizeof(verifyHash));
-    } else {
-        PRINTF("Unknown app\n");
-        // TODO show that rp.id is truncated if necessary
-        snprintf(verifyHash, sizeof(verifyHash), "%.*s", rpIdLen, rpId);
-    }
-    // Should not be necessary, but sanitize anyway
-    verifyHash[sizeof(verifyHash) - 1] = '\0';
-}
-
 void send_cbor_error(u2f_service_t *service, uint8_t error) {
     if (CMD_IS_OVER_U2F_CMD) {
-        G_io_apdu_buffer[0] = error;
-        G_io_apdu_buffer[1] = 0x90;
-        G_io_apdu_buffer[2] = 0x00;
-        if (ctap2Proxy.uiStarted) {
-            io_exchange(CHANNEL_APDU | IO_RETURN_AFTER_TX, 3);
-        } else {
-            ctap2Proxy.length = 3;
-        }
+        io_send_response_pointer((uint8_t *) &error, 1, SW_NO_ERROR);
     } else {
         u2f_message_reply(service, CTAP2_CMD_CBOR, (uint8_t *) &error, 1);
     }
@@ -73,13 +52,7 @@ void send_cbor_error(u2f_service_t *service, uint8_t error) {
 
 void send_cbor_response(u2f_service_t *service, uint32_t length) {
     if (CMD_IS_OVER_U2F_CMD) {
-        G_io_apdu_buffer[length] = 0x90;
-        G_io_apdu_buffer[length + 1] = 0x00;
-        if (ctap2Proxy.uiStarted) {
-            io_exchange(CHANNEL_APDU | IO_RETURN_AFTER_TX, length + 2);
-        } else {
-            ctap2Proxy.length = length + 2;
-        }
+        io_send_response_pointer(G_io_apdu_buffer, length, SW_NO_ERROR);
     } else {
         u2f_message_reply(service, CTAP2_CMD_CBOR, G_io_apdu_buffer, length);
     }
@@ -93,18 +66,8 @@ void ctap2_send_keepalive_processing() {
 }
 
 void performBuiltInUv(void) {
-    bolos_ux_params_t params = {.ux_id = BOLOS_UX_VALIDATE_PIN};
-
-    io_seproxyhal_io_heartbeat();
-
-    // Request user to enter his device PIN.
-    // This function doesn't return until the correct PIN is entered.
-    // If the user enter 3 wrong PIN, the device is reset to factory:
-    // - Current running app is terminated
-    // - All apps are removed
-    // - Seed is deleted
-    os_ux_blocking(&params);
-    PRINTF("Pin validated\n");
+    PRINTF("performBuiltInUv\n");
+    // No-op as the user is verified through the session PIN.
 }
 
 #define CBOR_MAKE_CREDENTIAL    0x01
@@ -143,7 +106,7 @@ void ctap2_handle_cmd_cbor(u2f_service_t *service, uint8_t *buffer, uint16_t len
             bool immediateReply;
             ctap2_get_assertion_handle(service, buffer + 1, length - 1, &immediateReply);
             if (immediateReply) {
-                ctap2_get_assertion_confirm();
+                ctap2_get_assertion_confirm(1);
             }
         } break;
         case CBOR_GET_NEXT_ASSERTION:
@@ -169,10 +132,20 @@ void ctap2_handle_cmd_cancel(u2f_service_t *service, uint8_t *buffer, uint16_t l
     UNUSED(length);
 
     PRINTF("ctap2_cmd_cancel %d\n", ctap2UxState);
-    if ((ctap2UxState != CTAP2_UX_STATE_NONE) && (ctap2UxState != CTAP2_UX_STATE_CANCELLED)) {
+    if (ctap2UxState != CTAP2_UX_STATE_NONE) {
         PRINTF("Cancel pending UI\n");
 
-        ctap2UxState = CTAP2_UX_STATE_CANCELLED;
+        ctap2UxState = CTAP2_UX_STATE_NONE;
+
+        // Answer as fast as possible as Chrome expect a fast answer and in case
+        // it didn't comes fast enough, it won't be sent back if the user
+        // eventually choose again this authenticator.
         send_cbor_error(service, ERROR_KEEPALIVE_CANCEL);
+
+#ifdef HAVE_BAGL
+        ux_stack_pop();
+        ux_stack_push();
+#endif
+        ui_idle();
     }
 }

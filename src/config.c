@@ -27,7 +27,8 @@
 
 config_t const N_u2f_real;
 
-static void derive_and_store_keys(uint32_t resetGeneration) {
+static int derive_and_store_keys(uint32_t resetGeneration) {
+    cx_err_t error;
     uint8_t key[64];
     uint8_t derivateKey[CX_SHA256_SIZE];
     uint32_t keyPath[3];
@@ -38,16 +39,22 @@ static void derive_and_store_keys(uint32_t resetGeneration) {
 
     // privateKeySeed
     keyPath[0] = PRIVATE_KEY_SEED_PATH;
-    os_perso_derive_node_bip32(CX_CURVE_SECP256R1, keyPath, 3, key, key + 32);
+    error = os_derive_bip32_no_throw(CX_CURVE_SECP256R1, keyPath, 3, key, key + 32);
+    if (error != CX_OK) {
+        return -1;
+    }
     if (memcmp(key, (uint8_t *) N_u2f.privateKeySeed, sizeof(N_u2f.privateKeySeed)) == 0) {
         // Keys are already initialized with the proper seed and resetGeneration
-        return;
+        return 0;
     }
     nvm_write((void *) N_u2f.privateKeySeed, (void *) key, sizeof(N_u2f.privateKeySeed));
 
     // wrappingKey
     keyPath[0] = WRAPPING_KEY_PATH;
-    os_perso_derive_node_bip32(CX_CURVE_SECP256R1, keyPath, 3, key, key + 32);
+    error = os_derive_bip32_no_throw(CX_CURVE_SECP256R1, keyPath, 3, key, key + 32);
+    if (error != CX_OK) {
+        return -1;
+    }
 
     // wrappingKeyU2F: aes_key = SHA256(VERSION || wrappingKeys)
     version = CREDENTIAL_VERSION_U2F;
@@ -60,9 +67,12 @@ static void derive_and_store_keys(uint32_t resetGeneration) {
     nvm_write((void *) N_u2f.wrappingKeyCTAP2,
               (void *) derivateKey,
               sizeof(N_u2f.wrappingKeyCTAP2));
+
+    return 0;
 }
 
-void config_init(void) {
+int config_init(void) {
+    int ret = 0;
     uint32_t tmp32;
     uint8_t tmp8;
     if (N_u2f.initialized != 1) {
@@ -92,8 +102,9 @@ void config_init(void) {
         nvm_write((void *) &N_u2f.initialized, (void *) &tmp8, sizeof(uint8_t));
     } else {
         // Check that the seed did not change - if it did, overwrite the keys
-        derive_and_store_keys(N_u2f.resetGeneration);
+        ret = derive_and_store_keys(N_u2f.resetGeneration);
     }
+    return ret;
 }
 
 uint8_t config_increase_and_get_authentification_counter(uint8_t *buffer) {

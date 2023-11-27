@@ -21,30 +21,24 @@ endif
 include $(BOLOS_SDK)/Makefile.defines
 
 $(info TARGET_NAME=$(TARGET_NAME))
-ifneq ($(TARGET_NAME),$(filter $(TARGET_NAME),TARGET_NANOX TARGET_NANOS2))
+ifneq ($(TARGET_NAME),$(filter $(TARGET_NAME),TARGET_NANOX TARGET_NANOS2 TARGET_STAX))
 $(error Environment variable TARGET_NAME is not valid or not supported)
 endif
 
 APPNAME = "Security Key"
 
-APP_LOAD_PARAMS  = --curve secp256r1
-APP_LOAD_PARAMS += --path "5722689'"  # int("WRA".encode("ascii").hex(), 16)
-APP_LOAD_PARAMS += --path "5262163'"  # int("PKS".encode("ascii").hex(), 16)
-APP_LOAD_PARAMS += --appFlags 0x040
-APP_LOAD_PARAMS += $(COMMON_LOAD_PARAMS)
+CURVE_APP_LOAD_PARAMS = secp256r1
+PATH_APP_LOAD_PARAMS = "5722689'"  # int("WRA".encode("ascii").hex(), 16)
+PATH_APP_LOAD_PARAMS += "5262163'"  # int("PKS".encode("ascii").hex(), 16)
 
 APPVERSION_M=1
-APPVERSION_N=1
-APPVERSION_P=1
+APPVERSION_N=4
+APPVERSION_P=0
 APPVERSION=$(APPVERSION_M).$(APPVERSION_N).$(APPVERSION_P)
 
-ICONNAME=icons/icon_security_key.gif
-
-################
-# Default rule #
-################
-
-all: default
+ICON_NANOX=icons/icon_security_key.gif
+ICON_NANOSP=icons/icon_security_key.gif
+ICON_STAX=icons/icon_security_key_stax.gif
 
 ################
 # Attestations #
@@ -93,42 +87,9 @@ endif
 # Platform #
 ############
 
-DEFINES += OS_IO_SEPROXYHAL IO_SEPROXYHAL_BUFFER_SIZE_B=128
-DEFINES += HAVE_SPRINTF
-DEFINES += HAVE_IO_USB HAVE_L4_USBLIB IO_USB_MAX_ENDPOINTS=6 IO_HID_EP_LENGTH=64 HAVE_USB_APDU
-DEFINES += HAVE_WEBUSB WEBUSB_URL_SIZE_B=0 WEBUSB_URL=""
-
 DEFINES += HAVE_U2F HAVE_IO_U2F
 DEFINES += HAVE_FIDO2
-DEFINES += USB_SEGMENT_SIZE=64
 DEFINES += CUSTOM_IO_APDU_BUFFER_SIZE=1031 # 1024 + 7
-DEFINES += UNUSED\(x\)=\(void\)x
-DEFINES += APPVERSION=\"$(APPVERSION)\"
-
-# Enforce SDK that supports UX Flow for Nano all targets, Nano S included
-DEFINES += HAVE_UX_FLOW
-DEFINES += HAVE_BAGL
-
-ifeq ($(TARGET_NAME),$(filter $(TARGET_NAME),TARGET_NANOX TARGET_NANOS2))
-DEFINES += HAVE_GLO096
-DEFINES += BAGL_WIDTH=128 BAGL_HEIGHT=64
-DEFINES += HAVE_BAGL_ELLIPSIS # long label truncation feature
-DEFINES += HAVE_BAGL_FONT_OPEN_SANS_REGULAR_11PX
-DEFINES += HAVE_BAGL_FONT_OPEN_SANS_EXTRABOLD_11PX
-DEFINES += HAVE_BAGL_FONT_OPEN_SANS_LIGHT_16PX
-endif
-
-# Enabling debug PRINTF
-DEBUG=0
-ifneq ($(DEBUG),0)
-    ifeq ($(TARGET_NAME),TARGET_NANOX)
-        DEFINES += HAVE_PRINTF PRINTF=mcu_usb_printf
-    else
-        DEFINES += HAVE_PRINTF PRINTF=screen_printf
-    endif
-else
-        DEFINES += PRINTF\(...\)=
-endif
 
 DEFINES += HAVE_UX_STACK_INIT_KEEP_TICKER
 
@@ -165,45 +126,19 @@ DEFINES += HAVE_FIDO2_RPID_FILTER
 
 DEFINES += RK_SIZE=6144
 
+DEFINES += HAVE_DEBUG_THROWS
+
 #DEFINES  += HAVE_CBOR_DEBUG
 
 ##############
 # Compiler #
 ##############
 
-WERROR=0
-ifneq ($(WERROR),0)
-    CFLAGS += -Werror
-endif
-
-CC      := $(CLANGPATH)clang
-CFLAGS  += -O3 -Os
-AS      := $(GCCPATH)arm-none-eabi-gcc
-LD      := $(GCCPATH)arm-none-eabi-gcc
-LDFLAGS += -O3 -Os
-LDLIBS  += -lm -lgcc -lc
-
-# Remove warning on custom snprintf implementation usage
-CFLAGS += -Wno-format-invalid-specifier -Wno-format-extra-args
-
-# Import rules to compile glyphs(/pone)
-include $(BOLOS_SDK)/Makefile.glyphs
-
-# Define directory to build
+# Application source files
 APP_SOURCE_PATH  += src src-cbor
-SDK_SOURCE_PATH  += lib_stusb lib_ux lib_u2f lib_stusb_impl
+SDK_SOURCE_PATH  += lib_u2f
 
-load: all
-	python3 -m ledgerblue.loadApp $(APP_LOAD_PARAMS)
+VARIANT_PARAM = APP
+VARIANT_VALUES = SecurityKey
 
-delete:
-	python3 -m ledgerblue.deleteApp $(COMMON_DELETE_PARAMS)
-
-# Import generic rules from the sdk
-include $(BOLOS_SDK)/Makefile.rules
-
-# Add dependency on custom makefile filename
-dep/%.d: %.c Makefile
-
-listvariants:
-	@echo VARIANTS NONE SecurityKey
+include $(BOLOS_SDK)/Makefile.standard_app

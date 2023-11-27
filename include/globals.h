@@ -27,6 +27,7 @@
 
 extern char verifyHash[65];
 extern char verifyName[20];
+extern char rpID[65];
 
 extern u2f_service_t G_io_u2f;
 
@@ -47,7 +48,6 @@ typedef struct shared_ctx_s {
 
 extern shared_ctx_t shared_ctx;
 extern ctap2_ux_state_t ctap2UxState;
-extern ctap2_proxy_t ctap2Proxy;
 
 static inline u2f_data_t *globals_get_u2f_data(void) {
     return &shared_ctx.u.u2fData;

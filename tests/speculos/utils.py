@@ -7,6 +7,8 @@ from fido2.cose import ES256
 from fido2.utils import sha256
 from fido2.webauthn import AttestedCredentialData
 
+from ragger.navigator import NavIns, NavInsID
+
 # Application build configuration
 HAVE_NO_RESET_GENERATION_INCREMENT = True
 HAVE_RK_SUPPORT_SETTING = True
@@ -14,26 +16,6 @@ HAVE_RK_SUPPORT_SETTING = True
 
 FIDO_RP_ID_HASH_1 = bytes.fromhex("000102030405060708090a0b0c0d0e0f"
                                   "101112131415161718191a1b1c1d1e1f")
-
-
-CRED_PARAMS = [
-    ("webctap.myservice.com",
-     bytes.fromhex("000102030405060708090a0b0c0d0e0f"
-                   "101112131415161718191a1b1c1d1e1f"),
-     "My user name"),
-    ("webctap.myservice_1.com",
-     bytes.fromhex("00000000000000000000000000000000"
-                   "00000000000000000000000000000001"),
-     "My user 1 name"),
-    ("webctap.myservice_2.com",
-     bytes.fromhex("00000000000000000000000000000000"
-                   "00000000000000000000000000000002"),
-     "My user 2 name"),
-    ("webctap.myservice_3.com",
-     bytes.fromhex("00000000000000000000000000000000"
-                   "00000000000000000000000000000003"),
-     "My user 3 name")
-]
 
 
 def prepare_apdu(cla=0, ins=0, p1=0, p2=0, data=b""):
@@ -60,7 +42,16 @@ def generate_make_credentials_params(ref=None):
         user_id = generate_random_bytes(64)
         user_name = None
     else:
-        rp_id, user_id, user_name = CRED_PARAMS[ref]
+        if ref == 0:
+            rp_id = "webctap.myservice.com"
+            user_id = bytes.fromhex("000102030405060708090a0b0c0d0e0f"
+                                    "101112131415161718191a1b1c1d1e1f")
+            user_name = "My user name"
+        else:
+            rp_id = f"webctap.myservice_{ref}.com"
+            user_id = bytes.fromhex("00000000000000000000000000000000"
+                                    f"0000000000000000000000000000000{ref}")
+            user_name = f"My user {ref} name"
 
     client_data_hash = generate_random_bytes(32)
     rp = {"id": rp_id}
@@ -143,3 +134,42 @@ fido_known_app = {
     "demo.yubico.com": "demo.yubico.com",
 }
 fido_known_appid = {get_rp_id_hash(x): y for x, y in fido_known_app.items()}
+
+
+def navigate(navigator,
+             user_accept,
+             check_screens,
+             check_cancel,
+             compare_args,
+             text,
+             nav_ins,
+             val_ins):
+
+    if check_screens:
+        assert compare_args
+        root, test_name = compare_args
+    else:
+        root, test_name = None, None
+
+    if user_accept is not None:
+        # Over U2F endpoint (but not over HID) the device needs the
+        # response to be retrieved before continuing the UX flow.
+
+        if text:
+            navigator.navigate_until_text_and_compare(
+                nav_ins,
+                val_ins,
+                text,
+                root,
+                test_name,
+                screen_change_after_last_instruction=False)
+        else:
+            navigator.navigate_and_compare(
+                root,
+                test_name,
+                val_ins,
+                screen_change_after_last_instruction=False)
+
+    elif check_cancel:
+        navigator.navigate([NavIns(NavInsID.WAIT, (0.1,))],
+                           screen_change_after_last_instruction=False)

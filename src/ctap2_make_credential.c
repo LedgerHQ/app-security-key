@@ -344,7 +344,7 @@ static int process_makeCred_authnr_options(cbipDecoder_t *decoder, cbipItem_t *m
         status = cbiph_get_map_key_str_bool(decoder, &optionsItem, OPTION_RESIDENT_KEY, &boolValue);
         if (status == CBIPH_STATUS_FOUND) {
 #ifdef HAVE_RK_SUPPORT_SETTING
-            if (!config_get_rk_enabled()) {
+            if (boolValue && !config_get_rk_enabled()) {
                 PRINTF("RK disabled\n");
                 return ERROR_UNSUPPORTED_OPTION;
             }
@@ -658,13 +658,9 @@ void ctap2_make_credential_confirm() {
     uint8_t nonce[CREDENTIAL_NONCE_SIZE];
     int status;
 
-    ctap2UxState = CTAP2_UX_STATE_NONE;
-
     PRINTF("ctap2_make_credential_confirm\n");
 
     ctap2_send_keepalive_processing();
-
-    ui_idle();
 
     // Perform User Verification if required
     if (ctap2RegisterData->pinRequired) {
@@ -716,7 +712,5 @@ exit:
 }
 
 void ctap2_make_credential_user_cancel() {
-    ctap2UxState = CTAP2_UX_STATE_NONE;
     send_cbor_error(&G_io_u2f, ERROR_OPERATION_DENIED);
-    ui_idle();
 }

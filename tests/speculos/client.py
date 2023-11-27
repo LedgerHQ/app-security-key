@@ -68,11 +68,8 @@ class LedgerCtapHidConnection(CtapHidConnection):
         self.u2f_hid_endpoint = (transport.upper() == "U2F")
         self.debug = debug
 
-        if self.u2f_hid_endpoint:
-            # Device answers should be fast
-            self.sock.settimeout(1)
-        else:
-            self.sock.settimeout(10)
+        # Set a timeout to allow tests to raise on socket rx failure
+        self.sock.settimeout(5)
 
     def write_packet(self, packet):
         packet = bytes(packet)
@@ -245,10 +242,10 @@ class TestClient:
 
     def start(self):
         try:
-            hid_dev = LedgerCtapHidConnection(self.USB_transport,
-                                              self.debug)
+            self.hid_dev = LedgerCtapHidConnection(self.USB_transport,
+                                                   self.debug)
             descriptor = HidDescriptor("sim", 0, 0, 64, 64, "speculos", "0000")
-            self.dev = LedgerCtapHidDevice(descriptor, hid_dev,
+            self.dev = LedgerCtapHidDevice(descriptor, self.hid_dev,
                                            self.USB_transport, self.debug)
 
             self.ctap1 = LedgerCtap1(self.dev, self.model, self.navigator,

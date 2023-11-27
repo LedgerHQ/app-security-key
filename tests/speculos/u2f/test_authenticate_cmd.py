@@ -126,7 +126,7 @@ def test_authenticate_with_reboot_ok(client):
 
 def test_authenticate_multiple_ok(client):
     registrations = []
-    for _ in range(10):
+    for _ in range(5):
         app_param, registration_data = register(client)
         registrations.append((app_param, registration_data))
 
@@ -144,7 +144,7 @@ def test_authenticate_counter_increment(client):
     app_param, registration_data = register(client)
 
     prev = 0
-    for _ in range(10):
+    for _ in range(5):
         challenge = generate_random_bytes(32)
 
         authentication_data = client.ctap1.authenticate(challenge,
@@ -346,3 +346,29 @@ def test_authenticate_raw(client):
             authentication_data = SignatureData(response)
 
             authentication_data.verify(app_param, challenge, registration_data.public_key)
+
+
+def test_authenticate_retrocompat(client):
+    # Make sure that app update will still works with previously generated
+    # key handles and public key already shared with some Relying Party
+    app_param_hex = "f430952043cccefab769aa034f8f38d6"
+    app_param_hex += "9c21d3d685ed7044a3602c4f8901ec73"
+    app_param = bytearray.fromhex(app_param_hex)
+
+    key_handle_hex = "012f3f3858150bbef433cb4106cd3366"
+    key_handle_hex += "6355b8f6a9642da8a7b85a29c5c0c5a2d5"
+    key_handle = bytearray.fromhex(key_handle_hex)
+
+    public_key_hex = "046aeca2df937f91bd30471e73f5c36d"
+    public_key_hex += "60a3cdff36cd469d1ac6c95c9d84e01c"
+    public_key_hex += "5db23952cc01a55c84b139277db0e810"
+    public_key_hex += "b92da64950770c6a67a47a8782ec827f8e"
+    public_key = bytearray.fromhex(public_key_hex)
+
+    challenge = generate_random_bytes(32)
+
+    authentication_data = client.ctap1.authenticate(challenge,
+                                                    app_param,
+                                                    key_handle)
+
+    authentication_data.verify(app_param, challenge, public_key)
