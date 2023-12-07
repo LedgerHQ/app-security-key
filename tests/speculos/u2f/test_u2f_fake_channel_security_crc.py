@@ -1,4 +1,5 @@
 import pytest
+import socket
 
 from fido2.ctap1 import ApduError, Ctap1
 from fido2.hid import CTAPHID
@@ -43,5 +44,5 @@ def test_register_raw_u2f_fake_channel_security_crc(client):
                                   p2=0x00,
                                   data=data)
 
-    with pytest.raises((AssertionError, ConnectionResetError, TimeoutError)) as e:
+    with pytest.raises((AssertionError, ConnectionResetError, TimeoutError, socket.timeout)) as e:
         response = client.ctap1.device.recv(CTAPHID.MSG)
