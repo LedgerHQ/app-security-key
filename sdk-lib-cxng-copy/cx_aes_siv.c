@@ -7,6 +7,8 @@
 #include "lcx_cmac.h"
 #include "lcx_aes_siv.h"
 
+uint8_t cx_constant_time_eq(const uint8_t *buf1, uint8_t *buf2, size_t len);
+
 static void cx_clear_bits(uint8_t *input)
 {
     input[8] &= 0x7f;
