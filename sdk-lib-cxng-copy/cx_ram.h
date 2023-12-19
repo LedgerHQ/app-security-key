@@ -32,9 +32,15 @@
 #include "cx_sha256.h"
 #include "cx_sha512.h"
 #include "cx_ripemd160.h"
+#if defined(HAVE_BLAKE3)
 #include "cx_blake3.h"
+#endif
+#ifdef HAVE_POLY1305
 #include "cx_poly1305.h"
+#endif
+#ifdef HAVE_CHACHA
 #include "lcx_chacha.h"
+#endif
 #include "cx_cipher.h"
 #include "cx_cmac.h"
 
