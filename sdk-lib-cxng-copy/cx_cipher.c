@@ -8,6 +8,10 @@
 #include <stddef.h>
 #include <string.h>
 
+// Disable DES, it is not used and removing it spare a little flash and burden
+// of exposing cx_des_xxx_info.
+#undef HAVE_DES
+
 typedef cx_err_t (*enc_func_t)(const cipher_key_t *ctx_key,
                                const uint8_t      *in_block,
                                uint8_t            *out_block);  ///< Encryption function
