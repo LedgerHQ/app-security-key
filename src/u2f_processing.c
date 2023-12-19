@@ -226,26 +226,26 @@ static void u2f_compute_enroll_response_hash(u2f_reg_resp_base_t *reg_resp_base,
     cx_sha256_t hash;
 
     cx_sha256_init(&hash);
-    cx_hash_no_throw(&hash.header, 0, DUMMY_ZERO, 1, NULL, 0);
-    cx_hash_no_throw(&hash.header,
-                     0,
-                     globals_get_u2f_data()->application_param,
-                     sizeof(globals_get_u2f_data()->application_param),
-                     NULL,
-                     0);
-    cx_hash_no_throw(&hash.header,
-                     0,
-                     globals_get_u2f_data()->challenge_param,
-                     sizeof(globals_get_u2f_data()->challenge_param),
-                     NULL,
-                     0);
-    cx_hash_no_throw(&hash.header, 0, reg_resp_base->key_handle, key_handle_length, NULL, 0);
-    cx_hash_no_throw(&hash.header,
-                     CX_LAST,
-                     reg_resp_base->user_key,
-                     sizeof(reg_resp_base->user_key),
-                     data_hash,
-                     CX_SHA256_SIZE);
+    crypto_hash(&hash.header, 0, DUMMY_ZERO, 1, NULL, 0);
+    crypto_hash(&hash.header,
+                0,
+                globals_get_u2f_data()->application_param,
+                sizeof(globals_get_u2f_data()->application_param),
+                NULL,
+                0);
+    crypto_hash(&hash.header,
+                0,
+                globals_get_u2f_data()->challenge_param,
+                sizeof(globals_get_u2f_data()->challenge_param),
+                NULL,
+                0);
+    crypto_hash(&hash.header, 0, reg_resp_base->key_handle, key_handle_length, NULL, 0);
+    crypto_hash(&hash.header,
+                CX_LAST,
+                reg_resp_base->user_key,
+                sizeof(reg_resp_base->user_key),
+                data_hash,
+                CX_SHA256_SIZE);
 }
 
 static int u2f_prepare_enroll_response(void) {
@@ -322,25 +322,20 @@ static void u2f_compute_sign_response_hash(u2f_auth_resp_base_t *auth_resp_base,
     cx_sha256_t hash;
 
     cx_sha256_init(&hash);
-    cx_hash_no_throw(&hash.header,
-                     0,
-                     globals_get_u2f_data()->application_param,
-                     sizeof(globals_get_u2f_data()->application_param),
-                     NULL,
-                     0);
-    cx_hash_no_throw(&hash.header, 0, DUMMY_USER_PRESENCE, 1, NULL, 0);
-    cx_hash_no_throw(&hash.header,
-                     0,
-                     auth_resp_base->counter,
-                     sizeof(auth_resp_base->counter),
-                     NULL,
-                     0);
-    cx_hash_no_throw(&hash.header,
-                     CX_LAST,
-                     globals_get_u2f_data()->challenge_param,
-                     sizeof(globals_get_u2f_data()->challenge_param),
-                     data_hash,
-                     CX_SHA256_SIZE);
+    crypto_hash(&hash.header,
+                0,
+                globals_get_u2f_data()->application_param,
+                sizeof(globals_get_u2f_data()->application_param),
+                NULL,
+                0);
+    crypto_hash(&hash.header, 0, DUMMY_USER_PRESENCE, 1, NULL, 0);
+    crypto_hash(&hash.header, 0, auth_resp_base->counter, sizeof(auth_resp_base->counter), NULL, 0);
+    crypto_hash(&hash.header,
+                CX_LAST,
+                globals_get_u2f_data()->challenge_param,
+                sizeof(globals_get_u2f_data()->challenge_param),
+                data_hash,
+                CX_SHA256_SIZE);
 }
 
 static int u2f_prepare_sign_response(void) {
