@@ -104,7 +104,7 @@ DEFINES += HAVE_UX_STACK_INIT_KEEP_TICKER
 # This means that the app APDU will be patched when streamed from the HSM and therefore
 # the apdu should not contain a crc.
 DEFINES += HAVE_COUNTER_MARKER
-APP_LOAD_PARAMS += --nocrc
+ENABLE_NOCRC_APP_LOAD_PARAMS = 1
 
 # Disable resetGeneration increment during ctap2 reset
 # This means credentials that are not discoverable won't be properly
