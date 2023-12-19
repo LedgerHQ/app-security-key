@@ -3,9 +3,30 @@
 #include "cx_cipher.h"
 #include "os_math.h"
 #include "os_utils.h"
+#include "os_pic.h"
 
 #include <stddef.h>
 #include <string.h>
+
+typedef cx_err_t (*enc_func_t)(const cipher_key_t *ctx_key,
+                               const uint8_t      *in_block,
+                               uint8_t            *out_block);  ///< Encryption function
+typedef cx_err_t (*dec_func_t)(const cipher_key_t *ctx_key,
+                               const uint8_t      *in_block,
+                               uint8_t            *out_block);  ///< Decryption function
+typedef cx_err_t (*ctr_func_t)(const cipher_key_t *ctx_key,
+                               size_t              len,
+                               size_t             *nc_off,
+                               uint8_t            *nonce_counter,
+                               uint8_t            *stream_block,
+                               const uint8_t      *input,
+                               uint8_t            *output);  ///< Encryption in CTR mode
+typedef cx_err_t (*setkey_func_t)(const cipher_key_t *ctx_key,
+                                  uint32_t            operation,
+                                  const uint8_t      *key,
+                                  uint32_t key_bitlen);  ///< Set key for encryption or decryption
+typedef cx_err_t (*ctx_reset_t)(void);                   ///< Reset
+
 
 #define CX_MAX_BLOCK_SIZE 16
 
@@ -156,10 +177,12 @@ static cx_err_t ecb_func(cx_cipher_context_t *ctx,
     }
     while (len > 0) {
         if (CX_ENCRYPT == operation) {
-            CX_CHECK(ctx->cipher_info->base->enc_func(ctx->cipher_key, input, output));
+            enc_func_t enc_func = PIC(((cx_cipher_base_t *)PIC(ctx->cipher_info->base))->enc_func);
+            CX_CHECK(enc_func(ctx->cipher_key, input, output));
         }
         else if (CX_DECRYPT == operation) {
-            CX_CHECK(ctx->cipher_info->base->dec_func(ctx->cipher_key, input, output));
+            dec_func_t dec_func = PIC(((cx_cipher_base_t *)PIC(ctx->cipher_info->base))->dec_func);
+            CX_CHECK(dec_func(ctx->cipher_key, input, output));
         }
         else {
             return CX_INVALID_PARAMETER_VALUE;
@@ -191,7 +214,8 @@ static cx_err_t cbc_func(cx_cipher_context_t *ctx,
     }
     while (len > 0) {
         if (CX_DECRYPT == operation) {
-            CX_CHECK(ctx->cipher_info->base->dec_func(ctx->cipher_key, input, block));
+            dec_func_t dec_func = PIC(((cx_cipher_base_t *)PIC(ctx->cipher_info->base))->dec_func);
+            CX_CHECK(dec_func(ctx->cipher_key, input, block));
             for (uint32_t i = 0; i < block_size; i++) {
                 tmp[i] = block[i] ^ iv[i];
             }
@@ -201,7 +225,8 @@ static cx_err_t cbc_func(cx_cipher_context_t *ctx,
             for (uint32_t i = 0; i < block_size; i++) {
                 block[i] = input[i] ^ iv[i];
             }
-            CX_CHECK(ctx->cipher_info->base->enc_func(ctx->cipher_key, block, tmp));
+            enc_func_t enc_func = PIC(((cx_cipher_base_t *)PIC(ctx->cipher_info->base))->enc_func);
+            CX_CHECK(enc_func(ctx->cipher_key, block, tmp));
             memcpy(iv, tmp, block_size);
         }
         if ((CX_ENCRYPT == operation) || (CX_DECRYPT == operation)) {
@@ -284,7 +309,8 @@ cx_err_t cx_cipher_setkey(cx_cipher_context_t *ctx,
     }
     ctx->key_bitlen = key_bitlen;
     ctx->operation  = operation;
-    return ctx->cipher_info->base->setkey_func(ctx->cipher_key, operation, key, key_bitlen);
+    setkey_func_t setkey_func = PIC(((cx_cipher_base_t *)PIC(ctx->cipher_info->base))->setkey_func);
+    return setkey_func(ctx->cipher_key, operation, key, key_bitlen);
 }
 
 cx_err_t cx_cipher_setiv(cx_cipher_context_t *ctx, const uint8_t *iv, size_t iv_len)
@@ -401,15 +427,18 @@ cx_err_t cx_cipher_update(cx_cipher_context_t *ctx,
             *out_len = in_len;
             return CX_OK;
         case CX_CHAIN_CTR:
-            CX_CHECK(ctx->cipher_info->base->ctr_func(ctx->cipher_key,
-                                                      in_len,
-                                                      &ctx->unprocessed_len,
-                                                      ctx->iv,
-                                                      ctx->unprocessed_data,
-                                                      input,
-                                                      output));
+        {
+            ctr_func_t ctr_func = PIC(((cx_cipher_base_t *)PIC(ctx->cipher_info->base))->ctr_func);
+            CX_CHECK(ctr_func(ctx->cipher_key,
+                              in_len,
+                              &ctx->unprocessed_len,
+                              ctx->iv,
+                              ctx->unprocessed_data,
+                              input,
+                              output));
             *out_len = in_len;
             return CX_OK;
+        }
         default:
             return CX_INVALID_PARAMETER_VALUE;
     }
