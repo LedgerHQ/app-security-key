@@ -21,7 +21,7 @@ endif
 include $(BOLOS_SDK)/Makefile.defines
 
 $(info TARGET_NAME=$(TARGET_NAME))
-ifneq ($(TARGET_NAME),$(filter $(TARGET_NAME),TARGET_NANOX TARGET_NANOS2 TARGET_STAX))
+ifneq ($(TARGET_NAME),$(filter $(TARGET_NAME),TARGET_NANOS TARGET_NANOX TARGET_NANOS2 TARGET_STAX))
 $(error Environment variable TARGET_NAME is not valid or not supported)
 endif
 
@@ -36,6 +36,7 @@ APPVERSION_N=4
 APPVERSION_P=0
 APPVERSION=$(APPVERSION_M).$(APPVERSION_N).$(APPVERSION_P)
 
+ICON_NANOS=icons/icon_security_key_nanos.gif
 ICON_NANOX=icons/icon_security_key.gif
 ICON_NANOSP=icons/icon_security_key.gif
 ICON_STAX=icons/icon_security_key_stax.gif
@@ -124,7 +125,11 @@ DEFINES += HAVE_RK_SUPPORT_SETTING
 
 DEFINES += HAVE_FIDO2_RPID_FILTER
 
+ifeq ($(TARGET_NAME),TARGET_NANOS)
+DEFINES += RK_SIZE=2048
+else
 DEFINES += RK_SIZE=6144
+endif
 
 DEFINES += HAVE_DEBUG_THROWS
 
@@ -137,6 +142,16 @@ DEFINES += HAVE_DEBUG_THROWS
 # Application source files
 APP_SOURCE_PATH  += src src-cbor
 SDK_SOURCE_PATH  += lib_u2f
+
+ifeq ($(API_LEVEL),)
+# Specific files for Nanos device which OS CX lib doesn't provide the needed
+# AES_SIV functions.
+# Check on API_LEVEL rather than TARGET_NAME to allow compilation on unified SDK.
+DEFINES += HAVE_AES_SIV HAVE_AES HAVE_CMAC
+INCLUDES_PATH += $(BOLOS_SDK)/lib_cxng/src
+APP_SOURCE_FILES += $(BOLOS_SDK)/lib_cxng/src/cx_ram.c
+APP_SOURCE_PATH  += sdk-lib-cxng-copy
+endif
 
 VARIANT_PARAM = APP
 VARIANT_VALUES = SecurityKey
