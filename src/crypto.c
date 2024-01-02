@@ -20,6 +20,7 @@
 
 #include "os.h"
 #include "cx.h"
+#include "ledger_assert.h"
 
 #include "config.h"
 #include "crypto_data.h"
@@ -29,6 +30,18 @@
 #define ROLE_PRIVATE_KEY           0
 #define ROLE_CRED_RANDOM_KEY_UV    1
 #define ROLE_CRED_RANDOM_KEY_NO_UV 2
+
+void crypto_hash(cx_hash_t *hash,
+                 uint32_t mode,
+                 const uint8_t *in,
+                 size_t len,
+                 uint8_t *out,
+                 size_t out_len) {
+    cx_err_t cx_err;
+
+    cx_err = cx_hash_no_throw(hash, mode, in, len, out, out_len);
+    LEDGER_ASSERT(cx_err == CX_OK, "cx_hash_no_throw fail");
+}
 
 bool crypto_compare(const uint8_t *a, const uint8_t *b, uint16_t length) {
     uint16_t given_length = length;
@@ -56,8 +69,8 @@ void crypto_compute_sha256(const uint8_t *in1,
     cx_sha256_t hash;
 
     cx_sha256_init(&hash);
-    cx_hash_no_throw(&hash.header, 0, in1, in1_len, NULL, 0);
-    cx_hash_no_throw(&hash.header, CX_LAST, in2, in2_len, out, CX_SHA256_SIZE);
+    crypto_hash(&hash.header, 0, in1, in1_len, NULL, 0);
+    crypto_hash(&hash.header, CX_LAST, in2, in2_len, out, CX_SHA256_SIZE);
 }
 
 int crypto_generate_private_key(const uint8_t *nonce,

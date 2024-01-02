@@ -28,16 +28,13 @@ def test_fido_screens_settings(client, test_name):
 
         # Enable and check "Enabling" warning message
         instructions.append(NavInsID.BOTH_CLICK)
-        # Screen 0 -> 1
-        instructions.append(NavInsID.RIGHT_CLICK)
-        # Screen 1 -> 2
-        instructions.append(NavInsID.RIGHT_CLICK)
-        # Screen 2 -> 3
-        instructions.append(NavInsID.RIGHT_CLICK)
-        # Screen 3 -> 4
-        instructions.append(NavInsID.RIGHT_CLICK)
-        # Screen 4 -> 5
-        instructions.append(NavInsID.RIGHT_CLICK)
+        if client.model != "nanos":
+            # Screen 0 -> 5
+            instructions += [NavInsID.RIGHT_CLICK] * 5
+        else:
+            # Screen 0 -> 13
+            instructions += [NavInsID.RIGHT_CLICK] * 13
+
         # Confirm
         instructions.append(NavInsID.BOTH_CLICK)
 

@@ -20,6 +20,7 @@
 
 #include "os.h"
 #include "cx.h"
+#include "lcx_aes_siv.h"
 
 #include "ctap2.h"
 #include "credential.h"

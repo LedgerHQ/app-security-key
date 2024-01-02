@@ -20,6 +20,16 @@
 #define __CRYPTO_H__
 
 /**
+ * Wrapper around cx_hash_no_throw with an assert in case of failure
+ */
+void crypto_hash(cx_hash_t *hash,
+                 uint32_t mode,
+                 const uint8_t *in,
+                 size_t len,
+                 uint8_t *out,
+                 size_t out_len);
+
+/**
  * Compare two buffer a and b.
  * Return true if they match, else false.
  */
