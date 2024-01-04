@@ -48,12 +48,17 @@ def enable_rk_option(client):
             NavInsID.BOTH_CLICK,
 
             # Enable and skip "Enabling" message
-            NavInsID.BOTH_CLICK,
-            NavInsID.RIGHT_CLICK,
-            NavInsID.RIGHT_CLICK,
-            NavInsID.RIGHT_CLICK,
-            NavInsID.RIGHT_CLICK,
-            NavInsID.RIGHT_CLICK,
+            NavInsID.BOTH_CLICK
+        ]
+
+        if client.model != "nanos":
+            # Screen 0 -> 5
+            instructions += [NavInsID.RIGHT_CLICK] * 5
+        else:
+            # Screen 0 -> 13
+            instructions += [NavInsID.RIGHT_CLICK] * 13
+
+        instructions += [
             NavInsID.BOTH_CLICK,
 
             # Leave settings

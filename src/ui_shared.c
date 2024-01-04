@@ -110,9 +110,20 @@ static void display_settings() {
 #endif  // HAVE_RK_SUPPORT_SETTING
 
 UX_STEP_NOCB(ux_idle_flow_1_step, pn, {&C_icon_security_key, "Security Key"});
+
+#ifndef TARGET_NANOS
 UX_STEP_NOCB(ux_idle_flow_2_step,
              nnnn,
              {"Use for two-factor", "authentication and", "password-less", "log ins."});
+#else
+UX_STEP_NOCB(ux_idle_flow_2_step,
+             nn,
+             {
+                 "Use for 2FA and",
+                 "password-less log ins.",
+             });
+#endif
+
 UX_STEP_NOCB(ux_idle_flow_3_step,
              bn,
              {

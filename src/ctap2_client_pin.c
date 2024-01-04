@@ -18,6 +18,7 @@
 
 #include "os.h"
 #include "cx.h"
+#include "ledger_assert.h"
 
 #include "ctap2.h"
 #include "config.h"
@@ -177,10 +178,19 @@ bool ctap2_client_pin_verify(int protocol,
         cx_hmac_sha256(key, keyLen, msg, msgLength, hmacValue, CX_SHA256_SIZE);
     } else {
         cx_hmac_sha256_t hmac;
+        cx_err_t cx_err;
 
-        cx_hmac_sha256_init_no_throw(&hmac, key, keyLen);
-        cx_hmac_no_throw((cx_hmac_t *) &hmac, 0, msg, msgLength, NULL, 0);
-        cx_hmac_no_throw((cx_hmac_t *) &hmac, CX_LAST, msg2, msg2Len, hmacValue, CX_SHA256_SIZE);
+        cx_err = cx_hmac_sha256_init_no_throw(&hmac, key, keyLen);
+        LEDGER_ASSERT(cx_err == CX_OK, "cx_hmac_sha256_init_no_throw fail");
+        cx_err = cx_hmac_no_throw((cx_hmac_t *) &hmac, 0, msg, msgLength, NULL, 0);
+        LEDGER_ASSERT(cx_err == CX_OK, "cx_hmac_no_throw fail");
+        cx_err = cx_hmac_no_throw((cx_hmac_t *) &hmac,
+                                  CX_LAST,
+                                  msg2,
+                                  msg2Len,
+                                  hmacValue,
+                                  CX_SHA256_SIZE);
+        LEDGER_ASSERT(cx_err == CX_OK, "cx_hmac_no_throw fail");
     }
 
     if (!crypto_compare(signature, hmacValue, signatureLength)) {

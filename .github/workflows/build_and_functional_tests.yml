@@ -22,7 +22,6 @@ jobs:
     name: Build application using the reusable workflow
     uses: LedgerHQ/ledger-app-workflows/.github/workflows/reusable_build.yml@v1
     with:
-      run_for_devices: '["nanox", "nanosp", "stax"]'
       upload_app_binaries_artifact: compiled_app_binaries
 
   ragger_tests:
@@ -35,6 +34,9 @@ jobs:
           - model: stax
 
           - model: nanosp
+            args: "--fast"
+
+          - model: nanos
             args: "--fast"
 
           - model: nanox
