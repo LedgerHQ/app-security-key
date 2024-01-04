@@ -17,13 +17,13 @@ You can also use [this demo](https://webauthn.me/) to test this app, or use [its
 
 ## Building
 
-On a development environment:
+### With VSCode
 
-* Set `BOLOS_SDK` to a place where the Nano S SDK has been cloned (<https://github.com/LedgerHQ/nanos-secure-sdk>)
-* Until the SDK patch have not been integrated, you need to patch the SDK with the needed fix available in `sdk-patch` directory.
-* Install `arm-none-eabi-gcc` and `clang`
-* Run `make`
+You can quickly setup a convenient environment to build and test your application by using [Ledger's VSCode developer tools extension](https://marketplace.visualstudio.com/items?itemName=LedgerHQ.ledger-dev-tools) which leverages the [ledger-app-dev-tools](https://github.com/LedgerHQ/ledger-app-builder/pkgs/container/ledger-app-builder%2Fledger-app-dev-tools) docker image.
 
+### With a terminal
+
+The [ledger-app-dev-tools](https://github.com/LedgerHQ/ledger-app-builder/pkgs/container/ledger-app-builder%2Fledger-app-dev-tools) docker image contains all the required tools and libraries to **build**, **test** and **load** an application.
 
 ## Acronyms
 
@@ -52,11 +52,10 @@ See dedicated `README.md` in tests `directory`.
 
 - On Firefox on Linux, Nano S Plus is missing in snap udev rules.
 - There are some instabilities on Safari on MacOS, it's recommended to use another browser.
-- Android support on FIDO2 for external security key is not available yet. It should be starting with Google Play services v23.35
+- On Android, it is supported as soon as you have Google Play services v23.35 or above and that the service configuration doesn't require Discoverable Credentials.
 
 Due to OS constraints, this Security Key App as some limitations:
 
-* It is not available on the Nano S due to the lack of support of AES-SIV on Nano S OS.
 * Discoverable / Resident credentials are supported but are stored on a part of the device flash that will be wiped upon app deletion, which can happen:
   - If the user chooses to uninstall it from Ledger Live
   - If the user chooses to update the app to a new available version
