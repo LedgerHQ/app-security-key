@@ -391,6 +391,8 @@ void ctap2_get_assertion_ux(ctap2_ux_state_t state) {
 
     ctap2UxState = state;
 
+    UX_WAKE_UP();
+
 #if defined(HAVE_BAGL)
     ux_step = 0;
 #elif defined(HAVE_NBGL)
