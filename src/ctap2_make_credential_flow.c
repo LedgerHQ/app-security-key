@@ -155,6 +155,8 @@ void ctap2_make_credential_ux(void) {
 
     ctap2_ux_get_display_user();
 
+    UX_WAKE_UP();
+
 #if defined(HAVE_BAGL)
     ux_flow_init(0,
                  (ctap2RegisterData->residentKey ? ux_ctap2_make_cred_resident_flow

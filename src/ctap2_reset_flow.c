@@ -66,6 +66,8 @@ UX_FLOW(ux_ctap2_reset_flow,
 void ctap2_reset_ux(void) {
     ctap2UxState = CTAP2_UX_STATE_RESET;
 
+    UX_WAKE_UP();
+
     ux_flow_init(0, ux_ctap2_reset_flow, NULL);
 }
 
@@ -74,6 +76,8 @@ void ctap2_reset_ux(void) {
 
 void ctap2_reset_ux(void) {
     ctap2UxState = CTAP2_UX_STATE_RESET;
+
+    UX_WAKE_UP();
 
     io_seproxyhal_play_tune(TUNE_LOOK_AT_ME);
 
