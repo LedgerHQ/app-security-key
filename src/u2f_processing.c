@@ -681,34 +681,4 @@ int u2f_handle_apdu(uint8_t *rx, int data_length) {
     if (G_io_apdu_buffer[OFFSET_CLA] != FIDO_CLA) {
         return io_send_sw(SW_CLA_NOT_SUPPORTED);
     }
-
-    PRINTF("INS %d, P1 %d, P2 %d, L %d\n",
-           G_io_apdu_buffer[OFFSET_INS],
-           G_io_apdu_buffer[OFFSET_P1],
-           G_io_apdu_buffer[OFFSET_P2],
-           data_length);
-
-    switch (G_io_apdu_buffer[OFFSET_INS]) {
-        case FIDO_INS_ENROLL:
-            PRINTF("enroll\n");
-            return u2f_handle_apdu_enroll(rx, data_length);
-            break;
-        case FIDO_INS_SIGN:
-            PRINTF("sign\n");
-            return u2f_handle_apdu_sign(rx, data_length);
-            break;
-        case FIDO_INS_GET_VERSION:
-            PRINTF("version\n");
-            return u2f_handle_apdu_get_version(rx, data_length);
-            break;
-
-        case FIDO_INS_CTAP2_PROXY:
-            PRINTF("ctap2_proxy\n");
-            return u2f_handle_apdu_ctap2_proxy(rx, data_length);
-            break;
-
-        default:
-            PRINTF("unsupported\n");
-            return io_send_sw(SW_INS_NOT_SUPPORTED);
-    }
 }
