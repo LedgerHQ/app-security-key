@@ -35,6 +35,10 @@ void app_ticker_event_callback(void) {
     if (ctap2UxState != CTAP2_UX_STATE_NONE) {
         u2f_transport_ctap2_send_keepalive(&G_io_u2f, KEEPALIVE_REASON_TUP_NEEDED);
     }
+#ifdef HAVE_NFC
+    nfc_idle_work();
+    nfc_idle_work2();
+#endif
 }
 
 /**

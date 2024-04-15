@@ -57,7 +57,7 @@ static int parse_getAssert_authnr_rpid(cbipDecoder_t *decoder, cbipItem_t *mapIt
     }
 
 #ifdef HAVE_FIDO2_RPID_FILTER
-    if (CMD_IS_OVER_U2F_CMD) {
+    if (CMD_IS_OVER_U2F_CMD && !CMD_IS_OVER_U2F_NFC) {
         if (ctap2_check_rpid_filter(ctap2AssertData->rpId, ctap2AssertData->rpIdLen)) {
             PRINTF("rpId denied by filter\n");
             return ERROR_PROP_RPID_MEDIA_DENIED;
@@ -380,7 +380,17 @@ void ctap2_get_assertion_handle(u2f_service_t *service,
         goto exit;
     }
 
-    if (!ctap2AssertData->userPresenceRequired && !ctap2AssertData->pinRequired) {
+    if (CMD_IS_OVER_U2F_NFC) {
+        // No up nor uv requested, skip UX and reply immediately
+        // TODO: is this what we want?
+        // TODO: Handle cases where availableCredentials is != 1
+        //  -> which credentials should be chosen?
+        //  -> when credentials comes from allowListPresent, I think the spec allow to choose for
+        //  the user
+        //  -> when credentials comes from rk, the spec ask to use authenticatorGetNextAssertion
+        //  features
+        *immediateReply = true;
+    } else if (!ctap2AssertData->userPresenceRequired && !ctap2AssertData->pinRequired) {
         // No up nor uv required, skip UX and reply immediately
         *immediateReply = true;
     } else {
