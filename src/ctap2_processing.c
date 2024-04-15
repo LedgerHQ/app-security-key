@@ -29,9 +29,19 @@
 #include "fido_known_apps.h"
 #include "ui_shared.h"
 #include "sw_code.h"
+#include "nfc_io.h"
+
+static uint8_t cmdType;
 
 #define RPID_FILTER      "webctap."
 #define RPID_FILTER_SIZE (sizeof(RPID_FILTER) - 1)
+
+#define CBOR_MAKE_CREDENTIAL    0x01
+#define CBOR_GET_ASSERTION      0x02
+#define CBOR_GET_NEXT_ASSERTION 0x08
+#define CBOR_GET_INFO           0x04
+#define CBOR_CLIENT_PIN         0x06
+#define CBOR_RESET              0x07
 
 bool ctap2_check_rpid_filter(const char *rpId, uint32_t rpIdLen) {
     if ((rpIdLen < RPID_FILTER_SIZE) || (memcmp(rpId, RPID_FILTER, RPID_FILTER_SIZE) != 0)) {
@@ -50,7 +60,16 @@ void send_cbor_error(u2f_service_t *service, uint8_t error) {
 }
 
 void send_cbor_response(u2f_service_t *service, uint32_t length) {
-    if (CMD_IS_OVER_U2F_CMD) {
+    if (CMD_IS_OVER_U2F_NFC) {
+        const char *status = NULL;
+        if (cmdType == CBOR_MAKE_CREDENTIAL) {
+            status = "Registration details\nsent";
+        } else if (cmdType == CBOR_GET_ASSERTION) {
+            status = "Login request signed";
+        }
+        nfc_io_set_response_ready(SW_NO_ERROR, length, status);
+        nfc_io_send_prepared_response();
+    } else if (CMD_IS_OVER_U2F_CMD) {
         io_send_response_pointer(responseBuffer, length, SW_NO_ERROR);
     } else {
         u2f_message_reply(service, CTAP2_CMD_CBOR, responseBuffer, length);
@@ -68,13 +87,6 @@ void performBuiltInUv(void) {
     PRINTF("performBuiltInUv\n");
     // No-op as the user is verified through the session PIN.
 }
-
-#define CBOR_MAKE_CREDENTIAL    0x01
-#define CBOR_GET_ASSERTION      0x02
-#define CBOR_GET_NEXT_ASSERTION 0x08
-#define CBOR_GET_INFO           0x04
-#define CBOR_CLIENT_PIN         0x06
-#define CBOR_RESET              0x07
 
 void ctap2_handle_cmd_cbor(u2f_service_t *service, uint8_t *buffer, uint16_t length) {
     int status;
@@ -96,11 +108,16 @@ void ctap2_handle_cmd_cbor(u2f_service_t *service, uint8_t *buffer, uint16_t len
         send_cbor_error(service, ERROR_INVALID_CBOR);
         return;
     }
+    cmdType = buffer[0];
 
     switch (buffer[0]) {
-        case CBOR_MAKE_CREDENTIAL:
-            ctap2_make_credential_handle(service, buffer + 1, length - 1);
-            break;
+        case CBOR_MAKE_CREDENTIAL: {
+            bool immediateReply;
+            ctap2_make_credential_handle(service, buffer + 1, length - 1, &immediateReply);
+            if (immediateReply) {
+                ctap2_make_credential_confirm();
+            }
+        } break;
         case CBOR_GET_ASSERTION: {
             bool immediateReply;
             ctap2_get_assertion_handle(service, buffer + 1, length - 1, &immediateReply);

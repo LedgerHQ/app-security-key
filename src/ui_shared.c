@@ -269,9 +269,19 @@ static void ui_menu_settings_page(void) {
 }
 
 void ui_idle(void) {
+    const char *txt = "Use this app for two-factor\nauthentication and\npassword-less log ins.";
+#ifdef HAVE_NFC
+    bool nfc_enabled;
+
+    nfc_enabled = os_setting_get(OS_SETTING_FEATURES, NULL, 0) & OS_SETTING_FEATURES_NFC_ENABLED;
+    if (!nfc_enabled) {
+        txt = "\n\n/!\\ NFC is disabled /!\\";
+    }
+#endif
+
     nbgl_useCaseHome(APPNAME,
                      &C_icon_security_key_64px,
-                     "Use this app for two-factor\nauthentication and\npassword-less log ins.",
+                     txt,
 #ifdef HAVE_RK_SUPPORT_SETTING
                      true,
 #else

@@ -21,8 +21,9 @@ def test_cmd_wrong_cla(client):
 
 def test_cmd_wrong_ins(client):
     for ins in range(0xff + 1):
-        # Only supported INS are [0x01, 0x02, 0x03, 0x10]
-        if ins in [0x01, 0x02, 0x03, 0x10]:
+        # Only supported INS are [0x01, 0x02, 0x03, 0x10, 0xa4]
+        # source: src/u2f_processing.c
+        if ins in [0x01, 0x02, 0x03, 0x10, 0xa4]:
             continue
 
         with pytest.raises(ApduError) as e:
@@ -71,7 +72,7 @@ def test_cmd_length(client):
         assert e.value.code == APDU.SW_WRONG_LENGTH
 
 
-def test_cmd_no_data_encoding(client):
+def test_cmd_no_data_extended_encoding(client):
     cla = 0x00
     ins = Ctap1.INS.VERSION
     p1 = 0x00
@@ -81,11 +82,11 @@ def test_cmd_no_data_encoding(client):
 
     # Extended encoding, explicit Lc and Le
     apdu = struct.pack(">BBBBBHH", cla, ins, p1, p2, 0, nc, ne)
-    client.ctap1.send_raw_apdu(apdu)
+    result = client.ctap1.send_raw_apdu(apdu)
 
     # Extended encoding, explicit Lc and no Le
     apdu = struct.pack(">BBBBBH", cla, ins, p1, p2, 0, nc)
-    client.ctap1.send_raw_apdu(apdu)
+    assert result == client.ctap1.send_raw_apdu(apdu)
 
     # Test errors
 
@@ -95,23 +96,49 @@ def test_cmd_no_data_encoding(client):
         client.ctap1.send_raw_apdu(apdu)
     assert e.value.code == APDU.SW_WRONG_LENGTH
 
+
+@pytest.mark.skip_endpoint("u2f")
+def test_cmd_no_data_extended_encoding_hid_only(client):
+    cla = 0x00
+    ins = Ctap1.INS.VERSION
+    p1 = 0x00
+    p2 = 0x00
+    ne = 0xaabb  # Can be quite anything
+
+    # Extended encoding, no Lc and explicit Le
+    apdu = struct.pack(">BBBBBH", cla, ins, p1, p2, 0, ne)
+    result = client.ctap1.send_raw_apdu(apdu)
+
+    # Extended encoding, no Lc and no Le
+    apdu = struct.pack(">BBBB", cla, ins, p1, p2)
+    assert result == client.ctap1.send_raw_apdu(apdu)
+
+
+@pytest.mark.skip_endpoint("hid")
+def test_cmd_no_data_short_encoding_u2f_only(client):
+    cla = 0x00
+    ins = Ctap1.INS.VERSION
+    p1 = 0x00
+    p2 = 0x00
+
     # Short encoding (not supported), Lc and Le
     apdu = struct.pack(">BBBBBB", cla, ins, p1, p2, 0, 0xaa)
     with pytest.raises(ApduError) as e:
         client.ctap1.send_raw_apdu(apdu)
     assert e.value.code == APDU.SW_WRONG_LENGTH
 
-    # Next tests only work over raw§HID until all sdk u2f_impl.c are updated
-    if client.use_U2F_endpoint:
-        pytest.skip("Does not work with this transport until SDK patch")
 
-    # Extended encoding, no Lc and explicit Le
-    apdu = struct.pack(">BBBBBH", cla, ins, p1, p2, 0, ne)
-    client.ctap1.send_raw_apdu(apdu)
+@pytest.mark.skip_endpoint("u2f")
+def test_cmd_no_data_short_encoding_hid_only(client):
+    cla = 0x00
+    ins = Ctap1.INS.VERSION
+    p1 = 0x00
+    p2 = 0x00
+    nc = 0
 
-    # Extended encoding, no Lc and no Le
-    apdu = struct.pack(">BBBB", cla, ins, p1, p2)
-    client.ctap1.send_raw_apdu(apdu)
+    # Short encoding Lc and Le
+    apdu = struct.pack(">BBBBBB", cla, ins, p1, p2, 0, 0xaa)
+    result = client.ctap1.send_raw_apdu(apdu)
 
     # Short encoding, Lc and no Le
     # This should not be supported as spec requires that messages over HID
@@ -120,4 +147,4 @@ def test_cmd_no_data_encoding(client):
     # However, it is not respected on v1.7.0 even after an issue was raised:
     # https://github.com/fido-alliance/conformance-test-tools-resources/issues/614
     apdu = struct.pack(">BBBBB", cla, ins, p1, p2, nc)
-    client.ctap1.send_raw_apdu(apdu)
+    assert result == client.ctap1.send_raw_apdu(apdu)

@@ -146,6 +146,9 @@ DEFINES += HAVE_DEBUG_THROWS
 
 #DEFINES  += HAVE_CBOR_DEBUG
 
+
+ENABLE_NFC = 1
+
 ##############
 # Compiler #
 ##############
