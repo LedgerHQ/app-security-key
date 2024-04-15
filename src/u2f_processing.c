@@ -43,11 +43,10 @@
 #define U2F_VERSION      "U2F_V2"
 #define U2F_VERSION_SIZE (sizeof(U2F_VERSION) - 1)
 
-#define OFFSET_CLA  0
-#define OFFSET_INS  1
-#define OFFSET_P1   2
-#define OFFSET_P2   3
-#define OFFSET_DATA 7
+#define OFFSET_CLA 0
+#define OFFSET_INS 1
+#define OFFSET_P1  2
+#define OFFSET_P2  3
 
 #define FIDO_CLA             0x00
 #define FIDO_INS_ENROLL      0x01
@@ -73,32 +72,33 @@ static const uint8_t DUMMY_ZERO[] = {0x00};
 #define SIGN_USER_PRESENCE_MASK 0x01
 static const uint8_t DUMMY_USER_PRESENCE[] = {SIGN_USER_PRESENCE_MASK};
 
-/********************************************************************/
-/*  Temporary definition of u2f_get_cmd_msg_data_length             */
-/*                                                                  */
-/* This is necessary until all SDK are updated to expose it.        */
-/* As some SDK already exposes it, this redefinition is a weak one. */
-/********************************************************************/
+#define APDU_MIN_HEADER       4
+#define LC_FIRST_BYTE_OFFSET  4
+#define SHORT_ENC_LC_SIZE     1
+#define SHORT_ENC_LE_SIZE     1
+#define EXT_ENC_LC_SIZE       3
+#define EXT_ENC_LE_SIZE       2  // considering only scenarios where Lc is present
+#define SHORT_ENC_DATA_OFFSET 5
+#define EXT_ENC_DATA_OFFSET   7
 
-#define APDU_MIN_HEADER      4
-#define LC_FIRST_BYTE_OFFSET 4
-#define LONG_ENC_LC_SIZE     3
-#define LONG_ENC_LE_SIZE     2  // considering only scenarios where Lc is present
-
-__attribute__((weak)) int u2f_get_cmd_msg_data_length(const uint8_t *buffer, uint16_t length) {
+int u2f_get_cmd_msg_data(uint8_t *rx, uint16_t rx_length, uint8_t **data, uint16_t *le) {
+    uint32_t data_length;
     /* Parse buffer to retrieve the data length.
-       Only Extended encoding is supported */
+       Both Short and Extended encodings are supported */
 
-    if (length < APDU_MIN_HEADER) {
+    // By default, if absent, le == 0
+    *le = 0;
+
+    if (rx_length < APDU_MIN_HEADER) {
         return -1;
     }
 
-    if (length == APDU_MIN_HEADER) {
+    if (rx_length == APDU_MIN_HEADER) {
         // Either short or extended encoding with Lc and Le omitted
         return 0;
     }
 
-    if (length == APDU_MIN_HEADER + 1) {
+    if (rx_length == APDU_MIN_HEADER + 1) {
         // Short encoding, with next byte either Le or Lc with the other one omitted
         // There is no way to tell so no way to check the value
         // but anyway the data length is 0
@@ -106,48 +106,88 @@ __attribute__((weak)) int u2f_get_cmd_msg_data_length(const uint8_t *buffer, uin
         // Support this particular short encoding APDU as Fido Conformance Tool v1.7.0
         // is using it even though spec requires that short encoding should not be used
         // over HID.
+        if (rx[APDU_MIN_HEADER] != 0) {
+            *le = rx[APDU_MIN_HEADER];
+        }
+
         return 0;
     }
 
-    if (length < APDU_MIN_HEADER + 3) {
-        // Short encoding or bad length
-        // We don't support short encoding
-        return -1;
-    }
-
-    if (length == APDU_MIN_HEADER + 3) {
-        if (buffer[4] != 0) {
-            // Short encoding or bad length
-            // We don't support short encoding
+    if (rx_length == APDU_MIN_HEADER + 2) {
+        // Short encoding
+        data_length = rx[LC_FIRST_BYTE_OFFSET];
+        if (data_length == 0) {
+            // next byte is LE
+            *le = rx[LC_FIRST_BYTE_OFFSET + 1];
+        } else if (data_length == 1) {
+            *data = rx + SHORT_ENC_DATA_OFFSET;
+        } else {
             return -1;
         }
-        // Can't be short encoding as Lc = 0x00 would lead to invalid length
-        // so extended encoding and either:
-        // - Lc = 0x00 0x00 0x00 and Le is omitted
-        // - Lc omitted and Le = 0x00 0xyy 0xzz
-        // so no way to check the value
-        // but anyway the data length is 0
-        return 0;
     }
 
-    if (buffer[LC_FIRST_BYTE_OFFSET] != 0) {
-        // Short encoding or bad length
-        // We don't support short encoding
-        return -1;
+    if (rx_length == APDU_MIN_HEADER + 3) {
+        if (rx[4] != 0) {
+            // Short encoding, Lc (1B) and data present, with two next bytes either:
+            // - Lc = 0x01, data = 0xyy and Le = 0xzz
+            // - Lc = 0x02, data = 0xyyzz and Le is omitted
+            data_length = rx[LC_FIRST_BYTE_OFFSET];
+            *data = rx + SHORT_ENC_DATA_OFFSET;
+
+            // Ensure that Lc value is consistent and retrieve Le
+            if (SHORT_ENC_DATA_OFFSET + data_length == rx_length) {
+                /* Lc = 0x02, data = 0xyyzz and Le is omitted*/
+            } else if (SHORT_ENC_DATA_OFFSET + data_length + SHORT_ENC_LE_SIZE == rx_length) {
+                /* Lc = 0x01, data = 0xyy and Le = 0xzz */
+                *le = rx[SHORT_ENC_DATA_OFFSET + data_length];
+            } else {
+                return -1;
+            }
+            return data_length;
+        } else {
+            // Can't be short encoding as Lc = 0x00 would lead to invalid length
+            // so extended encoding and either:
+            // - Lc = 0x00 0x00 0x00 and Le is omitted
+            // - Lc omitted and Le = 0x00 0xyy 0xzz
+            // so no way to check the value
+            // but anyway the data length is 0
+            return 0;
+        }
     }
 
-    // Can't be short encoding as Lc = 0 would lead to invalid length
-    // so extended encoding with Lc field present, optionally Le (2B) is present too
-    uint32_t dataLength =
-        (buffer[LC_FIRST_BYTE_OFFSET + 1] << 8) | (buffer[LC_FIRST_BYTE_OFFSET + 2]);
+    if (rx[LC_FIRST_BYTE_OFFSET] != 0) {
+        // Short encoding, Lc and data present, optionally Le (1B) is present too
+        data_length = rx[LC_FIRST_BYTE_OFFSET];
+        *data = rx + SHORT_ENC_DATA_OFFSET;
 
-    // Ensure that Lc value is consistent
-    if ((APDU_MIN_HEADER + LONG_ENC_LC_SIZE + dataLength != length) &&
-        (APDU_MIN_HEADER + LONG_ENC_LC_SIZE + dataLength + LONG_ENC_LE_SIZE != length)) {
-        return -1;
+        // Ensure that Lc value is consistent and retrieve Le
+        if (SHORT_ENC_DATA_OFFSET + data_length == rx_length) {
+            /* Le is omitted*/
+        } else if (SHORT_ENC_DATA_OFFSET + data_length + SHORT_ENC_LE_SIZE == rx_length) {
+            /* Le is present*/
+            *le = rx[SHORT_ENC_DATA_OFFSET + data_length];
+        } else {
+            return -1;
+        }
+        return data_length;
+    } else {
+        // Can't be short encoding as Lc = 0 would lead to invalid length
+        // so extended encoding with Lc field present, optionally Le (2B) is present too
+        data_length = (rx[LC_FIRST_BYTE_OFFSET + 1] << 8) | (rx[LC_FIRST_BYTE_OFFSET + 2]);
+        *data = rx + EXT_ENC_DATA_OFFSET;
+
+        // Ensure that Lc value is consistent and retrieve Le
+        if (APDU_MIN_HEADER + EXT_ENC_LC_SIZE + data_length == rx_length) {
+            /* Le is omitted*/
+        } else if (APDU_MIN_HEADER + EXT_ENC_LC_SIZE + data_length + EXT_ENC_LE_SIZE == rx_length) {
+            /* Le is present*/
+            *le = (rx[EXT_ENC_DATA_OFFSET + data_length] << 8) +
+                  rx[EXT_ENC_DATA_OFFSET + data_length];
+        } else {
+            return -1;
+        }
+        return data_length;
     }
-
-    return dataLength;
 }
 
 /******************************************/
@@ -536,9 +576,9 @@ static void u2f_prompt_user_presence(bool enroll, uint8_t *applicationParameter)
 /*           U2F APDU handlers            */
 /******************************************/
 
-static int u2f_handle_apdu_enroll(uint8_t *rx, uint32_t data_length) {
+static int u2f_handle_apdu_enroll(const uint8_t *rx, uint32_t data_length, const uint8_t *data) {
     // Parse request and check length validity
-    u2f_reg_req_t *reg_req = (u2f_reg_req_t *) (rx + OFFSET_DATA);
+    u2f_reg_req_t *reg_req = (u2f_reg_req_t *) data;
     if (data_length != sizeof(u2f_reg_req_t)) {
         return io_send_sw(SW_WRONG_LENGTH);
     }
@@ -574,16 +614,16 @@ static int u2f_handle_apdu_enroll(uint8_t *rx, uint32_t data_length) {
     return 0;
 }
 
-static int u2f_handle_apdu_sign(uint8_t *rx, uint32_t data_length) {
+static int u2f_handle_apdu_sign(const uint8_t *rx, uint32_t data_length, uint8_t *data) {
     uint8_t *nonce;
     // Parse request base and check length validity
-    u2f_auth_req_base_t *auth_req_base = (u2f_auth_req_base_t *) (rx + OFFSET_DATA);
+    u2f_auth_req_base_t *auth_req_base = (u2f_auth_req_base_t *) data;
     if (data_length < sizeof(u2f_auth_req_base_t)) {
         return io_send_sw(SW_WRONG_LENGTH);
     }
 
     // Parse request key handle and check length validity
-    uint8_t *key_handle = rx + OFFSET_DATA + sizeof(u2f_auth_req_base_t);
+    uint8_t *key_handle = data + sizeof(u2f_auth_req_base_t);
     if (data_length != sizeof(u2f_auth_req_base_t) + auth_req_base->key_handle_length) {
         return io_send_sw(SW_WRONG_LENGTH);
     }
@@ -638,9 +678,10 @@ static int u2f_handle_apdu_sign(uint8_t *rx, uint32_t data_length) {
     return 0;
 }
 
-static int u2f_handle_apdu_get_version(uint8_t *rx, uint32_t data_length) {
-    int offset = 0;
-
+static int u2f_handle_apdu_get_version(const uint8_t *rx,
+                                       uint32_t data_length,
+                                       const uint8_t *data) {
+    UNUSED(data);
     if (data_length != 0) {
         return io_send_sw(SW_WRONG_LENGTH);
     }
@@ -649,36 +690,58 @@ static int u2f_handle_apdu_get_version(uint8_t *rx, uint32_t data_length) {
         return io_send_sw(SW_INCORRECT_P1P2);
     }
 
-    // Fill version
-    memmove(G_io_apdu_buffer, U2F_VERSION, U2F_VERSION_SIZE);
-    offset += U2F_VERSION_SIZE;
-
-    return io_send_response_pointer(G_io_apdu_buffer, offset, SW_NO_ERROR);
+    return io_send_response_pointer((const uint8_t *) U2F_VERSION, U2F_VERSION_SIZE, SW_NO_ERROR);
 }
 
-static int u2f_handle_apdu_ctap2_proxy(uint8_t *rx, int data_length) {
+static int u2f_handle_apdu_ctap2_proxy(uint8_t *rx, int data_length, uint8_t *data) {
     if ((rx[OFFSET_P1] != 0) || (rx[OFFSET_P2] != 0)) {
         return io_send_sw(SW_INCORRECT_P1P2);
     }
 
-    ctap2_handle_cmd_cbor(&G_io_u2f, rx + OFFSET_DATA, data_length);
+    ctap2_handle_cmd_cbor(&G_io_u2f, data, data_length);
     return 0;
 }
 
-int u2f_handle_apdu(uint8_t *rx, int data_length) {
-    PRINTF("Media handleApdu %d\n", G_io_app.apdu_state);
+int u2f_handle_apdu(uint8_t *rx, int rx_length) {
+    uint8_t *data = NULL;
+    uint16_t le = 0;
+    // PRINTF("Media handleApdu %d\n", G_io_app.apdu_state);
 
     // Make sure cmd is detected as over U2F_CMD and not as CMD_IS_OVER_CTAP2_CBOR_CMD
     if (!CMD_IS_OVER_U2F_CMD) {
         return io_send_sw(SW_CONDITIONS_NOT_SATISFIED);
     }
 
-    data_length = u2f_get_cmd_msg_data_length(rx, data_length);
+    int data_length = u2f_get_cmd_msg_data(rx, rx_length, &data, &le);
     if (data_length < 0) {
         return io_send_sw(SW_WRONG_LENGTH);
     }
 
-    if (G_io_apdu_buffer[OFFSET_CLA] != FIDO_CLA) {
+    PRINTF("INS %d, P1 %d P2 %d L %d\n", rx[OFFSET_INS], rx[OFFSET_P1], rx[OFFSET_P2], data_length);
+
+    if (rx[OFFSET_CLA] == FIDO_CLA) {
+        switch (rx[OFFSET_INS]) {
+            case FIDO_INS_ENROLL:
+                PRINTF("enroll\n");
+                return u2f_handle_apdu_enroll(rx, data_length, data);
+
+            case FIDO_INS_SIGN:
+                PRINTF("sign\n");
+                return u2f_handle_apdu_sign(rx, data_length, data);
+
+            case FIDO_INS_GET_VERSION:
+                PRINTF("version\n");
+                return u2f_handle_apdu_get_version(rx, data_length, data);
+
+            case FIDO_INS_CTAP2_PROXY:
+                PRINTF("ctap2_proxy\n");
+                return u2f_handle_apdu_ctap2_proxy(rx, data_length, data);
+
+            default:
+                PRINTF("unsupported\n");
+                return io_send_sw(SW_INS_NOT_SUPPORTED);
+        }
+    } else {
         return io_send_sw(SW_CLA_NOT_SUPPORTED);
     }
 }
