@@ -881,7 +881,7 @@ void ctap2_get_assertion_confirm(uint16_t idx) {
     // Build the response
     status = sign_and_build_getAssert_authData(shared_ctx.sharedBuffer,
                                                dataLen,
-                                               G_io_apdu_buffer + 1,
+                                               responseBuffer + 1,
                                                CUSTOM_IO_APDU_BUFFER_SIZE - 1,
                                                &credData);
     if (status < 0) {
@@ -890,7 +890,7 @@ void ctap2_get_assertion_confirm(uint16_t idx) {
     dataLen = status;
     status = 0;
 
-    G_io_apdu_buffer[0] = ERROR_NONE;
+    responseBuffer[0] = ERROR_NONE;
 
 exit:
     if (status == 0) {

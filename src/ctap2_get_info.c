@@ -22,6 +22,7 @@
 #include "ctap2.h"
 #include "cbip_encode.h"
 #include "config.h"
+#include "globals.h"
 
 #define CTAP_HEADER_SIZE 7
 
@@ -45,7 +46,7 @@ void ctap2_get_info_handle(u2f_service_t *service, uint8_t *buffer, uint16_t len
 
     PRINTF("ctap2_get_info_handle\n");
 
-    cbip_encoder_init(&encoder, G_io_apdu_buffer + 1, CUSTOM_IO_APDU_BUFFER_SIZE - 1);
+    cbip_encoder_init(&encoder, responseBuffer + 1, CUSTOM_IO_APDU_BUFFER_SIZE - 1);
 
     cbip_add_map_header(&encoder, 6);
 
@@ -95,6 +96,6 @@ void ctap2_get_info_handle(u2f_service_t *service, uint8_t *buffer, uint16_t len
     cbip_add_array_header(&encoder, 1);
     cbip_add_int(&encoder, PIN_PROTOCOL_VERSION_V1);
 
-    G_io_apdu_buffer[0] = ERROR_NONE;
+    responseBuffer[0] = ERROR_NONE;
     send_cbor_response(service, 1 + encoder.offset);
 }

@@ -694,7 +694,7 @@ void ctap2_make_credential_confirm() {
     // Compute standard attestation then build CBOR response
     status = sign_and_build_makeCred_response(shared_ctx.sharedBuffer,
                                               dataLen,
-                                              G_io_apdu_buffer + 1,
+                                              responseBuffer + 1,
                                               CUSTOM_IO_APDU_BUFFER_SIZE - 1);
     if (status < 0) {
         status = ERROR_OTHER;
@@ -703,7 +703,7 @@ void ctap2_make_credential_confirm() {
     dataLen = status;
     status = 0;
 
-    G_io_apdu_buffer[0] = ERROR_NONE;
+    responseBuffer[0] = ERROR_NONE;
 
 exit:
     if (status == 0) {

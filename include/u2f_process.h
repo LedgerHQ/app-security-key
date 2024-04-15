@@ -22,6 +22,7 @@
 #include "credential.h"
 
 typedef struct u2f_data_t {
+    uint8_t ins;
     uint8_t challenge_param[32];
     uint8_t application_param[32];
     uint8_t nonce[CREDENTIAL_NONCE_SIZE];

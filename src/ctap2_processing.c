@@ -51,9 +51,9 @@ void send_cbor_error(u2f_service_t *service, uint8_t error) {
 
 void send_cbor_response(u2f_service_t *service, uint32_t length) {
     if (CMD_IS_OVER_U2F_CMD) {
-        io_send_response_pointer(G_io_apdu_buffer, length, SW_NO_ERROR);
+        io_send_response_pointer(responseBuffer, length, SW_NO_ERROR);
     } else {
-        u2f_message_reply(service, CTAP2_CMD_CBOR, G_io_apdu_buffer, length);
+        u2f_message_reply(service, CTAP2_CMD_CBOR, responseBuffer, length);
     }
 }
 
