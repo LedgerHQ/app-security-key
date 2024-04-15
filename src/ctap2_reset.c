@@ -35,7 +35,7 @@ void ctap2_reset_handle(u2f_service_t *service, uint8_t *buffer, uint16_t length
 void ctap2_reset_confirm() {
     config_process_ctap2_reset();
 
-    G_io_apdu_buffer[0] = ERROR_NONE;
+    responseBuffer[0] = ERROR_NONE;
     send_cbor_response(&G_io_u2f, 1);
 }
 

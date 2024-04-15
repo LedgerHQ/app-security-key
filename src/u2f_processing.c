@@ -425,19 +425,19 @@ static int u2f_process_user_presence_confirmed(void) {
     uint16_t sw = SW_PROPRIETARY_INTERNAL;
     uint16_t length = 0;
 
-    switch (G_io_apdu_buffer[OFFSET_INS]) {
+    switch (globals_get_u2f_data()->ins) {
         case FIDO_INS_ENROLL:
-            sw = u2f_prepare_enroll_response(G_io_apdu_buffer, &length);
+            sw = u2f_prepare_enroll_response(responseBuffer, &length);
             break;
 
         case FIDO_INS_SIGN:
-            sw = u2f_prepare_sign_response(G_io_apdu_buffer, &length);
+            sw = u2f_prepare_sign_response(responseBuffer, &length);
             break;
 
         default:
             break;
     }
-    return io_send_response_pointer(G_io_apdu_buffer, length, sw);
+    return io_send_response_pointer(responseBuffer, length, sw);
 }
 
 /******************************************/
@@ -607,7 +607,8 @@ static int u2f_handle_apdu_enroll(const uint8_t *rx, uint32_t data_length, const
         return io_send_sw(SW_INCORRECT_P1P2);
     }
 
-    // Backup challenge and application parameters to be used if user accept the request
+    // Backup ins, challenge and application parameters to be used if user accept the request
+    globals_get_u2f_data()->ins = FIDO_INS_ENROLL;
     memmove(globals_get_u2f_data()->challenge_param,
             reg_req->challenge_param,
             sizeof(reg_req->challenge_param));
@@ -670,7 +671,8 @@ static int u2f_handle_apdu_sign(const uint8_t *rx, uint32_t data_length, uint8_t
         return io_send_sw(SW_CONDITIONS_NOT_SATISFIED);
     }
 
-    // Backup nonce, challenge and application parameters to be used if user accept the request
+    // Backup ins, nonce, challenge and application parameters to be used if user accept the request
+    globals_get_u2f_data()->ins = FIDO_INS_SIGN;
     memmove(globals_get_u2f_data()->nonce, nonce, CREDENTIAL_NONCE_SIZE);
     memmove(globals_get_u2f_data()->challenge_param,
             auth_req_base->challenge_param,
