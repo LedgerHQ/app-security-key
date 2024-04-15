@@ -38,6 +38,7 @@
 #include "globals.h"
 #include "fido_known_apps.h"
 #include "ctap2.h"
+#include "sw_code.h"
 
 #define U2F_VERSION      "U2F_V2"
 #define U2F_VERSION_SIZE (sizeof(U2F_VERSION) - 1)
@@ -56,15 +57,6 @@
 #define P1_U2F_CHECK_IS_REGISTERED    0x07
 #define P1_U2F_REQUEST_USER_PRESENCE  0x03
 #define P1_U2F_OPTIONAL_USER_PRESENCE 0x08
-
-#define SW_NO_ERROR                 0x9000
-#define SW_WRONG_LENGTH             0x6700
-#define SW_CONDITIONS_NOT_SATISFIED 0x6985
-#define SW_WRONG_DATA               0x6A80
-#define SW_INCORRECT_P1P2           0x6A86
-#define SW_INS_NOT_SUPPORTED        0x6D00
-#define SW_CLA_NOT_SUPPORTED        0x6E00
-#define SW_PROPRIETARY_INTERNAL     0x6FFF
 
 #define U2F_ENROLL_RESERVED 0x05
 static const uint8_t DUMMY_ZERO[] = {0x00};
