@@ -72,6 +72,8 @@ static const uint8_t DUMMY_ZERO[] = {0x00};
 #define SIGN_USER_PRESENCE_MASK 0x01
 static const uint8_t DUMMY_USER_PRESENCE[] = {SIGN_USER_PRESENCE_MASK};
 
+#define U2F_ENROLL_USER_KEY_SIZE 65
+
 #define APDU_MIN_HEADER       4
 #define LC_FIRST_BYTE_OFFSET  4
 #define SHORT_ENC_LC_SIZE     1
@@ -219,7 +221,7 @@ typedef struct u2f_reg_req_t {
 // __attribute__((__packed__)) not necessary as we use only uint8_t
 typedef struct u2f_reg_resp_base_t {
     uint8_t reserved_byte;
-    uint8_t user_key[65];
+    uint8_t user_key[U2F_ENROLL_USER_KEY_SIZE];
     uint8_t key_handle_length;
     uint8_t key_handle[CREDENTIAL_MINIMAL_SIZE];  // We generate fix size key handles
     // attestation certificate: not in this base struct due to not const length
@@ -289,35 +291,42 @@ static void u2f_compute_enroll_response_hash(u2f_reg_resp_base_t *reg_resp_base,
                 CX_SHA256_SIZE);
 }
 
-static int u2f_prepare_enroll_response(void) {
+static int u2f_generate_pubkey(const uint8_t *nonce,
+                               uint8_t user_key[static U2F_ENROLL_USER_KEY_SIZE]) {
+    cx_ecfp_private_key_t private_key;
+
+    if (crypto_generate_private_key(nonce, &private_key, CX_CURVE_SECP256R1) != 0) {
+        return -1;
+    }
+    if (crypto_generate_public_key(&private_key, user_key, CX_CURVE_SECP256R1) <= 0) {
+        explicit_bzero(&private_key, sizeof(private_key));
+        return -1;
+    }
+    explicit_bzero(&private_key, sizeof(private_key));
+    return 0;
+}
+
+static uint16_t u2f_prepare_enroll_response(uint8_t *buffer, uint16_t *length) {
     int offset = 0;
     int result;
     int key_handle_length;
 
-    u2f_reg_resp_base_t *reg_resp_base = (u2f_reg_resp_base_t *) G_io_apdu_buffer;
+    *length = 0;
+
+    u2f_reg_resp_base_t *reg_resp_base = (u2f_reg_resp_base_t *) buffer;
     offset += sizeof(u2f_reg_resp_base_t);
 
     // Fill reserved byte
     reg_resp_base->reserved_byte = U2F_ENROLL_RESERVED;
 
-    // Generate nonce
-    cx_rng_no_throw(globals_get_u2f_data()->nonce, CREDENTIAL_NONCE_SIZE);
-
-    // Generate private and public key and fill public key
     {
-        cx_ecfp_private_key_t private_key;
+        // Generate nonce
+        cx_rng_no_throw(globals_get_u2f_data()->nonce, CREDENTIAL_NONCE_SIZE);
 
-        if (crypto_generate_private_key(globals_get_u2f_data()->nonce,
-                                        &private_key,
-                                        CX_CURVE_SECP256R1) != 0) {
-            return io_send_sw(SW_PROPRIETARY_INTERNAL);
+        // Generate and fill public key
+        if (u2f_generate_pubkey(globals_get_u2f_data()->nonce, reg_resp_base->user_key) != 0) {
+            return SW_PROPRIETARY_INTERNAL;
         }
-        if (crypto_generate_public_key(&private_key, reg_resp_base->user_key, CX_CURVE_SECP256R1) <=
-            0) {
-            explicit_bzero(&private_key, sizeof(private_key));
-            return io_send_sw(SW_PROPRIETARY_INTERNAL);
-        }
-        explicit_bzero(&private_key, sizeof(private_key));
     }
 
     // Generate key handle
@@ -332,14 +341,14 @@ static int u2f_prepare_enroll_response(void) {
 
     // We only support generating key_handle with fixed length
     if (key_handle_length != sizeof(reg_resp_base->key_handle)) {
-        return io_send_sw(SW_PROPRIETARY_INTERNAL);
+        return SW_PROPRIETARY_INTERNAL;
     }
 
     // Fill key handle length
     reg_resp_base->key_handle_length = key_handle_length;
 
     // Fill attestation certificate
-    memmove(G_io_apdu_buffer + offset, ATTESTATION_CERT, sizeof(ATTESTATION_CERT));
+    memmove(buffer + offset, ATTESTATION_CERT, sizeof(ATTESTATION_CERT));
     offset += sizeof(ATTESTATION_CERT);
 
     // Prepare signature
@@ -347,14 +356,14 @@ static int u2f_prepare_enroll_response(void) {
     u2f_compute_enroll_response_hash(reg_resp_base, key_handle_length, data_hash);
 
     // Fill signature
-    uint8_t *signature = (G_io_apdu_buffer + offset);
+    uint8_t *signature = (buffer + offset);
     result = crypto_sign_attestation(data_hash, signature, false);
 
     if (result > 0) {
-        offset += result;
-        return io_send_response_pointer(G_io_apdu_buffer, offset, SW_NO_ERROR);
+        *length = offset + result;
+        return SW_NO_ERROR;
     } else {
-        return io_send_sw(SW_PROPRIETARY_INTERNAL);
+        return SW_PROPRIETARY_INTERNAL;
     }
 }
 
@@ -379,11 +388,13 @@ static void u2f_compute_sign_response_hash(u2f_auth_resp_base_t *auth_resp_base,
                 CX_SHA256_SIZE);
 }
 
-static int u2f_prepare_sign_response(void) {
+static uint16_t u2f_prepare_sign_response(uint8_t *buffer, uint16_t *length) {
     int offset = 0;
     int result;
 
-    u2f_auth_resp_base_t *auth_resp_base = (u2f_auth_resp_base_t *) G_io_apdu_buffer;
+    *length = 0;
+
+    u2f_auth_resp_base_t *auth_resp_base = (u2f_auth_resp_base_t *) buffer;
     offset += sizeof(u2f_auth_resp_base_t);
 
     // Fill user presence byte
@@ -398,12 +409,12 @@ static int u2f_prepare_sign_response(void) {
 
     // Generate private key and fill signature
     cx_ecfp_private_key_t private_key;
-    uint8_t *signature = (G_io_apdu_buffer + offset);
+    uint8_t *signature = (buffer + offset);
 
     if (crypto_generate_private_key(globals_get_u2f_data()->nonce,
                                     &private_key,
                                     CX_CURVE_SECP256R1) != 0) {
-        return io_send_sw(SW_PROPRIETARY_INTERNAL);
+        return SW_PROPRIETARY_INTERNAL;
     }
 
     result = crypto_sign_application(data_hash, &private_key, signature);
@@ -412,24 +423,30 @@ static int u2f_prepare_sign_response(void) {
 
     if (result > 0) {
         offset += result;
-        return io_send_response_pointer(G_io_apdu_buffer, offset, SW_NO_ERROR);
+        *length = offset;
+        return SW_NO_ERROR;
     } else {
-        return io_send_sw(SW_PROPRIETARY_INTERNAL);
+        return SW_PROPRIETARY_INTERNAL;
     }
 }
 
 static int u2f_process_user_presence_confirmed(void) {
+    uint16_t sw = SW_PROPRIETARY_INTERNAL;
+    uint16_t length = 0;
+
     switch (G_io_apdu_buffer[OFFSET_INS]) {
         case FIDO_INS_ENROLL:
-            return u2f_prepare_enroll_response();
+            sw = u2f_prepare_enroll_response(G_io_apdu_buffer, &length);
+            break;
 
         case FIDO_INS_SIGN:
-            return u2f_prepare_sign_response();
+            sw = u2f_prepare_sign_response(G_io_apdu_buffer, &length);
+            break;
 
         default:
             break;
     }
-    return io_send_sw(SW_PROPRIETARY_INTERNAL);
+    return io_send_response_pointer(G_io_apdu_buffer, length, sw);
 }
 
 /******************************************/
