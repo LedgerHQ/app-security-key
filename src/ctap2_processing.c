@@ -28,8 +28,7 @@
 #include "globals.h"
 #include "fido_known_apps.h"
 #include "ui_shared.h"
-
-#define SW_NO_ERROR 0x9000
+#include "sw_code.h"
 
 #define RPID_FILTER      "webctap."
 #define RPID_FILTER_SIZE (sizeof(RPID_FILTER) - 1)
