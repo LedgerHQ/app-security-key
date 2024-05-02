@@ -21,7 +21,7 @@ endif
 include $(BOLOS_SDK)/Makefile.defines
 
 $(info TARGET_NAME=$(TARGET_NAME))
-ifneq ($(TARGET_NAME),$(filter $(TARGET_NAME),TARGET_NANOS TARGET_NANOX TARGET_NANOS2 TARGET_STAX))
+ifneq ($(TARGET_NAME),$(filter $(TARGET_NAME),TARGET_NANOS TARGET_NANOX TARGET_NANOS2 TARGET_STAX TARGET_FLEX))
 $(error Environment variable TARGET_NAME is not valid or not supported)
 endif
 
@@ -40,6 +40,7 @@ ICON_NANOS=icons/icon_security_key_nanos.gif
 ICON_NANOX=icons/icon_security_key.gif
 ICON_NANOSP=icons/icon_security_key.gif
 ICON_STAX=icons/icon_security_key_stax.gif
+ICON_FLEX=icons/icon_security_key_flex.gif
 
 ################
 # Attestations #
@@ -82,6 +83,16 @@ endif
 PROD_FIDO2_STAX_PRIVATE_KEY?=0
 ifneq ($(PROD_FIDO2_STAX_PRIVATE_KEY),0)
     DEFINES += PROD_FIDO2_STAX_PRIVATE_KEY=${PROD_FIDO2_STAX_PRIVATE_KEY}
+endif
+
+PROD_U2F_FLEX_PRIVATE_KEY?=0
+ifneq ($(PROD_U2F_FLEX_PRIVATE_KEY),0)
+    DEFINES += PROD_U2F_FLEX_PRIVATE_KEY=${PROD_U2F_FLEX_PRIVATE_KEY}
+endif
+
+PROD_FIDO2_FLEX_PRIVATE_KEY?=0
+ifneq ($(PROD_FIDO2_FLEX_PRIVATE_KEY),0)
+    DEFINES += PROD_FIDO2_FLEX_PRIVATE_KEY=${PROD_FIDO2_FLEX_PRIVATE_KEY}
 endif
 
 ############

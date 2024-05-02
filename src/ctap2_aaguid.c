@@ -103,3 +103,24 @@ uint8_t const AAGUID[16] = {0x6e,
                             0x5b,
                             0x34};
 #endif
+
+#if defined(TARGET_FLEX)
+
+// sha256 "Ledger FIDO 2 1.0 Flex"
+uint8_t const AAGUID[16] = {0x1d,
+                            0x8c,
+                            0xac,
+                            0x46,
+                            0x47,
+                            0xa1,
+                            0x33,
+                            0x86,
+                            0xaf,
+                            0x50,
+                            0xe8,
+                            0x8a,
+                            0xe4,
+                            0x6f,
+                            0xe8,
+                            0x02};
+#endif
