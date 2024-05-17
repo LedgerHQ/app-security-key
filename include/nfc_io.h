@@ -1,7 +1,7 @@
 /*
 *******************************************************************************
 *   Ledger App Security Key
-*   (c) 2022 Ledger
+*   (c) 2024 Ledger
 *
 *  Licensed under the Apache License, Version 2.0 (the "License");
 *  you may not use this file except in compliance with the License.
@@ -16,19 +16,29 @@
 *   limitations under the License.
 ********************************************************************************/
 
-#include "os.h"
+#ifdef HAVE_NFC
+void nfc_io_set_le(uint32_t le);
+void nfc_io_set_response_ready(uint16_t sw, uint16_t len, const char *status);
+bool nfc_io_is_response_pending(void);
+int nfc_io_send_prepared_response(void);
 
-#include "globals.h"
-
-char verifyName[20];
-char verifyHash[65];
-char rpID[65];
-
-shared_ctx_t shared_ctx;
-ctap2_ux_state_t ctap2UxState;
-
-#ifdef TARGET_NANOS
-// Spare RAM on Nanos
 #else
-uint8_t responseBuffer[IO_APDU_BUFFER_SIZE];
+static inline void nfc_io_set_le(uint32_t le) {
+    return;
+}
+
+static inline void nfc_io_set_response_ready(uint16_t sw, uint16_t len, const char *status) {
+    UNUSED(sw);
+    UNUSED(len);
+    UNUSED(status);
+    return;
+}
+
+static inline bool nfc_io_is_response_pending(void) {
+    return false;
+}
+
+static inline int nfc_io_send_prepared_response(void) {
+    return -1;
+}
 #endif

@@ -1,7 +1,7 @@
 /*
 *******************************************************************************
 *   Ledger App Security Key
-*   (c) 2022 Ledger
+*   (c) 2024 Ledger
 *
 *  Licensed under the Apache License, Version 2.0 (the "License");
 *  you may not use this file except in compliance with the License.
@@ -16,19 +16,12 @@
 *   limitations under the License.
 ********************************************************************************/
 
-#include "os.h"
-
-#include "globals.h"
-
-char verifyName[20];
-char verifyHash[65];
-char rpID[65];
-
-shared_ctx_t shared_ctx;
-ctap2_ux_state_t ctap2UxState;
-
-#ifdef TARGET_NANOS
-// Spare RAM on Nanos
-#else
-uint8_t responseBuffer[IO_APDU_BUFFER_SIZE];
-#endif
+#define SW_NO_ERROR                 0x9000
+#define SW_MORE_DATA                0x6100
+#define SW_WRONG_LENGTH             0x6700
+#define SW_CONDITIONS_NOT_SATISFIED 0x6985
+#define SW_WRONG_DATA               0x6A80
+#define SW_INCORRECT_P1P2           0x6A86
+#define SW_INS_NOT_SUPPORTED        0x6D00
+#define SW_CLA_NOT_SUPPORTED        0x6E00
+#define SW_PROPRIETARY_INTERNAL     0x6FFF
