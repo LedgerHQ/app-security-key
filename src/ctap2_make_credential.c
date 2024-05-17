@@ -169,6 +169,8 @@ static int parse_makeCred_authnr_user(cbipDecoder_t *decoder, cbipItem_t *mapIte
         // https://www.w3.org/TR/webauthn/#dom-publickeycredentialuserentity-displayname
         if (ctap2RegisterData->userStrLen > 64) {
             // TODO show that user.display is truncated
+            // TODO: on Flex, there is enough place for 3x18 characters (54), so it currently
+            //       overflows under the "Register" button. We'll need to clean that (new page?)
             ctap2RegisterData->userStrLen = 64;
         }
         PRINTF("userStr %.*s\n", ctap2RegisterData->userStrLen, ctap2RegisterData->userStr);

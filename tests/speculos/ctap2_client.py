@@ -35,7 +35,7 @@ class LedgerCtap2(Ctap2):
         super().__init__(device)
 
     def confirm(self):
-        if self.model == "stax":
+        if self.model in ["stax", "flex"]:
             instructions = [NavInsID.USE_CASE_CHOICE_CONFIRM]
         else:
             instructions = [NavInsID.BOTH_CLICK]
@@ -43,7 +43,7 @@ class LedgerCtap2(Ctap2):
                                 screen_change_after_last_instruction=False)
 
     def wait_for_return_on_dashboard(self):
-        if self.model == "stax":
+        if self.model in ["stax", "flex"]:
             # On Stax tap on the center to dismiss the status message faster
             # Ignore if there is nothing that happen (probably already on home screen),
             # which is expected for flow without status (reset)
@@ -144,7 +144,7 @@ class LedgerCtap2(Ctap2):
                     text = "Don't register"
                 else:
                     text = "Register$"
-        elif self.model == "stax":
+        elif self.model in ["stax", "flex"]:
             if user_accept is not None:
                 if not user_accept:
                     val_ins = [NavInsID.USE_CASE_CHOICE_REJECT]
@@ -224,7 +224,7 @@ class LedgerCtap2(Ctap2):
                         text = "Log in"
                     else:
                         text = "Reject"
-        elif self.model == "stax":
+        elif self.model in ["stax", "flex"]:
             if user_accept is not None:
                 if login_type == "none":
                     val_ins = [NavInsID.TAPPABLE_CENTER_TAP]
@@ -282,7 +282,7 @@ class LedgerCtap2(Ctap2):
                     text = "Yes, delete"
                 else:
                     text = "No, don't delete"
-        elif self.model == "stax":
+        elif self.model in ["stax", "flex"]:
             if user_accept is not None:
                 if not user_accept:
                     val_ins = [NavInsID.USE_CASE_CHOICE_REJECT]

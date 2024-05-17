@@ -3,6 +3,7 @@ from pathlib import Path
 from ragger.firmware import Firmware
 from ragger.backend import SpeculosBackend
 from ragger.utils import find_project_root_dir
+from typing import Iterable
 
 from client import TestClient
 
@@ -97,3 +98,31 @@ def client(firmware, backend, navigator, transport: str, ctap2_u2f_proxy):
     client = TestClient(firmware, backend, navigator, transport, ctap2_u2f_proxy)
     client.start()
     return client
+
+
+@pytest.fixture(autouse=True)
+def skip_by_endpoint(request, client):
+    if request.node.get_closest_marker('skip_endpoint'):
+        endpoint = request.node.get_closest_marker('skip_endpoint').args[0].lower()
+        if (client.use_U2F_endpoint and endpoint == "u2f") \
+           or (client.use_raw_HID_endpoint and endpoint == "hid"):
+            pytest.skip('skipped on this endpoint: {}'.format(endpoint))
+
+
+@pytest.fixture(autouse=True)
+def skip_by_devices(request, firmware):
+    if request.node.get_closest_marker('skip_devices'):
+        devices = request.node.get_closest_marker('skip_devices').args[0]
+        if not isinstance(devices, Iterable):
+            devices = [devices]
+        if (firmware in devices):
+            pytest.skip('skipped on this device: {}'.format(firmware.device))
+
+
+def pytest_configure(config):
+    custom_decorator = [
+        "skip_endpoint(endpoint): skip test depending on endpoint (either HID or U2F)",
+        "skip_devices(devices): skip test depending on current device"
+    ]
+    for cd in custom_decorator:
+        config.addinivalue_line("markers", cd)

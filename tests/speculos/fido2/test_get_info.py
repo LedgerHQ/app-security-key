@@ -45,6 +45,10 @@ def test_get_info_aaguid(client):
         hs = sha256("Ledger FIDO 2 1.0 Stax".encode('utf-8')).hexdigest()
         hs = hs[:32]  # Keep only the 16 first bytes
         assert hs == info.aaguid.hex()
+    elif client.model == "flex":
+        hs = sha256("Ledger FIDO 2 1.0 Flex".encode('utf-8')).hexdigest()
+        hs = hs[:32]  # Keep only the 16 first bytes
+        assert hs == info.aaguid.hex()
     else:
         raise ValueError("Unhandled model")
 
