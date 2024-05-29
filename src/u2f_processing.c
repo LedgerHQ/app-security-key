@@ -30,6 +30,7 @@
 #include "u2f_transport.h"
 #include "u2f_impl.h"
 
+#include "u2f_process.h"
 #include "config.h"
 #include "crypto.h"
 #include "crypto_data.h"
@@ -681,7 +682,7 @@ int u2f_handle_apdu(uint8_t *rx, int data_length) {
         return io_send_sw(SW_CLA_NOT_SUPPORTED);
     }
 
-    PRINTF("INS %d, P1 %d P2 %d L %d\n",
+    PRINTF("INS %d, P1 %d, P2 %d, L %d\n",
            G_io_apdu_buffer[OFFSET_INS],
            G_io_apdu_buffer[OFFSET_P1],
            G_io_apdu_buffer[OFFSET_P2],

@@ -81,7 +81,7 @@ void ctap2_reset_ux(void) {
 
     io_seproxyhal_play_tune(TUNE_LOOK_AT_ME);
 
-    nbgl_useCaseChoice(&C_warning64px,
+    nbgl_useCaseChoice(&C_Warning_64px,
                        "Delete saved login\n"
                        "details for all\n"
                        "websites?\n",

@@ -197,7 +197,7 @@ static void settings_callback(int token, uint8_t index) {
             if (config_get_rk_enabled()) {
                 config_set_rk_enabled(false);
             } else {
-                nbgl_useCaseChoice(&C_warning64px,
+                nbgl_useCaseChoice(&C_Warning_64px,
                                    "Enable resident keys?",
                                    "Updating the OS or this app\n"
                                    "will delete login info stored on\n"
@@ -393,7 +393,7 @@ void app_nbgl_status(const char *message,
 
     nbgl_pageInfoDescription_t info = {.bottomButtonStyle = NO_BUTTON_STYLE,
                                        .footerText = NULL,
-                                       .centeredInfo.icon = &C_round_cross_64px,
+                                       .centeredInfo.icon = &C_Denied_Circle_64px,
                                        .centeredInfo.offsetY = 0,
                                        .centeredInfo.onTop = false,
                                        .centeredInfo.style = LARGE_CASE_INFO,
@@ -407,9 +407,9 @@ void app_nbgl_status(const char *message,
                                        .tuneId = TUNE_TAP_CASUAL};
 
     if (is_success) {
-        info.centeredInfo.icon = &C_round_check_64px;
+        info.centeredInfo.icon = &C_Check_Circle_64px;
     } else {
-        info.centeredInfo.icon = &C_round_warning_64px;
+        info.centeredInfo.icon = &C_Important_Circle_64px;
     }
 
     pageContext = nbgl_pageDrawInfo(&onActionCallback, &ticker, &info);

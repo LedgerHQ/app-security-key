@@ -51,7 +51,7 @@ class LedgerCtap1(Ctap1):
         self.debug = debug
 
     def confirm(self):
-        if self.model == "stax":
+        if self.model in ["stax", "flex"]:
             instructions = [NavInsID.USE_CASE_CHOICE_CONFIRM]
         else:
             instructions = [NavInsID.BOTH_CLICK]
@@ -59,7 +59,7 @@ class LedgerCtap1(Ctap1):
                                 screen_change_after_last_instruction=False)
 
     def wait_for_return_on_dashboard(self):
-        if self.model == "stax":
+        if self.model in ["stax", "flex"]:
             # On Stax tap on the center to dismiss the status message faster
             self.navigator.navigate([NavInsID.USE_CASE_STATUS_DISMISS])
         self.navigator._backend.wait_for_home_screen()
@@ -108,7 +108,7 @@ class LedgerCtap1(Ctap1):
                     text = "Register"
                 else:
                     text = "Abort"
-        elif self.model == "stax":
+        elif self.model in ["stax", "flex"]:
             if user_accept is not None:
                 if not user_accept:
                     val_ins = [NavInsID.USE_CASE_CHOICE_REJECT]
@@ -170,7 +170,7 @@ class LedgerCtap1(Ctap1):
                     text = "Login"
                 else:
                     text = "Abort"
-        elif self.model == "stax":
+        elif self.model in ["stax", "flex"]:
             if user_accept is not None:
                 if not user_accept:
                     val_ins = [NavInsID.USE_CASE_CHOICE_REJECT]

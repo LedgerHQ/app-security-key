@@ -27,11 +27,14 @@ jobs:
   ragger_tests:
     name: Run ragger tests
     strategy:
+      fail-fast: false
       matrix:
         include:
           - model: nanox
 
           - model: stax
+
+          - model: flex
 
           - model: nanosp
             args: "--fast"
