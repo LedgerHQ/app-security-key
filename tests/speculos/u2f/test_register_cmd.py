@@ -1,7 +1,6 @@
 import pytest
 
 from cryptography.x509 import load_der_x509_certificate
-from ragger.firmware import Firmware
 
 import fido2
 
