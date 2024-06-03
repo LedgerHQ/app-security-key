@@ -50,7 +50,6 @@ def test_fido_screens_settings(client, test_name):
         instructions = [
             # Enter in the settings
             NavInsID.USE_CASE_HOME_SETTINGS,
-            NavInsID.USE_CASE_SETTINGS_NEXT,
 
             # Enable and skip "Enabling" message
             NavIns(NavInsID.CHOICE_CHOOSE, (1,)),

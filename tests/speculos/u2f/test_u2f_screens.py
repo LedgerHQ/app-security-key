@@ -29,7 +29,6 @@ def test_u2f_screens_idle(client, test_name, firmware):
     else:
         instructions = [
             NavInsID.USE_CASE_HOME_SETTINGS,
-            NavInsID.USE_CASE_SETTINGS_NEXT,
             NavInsID.USE_CASE_SETTINGS_MULTI_PAGE_EXIT
         ]
 
