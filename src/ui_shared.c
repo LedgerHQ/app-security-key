@@ -171,7 +171,9 @@ void ui_idle(void) {
 #include "nbgl_page.h"
 #include "nbgl_layout.h"
 
-// 'About' menu
+/*
+ * 'Info' / 'Settings' menu
+ */
 
 #ifdef HAVE_RK_SUPPORT_SETTING
 static uint8_t initSettingPage;
@@ -199,7 +201,7 @@ static const nbgl_genericContents_t settingContents = {.callbackCallNeeded = fal
                                                        .contentsList = contents,
                                                        .nbContents = 1};
 
-void ui_back_from_menu_choice(void) {
+static void ui_back_from_menu_choice(void) {
     switches[0].initState = config_get_rk_enabled();
     nbgl_useCaseHomeAndSettings(
         APPNAME,
@@ -243,17 +245,53 @@ static void controls_callback(int token, uint8_t index, int page) {
 }
 #endif  // HAVE_RK_SUPPORT_SETTING
 
-void ui_idle(void) {
+/*
+ * When no NFC, warning status page
+ */
 
-    char *txt = NULL;
+#ifdef TARGET_STAX
+#define C_Info_32px C_info_i_32px
+#endif  // TARGET_STAX
+
+static const nbgl_pageInfoDescription_t nfc_info = {
+    .centeredInfo.icon = &INFO_I_ICON,
+    .centeredInfo.text1 = "Use NFC to log in with a single tap",
+    .centeredInfo.text3 =
+        "Quit this app and go to device settings, then enable NFC.\n"
+        "Make sure your mobile phone also has NFC enabled.",
+    .tapActionText = "Tap to dismiss",
+};
+
+static void no_NFC_callback(int token __attribute__((unused)),
+                            uint8_t index __attribute__((unused))) {
+    ui_idle();
+}
+
+static void no_NFC_info_page(void) {
+    nbgl_pageDrawInfo(no_NFC_callback, NULL, &nfc_info);
+    nbgl_refreshSpecial(FULL_COLOR_CLEAN_REFRESH);
+}
+
+static nbgl_homeAction_t homeNoNFCWarning = {};
+
+/*
+ * Home page
+ */
+
+void ui_idle(void) {
+    nbgl_homeAction_t *home_button = NULL;
+
 #ifdef HAVE_NFC
     bool nfc_enabled;
-
     nfc_enabled = os_setting_get(OS_SETTING_FEATURES, NULL, 0) & OS_SETTING_FEATURES_NFC_ENABLED;
     if (!nfc_enabled) {
-        txt = "\n\n/!\\ NFC is disabled /!\\";
+        homeNoNFCWarning.text = "NFC is disabled";
+        // TODO: currently the .icon is ignored in the SDK
+        homeNoNFCWarning.icon = &INFO_I_ICON;
+        homeNoNFCWarning.callback = no_NFC_info_page;
+        home_button = &homeNoNFCWarning;
     }
-#endif
+#endif  // ENABLE_NFC
 
 #ifdef HAVE_RK_SUPPORT_SETTING
     switches[0].text = "Resident keys";
@@ -269,7 +307,7 @@ void ui_idle(void) {
     switches[0].token = FIRST_USER_TOKEN;
     switches[0].tuneId = TUNE_TAP_CASUAL;
     switches[0].initState = config_get_rk_enabled();
-#endif
+#endif  //  HAVE_RK_SUPPORT_SETTING
     nbgl_useCaseHomeAndSettings(
         APPNAME,
         &C_icon_security_key_64px,
@@ -281,9 +319,13 @@ void ui_idle(void) {
         NULL,
 #endif  // HAVE_RK_SUPPORT_SETTING
         &infoList,
-        txt,
+        home_button,
         app_quit);
 }
+
+/*
+ * Generic reviews (register, authenticate)
+ */
 
 static nbgl_layout_t *layout;
 static nbgl_page_t *pageContext;
