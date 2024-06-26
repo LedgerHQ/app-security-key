@@ -171,115 +171,161 @@ void ui_idle(void) {
 #include "nbgl_page.h"
 #include "nbgl_layout.h"
 
-// 'About' menu
+/*
+ * 'Info' / 'Settings' menu
+ */
 
+#ifdef HAVE_RK_SUPPORT_SETTING
+static uint8_t initSettingPage;
+static nbgl_layoutSwitch_t switches[1] = {0};
+#endif  // HAVE_RK_SUPPORT_SETTING
 static const char *const INFO_TYPES[] = {"Version", "Developer", "Copyright"};
 static const char *const INFO_CONTENTS[] = {APPVERSION, "Ledger", "(c) 2023 Ledger"};
 
+static const nbgl_contentInfoList_t infoList = {
+    .nbInfos = 3,
+    .infoTypes = INFO_TYPES,
+    .infoContents = INFO_CONTENTS,
+};
+
 #ifdef HAVE_RK_SUPPORT_SETTING
 
-static nbgl_layoutSwitch_t toggle;
-static void ui_menu_settings_page(void);
+static void controls_callback(int token, uint8_t index, int page);
+
+static const nbgl_content_t contents[1] = {{.type = SWITCHES_LIST,
+                                            .content.switchesList.nbSwitches = 1,
+                                            .content.switchesList.switches = switches,
+                                            .contentActionCallback = controls_callback}};
+
+static const nbgl_genericContents_t settingContents = {.callbackCallNeeded = false,
+                                                       .contentsList = contents,
+                                                       .nbContents = 1};
+
+static void ui_back_from_menu_choice(void) {
+    switches[0].initState = config_get_rk_enabled();
+    nbgl_useCaseHomeAndSettings(
+        APPNAME,
+        &C_icon_security_key_64px,
+        "Use this app for two-factor\nauthentication and\npassword-less log ins.",
+        initSettingPage,
+        &settingContents,
+        &infoList,
+        NULL,
+        app_quit);
+}
 
 static void warning_choice(bool accept) {
     if (accept) {
         config_set_rk_enabled(true);
-        app_nbgl_status("Resident keys enabled", true, ui_menu_settings_page, NBGL_NO_TUNE);
+        app_nbgl_status("Resident keys enabled", true, ui_back_from_menu_choice, NBGL_NO_TUNE);
     } else {
-        ui_menu_settings_page();
+        ui_back_from_menu_choice();
     }
 }
 
-static void settings_callback(int token, uint8_t index) {
+static void controls_callback(int token, uint8_t index, int page) {
     UNUSED(index);
-    switch (token) {
-        case FIRST_USER_TOKEN:
-            if (config_get_rk_enabled()) {
-                config_set_rk_enabled(false);
-            } else {
-                nbgl_useCaseChoice(&C_Warning_64px,
-                                   "Enable resident keys?",
-                                   "Updating the OS or this app\n"
-                                   "will delete login info stored on\n"
-                                   "this device, causing login\n"
-                                   "issues.",
-                                   "Enable",
-                                   "Cancel",
-                                   warning_choice);
-            }
-            break;
-        default:
-            PRINTF("Should not happen!");
-            break;
+    initSettingPage = page;
+    if (token == FIRST_USER_TOKEN) {
+        if (config_get_rk_enabled()) {
+            config_set_rk_enabled(false);
+        } else {
+            nbgl_useCaseChoice(&C_Warning_64px,
+                               "Enable resident keys?",
+                               "Updating the OS or this app\n"
+                               "will delete login info stored on\n"
+                               "this device, causing login\n"
+                               "issues.",
+                               "Enable",
+                               "Cancel",
+                               warning_choice);
+        }
     }
+    switches[0].initState = config_get_rk_enabled();
 }
 #endif  // HAVE_RK_SUPPORT_SETTING
 
-static bool nav_callback(uint8_t page, nbgl_pageContent_t *content) {
-    if (page == 0) {
-        content->type = INFOS_LIST;
-        content->infosList.nbInfos = 3;
-        content->infosList.infoTypes = INFO_TYPES;
-        content->infosList.infoContents = INFO_CONTENTS;
-    }
-#ifdef HAVE_RK_SUPPORT_SETTING
-    else if (page == 1) {
-        toggle.text = "Resident keys";
-        toggle.subText =
-            "Stores login info on this\n"
-            "device's memory and lets you\n"
-            "login without username.\n\n"
-            "Caution: Updating the OS or\n"
-            "this app will delete the stored\n"
-            "login info, causing login issues\n"
-            "for connected accounts";
-        toggle.token = FIRST_USER_TOKEN;
-        toggle.tuneId = TUNE_TAP_CASUAL;
-        toggle.initState = config_get_rk_enabled();
-        content->type = SWITCHES_LIST;
-        content->switchesList.nbSwitches = 1;
-        content->switchesList.switches = &toggle;
-    } else {
-#endif  // HAVE_RK_SUPPORT_SETTING
-        return false;
-    }
-    return true;
+/*
+ * When no NFC, warning status page
+ */
+
+#ifdef TARGET_STAX
+#define C_Info_32px C_info_i_32px
+#endif  // TARGET_STAX
+
+static const nbgl_pageInfoDescription_t nfc_info = {
+    .centeredInfo.icon = &INFO_I_ICON,
+    .centeredInfo.text1 = "Use NFC to log in with a single tap",
+    .centeredInfo.text3 =
+        "Quit this app and go to device settings, then enable NFC.\n"
+        "Make sure your mobile phone also has NFC enabled.",
+    .tapActionText = "Tap to dismiss",
+};
+
+static void no_NFC_callback(int token __attribute__((unused)),
+                            uint8_t index __attribute__((unused))) {
+    ui_idle();
 }
 
-static void ui_menu_settings(uint8_t init_page) {
-    nbgl_useCaseSettings(APPNAME,
-                         init_page,
-#ifdef HAVE_RK_SUPPORT_SETTING
-                         2,
-#else
-                         1,
-#endif
-                         false,
-                         ui_idle,
-                         nav_callback,
-                         settings_callback);
+static void no_NFC_info_page(void) {
+    nbgl_pageDrawInfo(no_NFC_callback, NULL, &nfc_info);
+    nbgl_refreshSpecial(FULL_COLOR_CLEAN_REFRESH);
 }
 
-static void ui_menu_settings_home(void) {
-    ui_menu_settings(0);
-}
+static nbgl_homeAction_t homeNoNFCWarning = {};
 
-static void ui_menu_settings_page(void) {
-    ui_menu_settings(1);
-}
+/*
+ * Home page
+ */
 
 void ui_idle(void) {
-    nbgl_useCaseHome(APPNAME,
-                     &C_icon_security_key_64px,
-                     "Use this app for two-factor\nauthentication and\npassword-less log ins.",
+    nbgl_homeAction_t *home_button = NULL;
+
+#ifdef HAVE_NFC
+    bool nfc_enabled;
+    nfc_enabled = os_setting_get(OS_SETTING_FEATURES, NULL, 0) & OS_SETTING_FEATURES_NFC_ENABLED;
+    if (!nfc_enabled) {
+        homeNoNFCWarning.text = "NFC is disabled";
+        // TODO: currently the .icon is ignored in the SDK
+        homeNoNFCWarning.icon = &INFO_I_ICON;
+        homeNoNFCWarning.callback = no_NFC_info_page;
+        home_button = &homeNoNFCWarning;
+    }
+#endif  // ENABLE_NFC
+
 #ifdef HAVE_RK_SUPPORT_SETTING
-                     true,
+    switches[0].text = "Resident keys";
+    switches[0].subText =
+        "Stores login info on this\n"
+        "device's memory and lets you\n"
+        "login without username.\n"
+        "\n"
+        "Caution: Updating the OS or\n"
+        "this app will delete the stored\n"
+        "login info, causing login issues\n"
+        "for connected accounts.";
+    switches[0].token = FIRST_USER_TOKEN;
+    switches[0].tuneId = TUNE_TAP_CASUAL;
+    switches[0].initState = config_get_rk_enabled();
+#endif  //  HAVE_RK_SUPPORT_SETTING
+    nbgl_useCaseHomeAndSettings(
+        APPNAME,
+        &C_icon_security_key_64px,
+        "Use this app for two-factor\nauthentication and\npassword-less log ins.",
+        INIT_HOME_PAGE,
+#ifdef HAVE_RK_SUPPORT_SETTING
+        &settingContents,
 #else
-                     false,
-#endif
-                     ui_menu_settings_home,
-                     app_quit);
+        NULL,
+#endif  // HAVE_RK_SUPPORT_SETTING
+        &infoList,
+        home_button,
+        app_quit);
 }
+
+/*
+ * Generic reviews (register, authenticate)
+ */
 
 static nbgl_layout_t *layout;
 static nbgl_page_t *pageContext;

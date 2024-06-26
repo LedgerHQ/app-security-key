@@ -1,7 +1,7 @@
 /*
 *******************************************************************************
 *   Ledger App Security Key
-*   (c) 2022 Ledger
+*   (c) 2024 Ledger
 *
 *  Licensed under the Apache License, Version 2.0 (the "License");
 *  you may not use this file except in compliance with the License.
@@ -16,22 +16,12 @@
 *   limitations under the License.
 ********************************************************************************/
 
-#ifndef __U2F_PROCESS_H__
-#define __U2F_PROCESS_H__
-
-#include "credential.h"
-
-typedef struct u2f_data_t {
-    uint8_t ins;
-    uint8_t challenge_param[32];
-    uint8_t application_param[32];
-    uint8_t nonce[CREDENTIAL_NONCE_SIZE];
-} u2f_data_t;
-
-int u2f_handle_apdu(uint8_t *rx, int length);
-
-#ifdef HAVE_NFC
-void nfc_idle_work(void);
-#endif  // HAVE_NFC
-
-#endif  // __U2F_PROCESS_H__
+#define SW_NO_ERROR                 0x9000
+#define SW_MORE_DATA                0x6100
+#define SW_WRONG_LENGTH             0x6700
+#define SW_CONDITIONS_NOT_SATISFIED 0x6985
+#define SW_WRONG_DATA               0x6A80
+#define SW_INCORRECT_P1P2           0x6A86
+#define SW_INS_NOT_SUPPORTED        0x6D00
+#define SW_CLA_NOT_SUPPORTED        0x6E00
+#define SW_PROPRIETARY_INTERNAL     0x6FFF

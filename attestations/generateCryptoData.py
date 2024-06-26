@@ -9,7 +9,7 @@ attestation_cert_prefix = "static const uint8_t {}_{}_{}_ATTESTATION_CERT[] ="
 
 
 parser = argparse.ArgumentParser()
-parser.add_argument('env', type=str, help='CA, key and cert env')
+parser.add_argument('env', type=str, help='CA, key and cert env', choices=["test", "prod"])
 parser.add_argument('version', type=str, help='target protocol version', choices=["U2F", "FIDO2"])
 parser.add_argument('model', type=str, help='device model')
 
@@ -46,9 +46,19 @@ key_line_1 = "    " + ", ".join(["0x{}".format(x) for x in key_bytes[:16]])
 key_line_2 = "    " + ", ".join(["0x{}".format(x) for x in key_bytes[16:]])
 key_data = ",\n".join([key_line_1, key_line_2])
 
-key = attestation_key_prefix.format(env, version, model) \
-      + " {\n" + key_data + "};"
-print(key)
+if env == "PROD":
+    print("The key")
+    print("-"*100)
+    print(key_data.strip().replace(" ", "").replace("\n", ""))
+    print("-"*100)
+    print("What needs to be copy-pasted into `crypto_data.h`:")
+    print("-"*100)
+else:
+    print("What needs to be copy-pasted into `crypto_data.h`:")
+    print("-"*100)
+    key = attestation_key_prefix.format(env, version, model) \
+        + " {\n" + key_data + "};"
+    print(key)
 
 # Generate ATTESTATION_CERT
 with open(cert_file, 'rb') as f:
@@ -68,3 +78,4 @@ cert_data = ",\n".join(cert_lines)
 cert = attestation_cert_prefix.format(env, version, model) \
       + " {\n" + cert_data + "};"
 print(cert)
+print("-"*100)

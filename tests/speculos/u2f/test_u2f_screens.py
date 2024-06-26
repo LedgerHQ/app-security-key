@@ -15,7 +15,7 @@ def test_u2f_screens_idle(client, test_name, firmware):
     client.navigator._backend.get_current_screen_content()
 
     instructions = []
-    if firmware.device.startswith("nano"):
+    if firmware.is_nano:
         # Screen 0 -> 1
         instructions.append(NavInsID.RIGHT_CLICK)
         # Screen 1 -> 2
@@ -29,7 +29,6 @@ def test_u2f_screens_idle(client, test_name, firmware):
     else:
         instructions = [
             NavInsID.USE_CASE_HOME_SETTINGS,
-            NavInsID.USE_CASE_SETTINGS_NEXT,
             NavInsID.USE_CASE_SETTINGS_MULTI_PAGE_EXIT
         ]
 

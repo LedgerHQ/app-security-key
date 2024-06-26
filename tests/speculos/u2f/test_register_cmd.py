@@ -1,7 +1,6 @@
 import pytest
 
 from cryptography.x509 import load_der_x509_certificate
-from ragger.firmware import Firmware
 
 import fido2
 
@@ -46,9 +45,12 @@ def test_register_certificate(client):
     assert cert.extensions[0].critical is False
 
     # Check that value correspond to exposed transports
-    # TODO: to be cleaned when other devices have NFC enabled
-    expected = bytes.fromhex("03020430" if client.firmware == Firmware.FLEX else "03020520")
-    assert cert.extensions[0].value.value == expected
+    if client.model.startswith("nano"):
+        # USB
+        assert cert.extensions[0].value.value == bytes.fromhex("03020520")
+    else:
+        # USB + NFC
+        assert cert.extensions[0].value.value == bytes.fromhex("03020430")
 
 
 def test_register_user_refused(client, test_name):

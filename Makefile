@@ -32,8 +32,8 @@ PATH_APP_LOAD_PARAMS = "5722689'"  # int("WRA".encode("ascii").hex(), 16)
 PATH_APP_LOAD_PARAMS += "5262163'"  # int("PKS".encode("ascii").hex(), 16)
 
 APPVERSION_M=1
-APPVERSION_N=5
-APPVERSION_P=1
+APPVERSION_N=6
+APPVERSION_P=0
 APPVERSION=$(APPVERSION_M).$(APPVERSION_N).$(APPVERSION_P)
 
 ICON_NANOS=icons/icon_security_key_nanos.gif
@@ -125,13 +125,14 @@ ENABLE_NOCRC_APP_LOAD_PARAMS = 1
 # then reinstall flow), and this reset was causing even more issues
 DEFINES += HAVE_NO_RESET_GENERATION_INCREMENT
 
-# Disable by default rk support and expose a setting to enable it
-# This means that by default user won't be able to create "Resident Keys",
-# which are also named "Discoverable Credentials".
-# This has been implemented to protect user from the nvram wipe mostly happening
-# during an app update which will erase their RK credentials we no possibility
+# Adds the Resident Key support and exposes a setting to enable/disable it.
+# Currently the settings default value is `False`, which means that by default
+# users will need to activate the setting before being able to create "Resident
+# Keys", also named "Discoverable Credentials".
+# This has been implemented to protect user from the NVRAM wipe mostly happening
+# during an app update which will erase their RK credentials with no possibility
 # to restore them.
-# Advanced user can still choose to enable this setting at their own risk.
+# Advance users can still choose to completely disable this setting.
 DEFINES += HAVE_RK_SUPPORT_SETTING
 
 DEFINES += HAVE_FIDO2_RPID_FILTER
@@ -145,6 +146,9 @@ endif
 DEFINES += HAVE_DEBUG_THROWS
 
 #DEFINES  += HAVE_CBOR_DEBUG
+
+
+ENABLE_NFC = 1
 
 ##############
 # Compiler #

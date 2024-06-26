@@ -103,6 +103,15 @@
 #define CMD_IS_OVER_U2F_CMD        (G_io_app.apdu_state != APDU_IDLE)
 #define CMD_IS_OVER_CTAP2_CBOR_CMD (G_io_app.apdu_state == APDU_IDLE)
 
+#define CMD_IS_OVER_U2F_USB (G_io_u2f.media == U2F_MEDIA_USB)
+
+#ifdef HAVE_NFC
+#define CMD_IS_OVER_U2F_NFC (G_io_app.apdu_media == IO_APDU_MEDIA_NFC)
+void nfc_idle_work2(void);
+#else
+#define CMD_IS_OVER_U2F_NFC false
+#endif
+
 extern const uint8_t AAGUID[16];
 
 typedef struct ctap2_register_data_s {
@@ -177,7 +186,10 @@ void ctap2_send_keepalive_processing(void);
 // Correspond to FIDO2.1 spec performBuiltInUv() operation
 void performBuiltInUv(void);
 
-void ctap2_make_credential_handle(u2f_service_t *service, uint8_t *buffer, uint16_t length);
+void ctap2_make_credential_handle(u2f_service_t *service,
+                                  uint8_t *buffer,
+                                  uint16_t length,
+                                  bool *immediateReply);
 void ctap2_get_assertion_handle(u2f_service_t *service,
                                 uint8_t *buffer,
                                 uint16_t length,

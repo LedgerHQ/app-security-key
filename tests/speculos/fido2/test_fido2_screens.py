@@ -11,8 +11,7 @@ from utils import HAVE_RK_SUPPORT_SETTING
 from ragger.navigator import NavInsID, NavIns
 
 
-@pytest.mark.skipif(not HAVE_RK_SUPPORT_SETTING,
-                    reason="settings not enable")
+@pytest.mark.skipif(not HAVE_RK_SUPPORT_SETTING, reason="settings not enable")
 def test_fido_screens_settings(client, test_name):
 
     if client.model.startswith("nano"):
@@ -50,14 +49,13 @@ def test_fido_screens_settings(client, test_name):
         instructions = [
             # Enter in the settings
             NavInsID.USE_CASE_HOME_SETTINGS,
-            NavInsID.USE_CASE_SETTINGS_NEXT,
 
-            # Enable and skip "Enabling" message
+            # Enable RK and skip "Enabling" message
             NavIns(NavInsID.CHOICE_CHOOSE, (1,)),
             NavInsID.USE_CASE_CHOICE_CONFIRM,
             NavInsID.USE_CASE_STATUS_DISMISS,
 
-            # Disable
+            # Disable RK
             NavIns(NavInsID.CHOICE_CHOOSE, (1,)),
 
             # Leave settings

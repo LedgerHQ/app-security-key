@@ -382,7 +382,7 @@ static void handle_store_pin(u2f_service_t *service,
     // Invalidate previous token and force the user to issue a GET_PIN_TOKEN command
     authTokeninUse = false;
 
-    G_io_apdu_buffer[0] = ERROR_NONE;
+    responseBuffer[0] = ERROR_NONE;
     send_cbor_response(&G_io_u2f, 1);
 }
 
@@ -444,12 +444,12 @@ static void ctap2_handle_get_pin_retries(u2f_service_t *service,
     PRINTF("ctap2_handle_get_pin_retries\n");
     CHECK_PIN_SET();
 
-    cbip_encoder_init(&encoder, G_io_apdu_buffer + 1, CUSTOM_IO_APDU_BUFFER_SIZE - 1);
+    cbip_encoder_init(&encoder, responseBuffer + 1, CUSTOM_IO_APDU_BUFFER_SIZE - 1);
     cbip_add_map_header(&encoder, 1);
     cbip_add_int(&encoder, TAG_RESP_RETRIES);
     cbip_add_int(&encoder, N_u2f.pinRetries);
 
-    G_io_apdu_buffer[0] = ERROR_NONE;
+    responseBuffer[0] = ERROR_NONE;
     send_cbor_response(&G_io_u2f, 1 + encoder.offset);
 }
 
@@ -473,7 +473,7 @@ static void ctap2_handle_get_key_agreement(u2f_service_t *service,
         return;
     }
 
-    cbip_encoder_init(&encoder, G_io_apdu_buffer + 1, CUSTOM_IO_APDU_BUFFER_SIZE - 1);
+    cbip_encoder_init(&encoder, responseBuffer + 1, CUSTOM_IO_APDU_BUFFER_SIZE - 1);
     cbip_add_map_header(&encoder, 1);
     cbip_add_int(&encoder, TAG_RESP_KEY_AGREEMENT);
     status = encode_cose_key(&encoder, &publicKey, true);
@@ -482,7 +482,7 @@ static void ctap2_handle_get_key_agreement(u2f_service_t *service,
         return;
     }
 
-    G_io_apdu_buffer[0] = ERROR_NONE;
+    responseBuffer[0] = ERROR_NONE;
     send_cbor_response(&G_io_u2f, 1 + encoder.offset);
 }
 
@@ -658,12 +658,12 @@ static void ctap2_handle_get_pin_token(u2f_service_t *service,
                              &encryptedLength);
 
     // Generate the response
-    cbip_encoder_init(&encoder, G_io_apdu_buffer + 1, CUSTOM_IO_APDU_BUFFER_SIZE - 1);
+    cbip_encoder_init(&encoder, responseBuffer + 1, CUSTOM_IO_APDU_BUFFER_SIZE - 1);
     cbip_add_map_header(&encoder, 1);
     cbip_add_int(&encoder, TAG_RESP_PIN_TOKEN);
     cbip_add_byte_string(&encoder, tokenEnc, encryptedLength);
 
-    G_io_apdu_buffer[0] = ERROR_NONE;
+    responseBuffer[0] = ERROR_NONE;
     send_cbor_response(&G_io_u2f, 1 + encoder.offset);
 }
 
