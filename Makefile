@@ -132,7 +132,7 @@ DEFINES += HAVE_NO_RESET_GENERATION_INCREMENT
 # This has been implemented to protect user from the NVRAM wipe mostly happening
 # during an app update which will erase their RK credentials with no possibility
 # to restore them.
-# Advance users can still choose to completely disable this setting.
+# Advanced users can still choose to completely disable this setting.
 DEFINES += HAVE_RK_SUPPORT_SETTING
 
 DEFINES += HAVE_FIDO2_RPID_FILTER

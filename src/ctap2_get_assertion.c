@@ -313,8 +313,7 @@ static int process_getAssert_authnr_pin(cbipDecoder_t *decoder, cbipItem_t *mapI
 
 void ctap2_get_assertion_handle(u2f_service_t *service,
                                 uint8_t *buffer,
-                                uint16_t length,
-                                bool *immediateReply) {
+                                uint16_t length) {
     ctap2_assert_data_t *ctap2AssertData = globals_get_ctap2_assert_data();
     cbipDecoder_t decoder;
     cbipItem_t mapItem;
@@ -322,7 +321,6 @@ void ctap2_get_assertion_handle(u2f_service_t *service,
 
     PRINTF("ctap2_get_assertion_handle\n");
 
-    *immediateReply = false;
     memset(ctap2AssertData, 0, sizeof(ctap2_assert_data_t));
     ctap2AssertData->buffer = buffer;
 
@@ -389,10 +387,10 @@ void ctap2_get_assertion_handle(u2f_service_t *service,
         //  the user
         //  -> when credentials comes from rk, the spec ask to use authenticatorGetNextAssertion
         //  features
-        *immediateReply = true;
+        ctap2_get_assertion_confirm(1);
     } else if (!ctap2AssertData->userPresenceRequired && !ctap2AssertData->pinRequired) {
         // No up nor uv required, skip UX and reply immediately
-        *immediateReply = true;
+        ctap2_get_assertion_confirm(1);
     } else {
         // Look for a potential rk entry if no allow list was provided
         if (!ctap2AssertData->allowListPresent) {

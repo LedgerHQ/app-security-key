@@ -411,8 +411,7 @@ static int process_makeCred_authnr_pin(cbipDecoder_t *decoder, cbipItem_t *mapIt
 
 void ctap2_make_credential_handle(u2f_service_t *service,
                                   uint8_t *buffer,
-                                  uint16_t length,
-                                  bool *immediateReply) {
+                                  uint16_t length) {
     ctap2_register_data_t *ctap2RegisterData = globals_get_ctap2_register_data();
     cbipDecoder_t decoder;
     cbipItem_t mapItem;
@@ -420,7 +419,6 @@ void ctap2_make_credential_handle(u2f_service_t *service,
 
     PRINTF("ctap2_make_credential_handle\n");
 
-    *immediateReply = false;
     memset(ctap2RegisterData, 0, sizeof(ctap2_register_data_t));
     ctap2RegisterData->buffer = buffer;
 
@@ -489,7 +487,7 @@ void ctap2_make_credential_handle(u2f_service_t *service,
     if (CMD_IS_OVER_U2F_NFC) {
         // No up nor uv requested, skip UX and reply immediately
         // TODO: is this what we want?
-        *immediateReply = true;
+        ctap2_make_credential_confirm();
     } else {
         ctap2_make_credential_ux();
     }
