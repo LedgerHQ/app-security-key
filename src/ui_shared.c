@@ -249,9 +249,9 @@ static void controls_callback(int token, uint8_t index, int page) {
  * When no NFC, warning status page
  */
 
-#ifdef TARGET_STAX
+#if defined(TARGET_STAX) && API_LEVEL <= 15
 #define C_Info_32px C_info_i_32px
-#endif  // TARGET_STAX
+#endif  // defined(TARGET_STAX) && API_LEVEL <= 15
 
 static const nbgl_pageInfoDescription_t nfc_info = {
     .centeredInfo.icon = &INFO_I_ICON,
