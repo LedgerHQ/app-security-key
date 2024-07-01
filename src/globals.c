@@ -32,3 +32,12 @@ ctap2_ux_state_t ctap2UxState;
 #else
 uint8_t responseBuffer[IO_APDU_BUFFER_SIZE];
 #endif
+
+#include "string_utils.h"
+
+void truncate_pairs_for_display() {
+    truncate_for_nb_lines(rpID);
+    PRINTF("rpID after truncation: '%s'\n", rpID);
+    truncate_for_nb_lines(verifyHash);
+    PRINTF("verifyHash after truncation: '%s'\n", verifyHash);
+}

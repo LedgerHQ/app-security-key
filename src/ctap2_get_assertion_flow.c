@@ -48,11 +48,13 @@ static void ctap2_ux_display_user_assertion(char buffer[static 36]) {
         nameLength = nameLength * 2;
     }
 
+#if defined(HAVE_BAGL)
     if (nameLength > 32) {
         memcpy(buffer + 32, "...", sizeof("..."));
     }
+#endif  // HAVE_BAGL
 
-    PRINTF("name %s\n", buffer);
+    PRINTF("GET_ASSERTION: name %s\n", buffer);
 }
 
 static void ctap_ux_on_user_choice(bool confirm, uint16_t idx) {
@@ -387,7 +389,8 @@ void ctap2_get_assertion_ux(ctap2_ux_state_t state) {
     uint8_t len = MIN(sizeof(rpID) - 1, ctap2AssertData->rpIdLen);
     memcpy(rpID, ctap2AssertData->rpId, len);
     rpID[len] = '\0';
-    PRINTF("rpId %s\n", rpID);
+    PRINTF("GET_ASSERTION: rpId %s\n", rpID);
+    PRINTF("GET_ASSERTION: verifyHash %s\n", verifyHash);
 
     ctap2UxState = state;
 

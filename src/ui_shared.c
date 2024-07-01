@@ -24,6 +24,7 @@ static void app_quit(void) {
 }
 
 #include "config.h"
+#include "globals.h"
 #include "ui_shared.h"
 
 #if defined(HAVE_BAGL)
@@ -180,7 +181,7 @@ static uint8_t initSettingPage;
 static nbgl_layoutSwitch_t switches[1] = {0};
 #endif  // HAVE_RK_SUPPORT_SETTING
 static const char *const INFO_TYPES[] = {"Version", "Developer", "Copyright"};
-static const char *const INFO_CONTENTS[] = {APPVERSION, "Ledger", "(c) 2023 Ledger"};
+static const char *const INFO_CONTENTS[] = {APPVERSION, "Ledger", "(c) 2022-2024 Ledger"};
 
 static const nbgl_contentInfoList_t infoList = {
     .nbInfos = 3,
@@ -359,6 +360,11 @@ void app_nbgl_start_review(uint8_t nb_pairs,
                            const char *confirm_text,
                            nbgl_choiceCallback_t on_choice,
                            nbgl_callback_t on_select) {
+#if defined(HAVE_NBGL)
+    // only NBGL screens has such needs
+    truncate_pairs_for_display();
+#endif
+
     nbgl_layoutDescription_t layoutDescription;
     onChoice = on_choice;
     onSelect = on_select;

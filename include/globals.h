@@ -16,8 +16,7 @@
 *   limitations under the License.
 ********************************************************************************/
 
-#ifndef __GLOBALS_H__
-#define __GLOBALS_H__
+#pragma once
 
 #include "u2f_service.h"
 
@@ -72,4 +71,4 @@ static inline ctap2_assert_data_t *globals_get_ctap2_assert_data(void) {
     return &shared_ctx.u.ctap2Data.u.ctap2AssertData;
 }
 
-#endif
+void truncate_pairs_for_display(void);

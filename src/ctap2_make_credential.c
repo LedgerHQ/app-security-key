@@ -173,9 +173,9 @@ static int parse_makeCred_authnr_user(cbipDecoder_t *decoder, cbipItem_t *mapIte
             //       overflows under the "Register" button. We'll need to clean that (new page?)
             ctap2RegisterData->userStrLen = 64;
         }
-        PRINTF("userStr %.*s\n", ctap2RegisterData->userStrLen, ctap2RegisterData->userStr);
+        PRINTF("MAKE_CREDENTIAL: userStr %.*s\n", ctap2RegisterData->userStrLen, ctap2RegisterData->userStr);
     } else {
-        PRINTF("userID %.*H\n", ctap2RegisterData->userIdLen, ctap2RegisterData->userId);
+        PRINTF("MAKE_CREDENTIAL: userID %.*H\n", ctap2RegisterData->userIdLen, ctap2RegisterData->userId);
     }
     return 0;
 }

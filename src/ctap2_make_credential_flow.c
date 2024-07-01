@@ -148,11 +148,10 @@ void ctap2_make_credential_ux(void) {
     ctap2UxState = CTAP2_UX_STATE_MAKE_CRED;
 
     // TODO show that rp.id is truncated if necessary
-    uint8_t len = MIN(sizeof(rpID) - 1, ctap2RegisterData->rpIdLen);
-    memcpy(rpID, ctap2RegisterData->rpId, len);
-    rpID[len] = '\0';
-    PRINTF("rpId %s\n", rpID);
+    uint8_t len = MIN(sizeof(g.rpID) - 1, ctap2RegisterData->rpIdLen);
+    memcpy(g.rpID, ctap2RegisterData->rpId, len);
 
+    rpID[len] = '\0';
     ctap2_ux_get_display_user();
 
     UX_WAKE_UP();
