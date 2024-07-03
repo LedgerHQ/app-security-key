@@ -19,6 +19,11 @@ from fido2.hid.base import CtapHidConnection, HidDescriptor
 from ctap1_client import LedgerCtap1
 from ctap2_client import LedgerCtap2
 
+from ragger.firmware import Firmware
+from ragger.backend import BackendInterface
+from ragger.navigator import Navigator
+
+
 TESTS_SPECULOS_DIR = Path(__file__).absolute().parent
 REPO_ROOT_DIR = TESTS_SPECULOS_DIR.parent.parent
 APP_ELF_PATH = REPO_ROOT_DIR / "bin" / "app.elf"
@@ -213,8 +218,12 @@ class LedgerCtapHidDevice(CtapHidDevice):
 
 
 class TestClient:
-    def __init__(self, firmware, ragger_backend, navigator, transport,
-                 ctap2_u2f_proxy, debug=False):
+    def __init__(self, firmware: Firmware,
+                 ragger_backend: BackendInterface,
+                 navigator: Navigator,
+                 transport: str,
+                 ctap2_u2f_proxy: bool,
+                 debug=False):
         self.firmware = firmware
         self.model = firmware.device
         self.ragger_backend = ragger_backend

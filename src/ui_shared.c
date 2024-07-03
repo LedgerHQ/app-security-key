@@ -442,7 +442,8 @@ void app_nbgl_status(const char *message,
         .tickerValue = 3000    // 3 seconds
     };
     onQuit = on_quit;
-
+    prepare_display_status();
+    PRINTF("Will be displayed: '%s'\n", display_status);
     nbgl_pageInfoDescription_t info = {.bottomButtonStyle = NO_BUTTON_STYLE,
                                        .footerText = NULL,
                                        .centeredInfo.icon = &C_Denied_Circle_64px,
@@ -450,8 +451,8 @@ void app_nbgl_status(const char *message,
                                        .centeredInfo.onTop = false,
                                        .centeredInfo.style = LARGE_CASE_INFO,
                                        .centeredInfo.text1 = message,
-                                       .centeredInfo.text2 = NULL,
-                                       .centeredInfo.text3 = NULL,
+                                       .centeredInfo.text2 = "",
+                                       .centeredInfo.text3 = &g.display_status[0],
                                        .tapActionText = "",
                                        .tapActionToken = QUIT_TOKEN,
                                        .topRightStyle = NO_BUTTON_STYLE,

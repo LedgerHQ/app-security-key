@@ -61,6 +61,7 @@ void send_cbor_error(u2f_service_t *service, uint8_t error) {
 
 void send_cbor_response(u2f_service_t *service, uint32_t length) {
     if (CMD_IS_OVER_U2F_NFC) {
+        g.is_nfc = true;
         const char *status = NULL;
         if (cmdType == CBOR_MAKE_CREDENTIAL) {
             status = "Registration details\nsent";
