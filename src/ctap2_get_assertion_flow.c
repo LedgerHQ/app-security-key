@@ -45,7 +45,9 @@ static void ctap2_ux_display_user_assertion(char buffer[static 36]) {
     } else {
         nameLength = MIN(credData.userIdLen, (36 / 2) - 1);
         format_hex(credData.userId, nameLength, buffer, 36);
+#if defined(HAVE_BAGL)
         nameLength = nameLength * 2;
+#endif  // HAVE_BAGL
     }
 
 #if defined(HAVE_BAGL)
@@ -264,8 +266,9 @@ UX_FLOW(ux_ctap2_no_assertion_flow,
 
 static nbgl_page_t *pageContext;
 #define NB_OF_PAIRS 2
-static const nbgl_layoutTagValue_t pairs[NB_OF_PAIRS] = {{.item = "Website", .value = g.rpID},
-                                                         {.item = "User ID", .value = g.verifyHash}};
+static const nbgl_layoutTagValue_t pairs[NB_OF_PAIRS] = {
+    {.item = "Website", .value = g.rpID},
+    {.item = "User ID", .value = g.verifyHash}};
 
 #define SELECT_MAX_ID_NB      5
 #define SELECT_ID_BUFFER_SIZE 36

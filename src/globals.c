@@ -44,7 +44,8 @@ void truncate_pairs_for_display() {
 void prepare_display_status() {
     if (!g.is_nfc) {
         PRINTF("NOT NFC so no display status for rpID '%s' and verifyHash '%s'\n",
-               g.rpID, g.verifyHash);
+               g.rpID,
+               g.verifyHash);
         g.display_status[0] = '\0';
         return;
     }

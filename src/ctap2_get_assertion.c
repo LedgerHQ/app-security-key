@@ -311,9 +311,7 @@ static int process_getAssert_authnr_pin(cbipDecoder_t *decoder, cbipItem_t *mapI
     return 0;
 }
 
-void ctap2_get_assertion_handle(u2f_service_t *service,
-                                uint8_t *buffer,
-                                uint16_t length) {
+void ctap2_get_assertion_handle(u2f_service_t *service, uint8_t *buffer, uint16_t length) {
     ctap2_assert_data_t *ctap2AssertData = globals_get_ctap2_assert_data();
     cbipDecoder_t decoder;
     cbipItem_t mapItem;

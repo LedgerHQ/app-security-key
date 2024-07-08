@@ -9,7 +9,6 @@
 #include <nbgl_layout.h>
 #endif  // defined(HAVE_NBGL)
 
-
 void truncate_for_nb_lines(char *input) {
 #if !defined(HAVE_NBGL)
     UNUSED(input);
@@ -29,8 +28,14 @@ void truncate_for_nb_lines(char *input) {
         // Ex: on Flex, with a single call, 'MMMMMMMMMMMMMMMMMMMMMMMMMMMM' would be reduced to
         // 'MMMMMMMMMMMMMMMMMMMMMMM...', when it fact 'MMMMMMMMMMMMMMMMMMMMMMMM...' would fit.
         // As the truncation could be severe (down to 24B in this example), I think this is worth
-        // the extra computation (in any case, this would take a maximum of 3 iterations into the loop)
-        nbgl_getTextMaxLenInNbLines(LARGE_MEDIUM_FONT, input, AVAILABLE_WIDTH, line_nb, &max_bytes, false);
+        // the extra computation (in any case, this would take a maximum of 3 iterations into the
+        // loop)
+        nbgl_getTextMaxLenInNbLines(LARGE_MEDIUM_FONT,
+                                    input,
+                                    AVAILABLE_WIDTH,
+                                    line_nb,
+                                    &max_bytes,
+                                    false);
         if (size <= max_bytes) {
             return;
         }
