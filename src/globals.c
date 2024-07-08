@@ -17,12 +17,11 @@
 ********************************************************************************/
 
 #include "os.h"
+#include "os_io_seproxyhal.h"
 
 #include "globals.h"
 
-char verifyName[20];
-char verifyHash[65];
-char rpID[65];
+global_t g;
 
 shared_ctx_t shared_ctx;
 ctap2_ux_state_t ctap2UxState;
@@ -32,3 +31,27 @@ ctap2_ux_state_t ctap2UxState;
 #else
 uint8_t responseBuffer[IO_APDU_BUFFER_SIZE];
 #endif
+
+#include "string_utils.h"
+
+void truncate_pairs_for_display() {
+    truncate_for_nb_lines(g.rpID);
+    PRINTF("rpID after truncation: '%s'\n", glonal.rpID);
+    truncate_for_nb_lines(g.verifyHash);
+    PRINTF("verifyHash after truncation: '%s'\n", g.verifyHash);
+}
+
+void prepare_display_status() {
+    if (!g.is_nfc) {
+        PRINTF("NOT NFC so no display status for rpID '%s' and verifyHash '%s'\n",
+               g.rpID,
+               g.verifyHash);
+        g.display_status[0] = '\0';
+        return;
+    }
+    g.is_nfc = false;
+    strncpy(g.display_status, g.rpID, strlen(g.rpID));
+    g.display_status[strlen(g.rpID)] = '\n';
+    strncpy(g.display_status + strlen(g.rpID) + 1, g.verifyHash, strlen(g.verifyHash));
+    PRINTF("NFC so display status is: '%s'\n", g.display_status);
+}

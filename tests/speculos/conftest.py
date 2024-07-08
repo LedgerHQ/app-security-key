@@ -33,8 +33,6 @@ pytest_plugins = ("ragger.conftest.base_conftest", )
 
 BACKENDS = ["speculos"]
 
-DEVICES = ["nanox", "nanosp", "stax", "all"]
-
 
 def pytest_addoption(parser):
     parser.addoption("--transport", default="U2F")
@@ -88,13 +86,15 @@ def create_backend(root_pytest_dir: Path, backend_name: str,
 
 
 @pytest.fixture(scope="module")
-def backend(root_pytest_dir, backend_name, firmware, display, transport):
+def backend(root_pytest_dir: Path, backend_name: str, firmware: Firmware, display: bool,
+            transport: str):
     with create_backend(root_pytest_dir, backend_name, firmware, display, transport) as b:
         yield b
 
 
 @pytest.fixture
-def client(firmware, backend, navigator, transport: str, ctap2_u2f_proxy):
+def client(firmware: Firmware, backend, navigator, transport: str,
+           ctap2_u2f_proxy: bool) -> TestClient:
     client = TestClient(firmware, backend, navigator, transport, ctap2_u2f_proxy)
     client.start()
     return client

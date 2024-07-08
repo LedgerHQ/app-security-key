@@ -24,6 +24,7 @@ static void app_quit(void) {
 }
 
 #include "config.h"
+#include "globals.h"
 #include "ui_shared.h"
 
 #if defined(HAVE_BAGL)
@@ -180,7 +181,7 @@ static uint8_t initSettingPage;
 static nbgl_layoutSwitch_t switches[1] = {0};
 #endif  // HAVE_RK_SUPPORT_SETTING
 static const char *const INFO_TYPES[] = {"Version", "Developer", "Copyright"};
-static const char *const INFO_CONTENTS[] = {APPVERSION, "Ledger", "(c) 2023 Ledger"};
+static const char *const INFO_CONTENTS[] = {APPVERSION, "Ledger", "(c) 2022-2024 Ledger"};
 
 static const nbgl_contentInfoList_t infoList = {
     .nbInfos = 3,
@@ -359,6 +360,11 @@ void app_nbgl_start_review(uint8_t nb_pairs,
                            const char *confirm_text,
                            nbgl_choiceCallback_t on_choice,
                            nbgl_callback_t on_select) {
+#if defined(HAVE_NBGL)
+    // only NBGL screens has such needs
+    truncate_pairs_for_display();
+#endif
+
     nbgl_layoutDescription_t layoutDescription;
     onChoice = on_choice;
     onSelect = on_select;
@@ -436,7 +442,8 @@ void app_nbgl_status(const char *message,
         .tickerValue = 3000    // 3 seconds
     };
     onQuit = on_quit;
-
+    prepare_display_status();
+    PRINTF("Will be displayed: '%s'\n", display_status);
     nbgl_pageInfoDescription_t info = {.bottomButtonStyle = NO_BUTTON_STYLE,
                                        .footerText = NULL,
                                        .centeredInfo.icon = &C_Denied_Circle_64px,
@@ -444,8 +451,8 @@ void app_nbgl_status(const char *message,
                                        .centeredInfo.onTop = false,
                                        .centeredInfo.style = LARGE_CASE_INFO,
                                        .centeredInfo.text1 = message,
-                                       .centeredInfo.text2 = NULL,
-                                       .centeredInfo.text3 = NULL,
+                                       .centeredInfo.text2 = "",
+                                       .centeredInfo.text3 = &g.display_status[0],
                                        .tapActionText = "",
                                        .tapActionToken = QUIT_TOKEN,
                                        .topRightStyle = NO_BUTTON_STYLE,

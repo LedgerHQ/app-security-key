@@ -186,14 +186,8 @@ void ctap2_send_keepalive_processing(void);
 // Correspond to FIDO2.1 spec performBuiltInUv() operation
 void performBuiltInUv(void);
 
-void ctap2_make_credential_handle(u2f_service_t *service,
-                                  uint8_t *buffer,
-                                  uint16_t length,
-                                  bool *immediateReply);
-void ctap2_get_assertion_handle(u2f_service_t *service,
-                                uint8_t *buffer,
-                                uint16_t length,
-                                bool *immediateReply);
+void ctap2_make_credential_handle(u2f_service_t *service, uint8_t *buffer, uint16_t length);
+void ctap2_get_assertion_handle(u2f_service_t *service, uint8_t *buffer, uint16_t length);
 void ctap2_get_next_assertion_handle(u2f_service_t *service, uint8_t *buffer, uint16_t length);
 void ctap2_get_info_handle(u2f_service_t *service, uint8_t *buffer, uint16_t length);
 void ctap2_client_pin_handle(u2f_service_t *service, uint8_t *buffer, uint16_t length);

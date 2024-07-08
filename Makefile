@@ -33,7 +33,7 @@ PATH_APP_LOAD_PARAMS += "5262163'"  # int("PKS".encode("ascii").hex(), 16)
 
 APPVERSION_M=1
 APPVERSION_N=6
-APPVERSION_P=1
+APPVERSION_P=2
 APPVERSION=$(APPVERSION_M).$(APPVERSION_N).$(APPVERSION_P)
 
 ICON_NANOS=icons/icon_security_key_nanos.gif
@@ -132,7 +132,7 @@ DEFINES += HAVE_NO_RESET_GENERATION_INCREMENT
 # This has been implemented to protect user from the NVRAM wipe mostly happening
 # during an app update which will erase their RK credentials with no possibility
 # to restore them.
-# Advance users can still choose to completely disable this setting.
+# Advanced users can still choose to completely disable this setting.
 DEFINES += HAVE_RK_SUPPORT_SETTING
 
 DEFINES += HAVE_FIDO2_RPID_FILTER

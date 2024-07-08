@@ -173,9 +173,13 @@ static int parse_makeCred_authnr_user(cbipDecoder_t *decoder, cbipItem_t *mapIte
             //       overflows under the "Register" button. We'll need to clean that (new page?)
             ctap2RegisterData->userStrLen = 64;
         }
-        PRINTF("userStr %.*s\n", ctap2RegisterData->userStrLen, ctap2RegisterData->userStr);
+        PRINTF("MAKE_CREDENTIAL: userStr %.*s\n",
+               ctap2RegisterData->userStrLen,
+               ctap2RegisterData->userStr);
     } else {
-        PRINTF("userID %.*H\n", ctap2RegisterData->userIdLen, ctap2RegisterData->userId);
+        PRINTF("MAKE_CREDENTIAL: userID %.*H\n",
+               ctap2RegisterData->userIdLen,
+               ctap2RegisterData->userId);
     }
     return 0;
 }
@@ -409,10 +413,7 @@ static int process_makeCred_authnr_pin(cbipDecoder_t *decoder, cbipItem_t *mapIt
     return 0;
 }
 
-void ctap2_make_credential_handle(u2f_service_t *service,
-                                  uint8_t *buffer,
-                                  uint16_t length,
-                                  bool *immediateReply) {
+void ctap2_make_credential_handle(u2f_service_t *service, uint8_t *buffer, uint16_t length) {
     ctap2_register_data_t *ctap2RegisterData = globals_get_ctap2_register_data();
     cbipDecoder_t decoder;
     cbipItem_t mapItem;
@@ -420,7 +421,6 @@ void ctap2_make_credential_handle(u2f_service_t *service,
 
     PRINTF("ctap2_make_credential_handle\n");
 
-    *immediateReply = false;
     memset(ctap2RegisterData, 0, sizeof(ctap2_register_data_t));
     ctap2RegisterData->buffer = buffer;
 
@@ -489,7 +489,8 @@ void ctap2_make_credential_handle(u2f_service_t *service,
     if (CMD_IS_OVER_U2F_NFC) {
         // No up nor uv requested, skip UX and reply immediately
         // TODO: is this what we want?
-        *immediateReply = true;
+        g.is_nfc = true;
+        ctap2_make_credential_confirm();
     } else {
         ctap2_make_credential_ux();
     }

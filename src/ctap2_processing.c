@@ -61,6 +61,7 @@ void send_cbor_error(u2f_service_t *service, uint8_t error) {
 
 void send_cbor_response(u2f_service_t *service, uint32_t length) {
     if (CMD_IS_OVER_U2F_NFC) {
+        g.is_nfc = true;
         const char *status = NULL;
         if (cmdType == CBOR_MAKE_CREDENTIAL) {
             status = "Registration details\nsent";
@@ -111,20 +112,12 @@ void ctap2_handle_cmd_cbor(u2f_service_t *service, uint8_t *buffer, uint16_t len
     cmdType = buffer[0];
 
     switch (buffer[0]) {
-        case CBOR_MAKE_CREDENTIAL: {
-            bool immediateReply;
-            ctap2_make_credential_handle(service, buffer + 1, length - 1, &immediateReply);
-            if (immediateReply) {
-                ctap2_make_credential_confirm();
-            }
-        } break;
-        case CBOR_GET_ASSERTION: {
-            bool immediateReply;
-            ctap2_get_assertion_handle(service, buffer + 1, length - 1, &immediateReply);
-            if (immediateReply) {
-                ctap2_get_assertion_confirm(1);
-            }
-        } break;
+        case CBOR_MAKE_CREDENTIAL:
+            ctap2_make_credential_handle(service, buffer + 1, length - 1);
+            break;
+        case CBOR_GET_ASSERTION:
+            ctap2_get_assertion_handle(service, buffer + 1, length - 1);
+            break;
         case CBOR_GET_NEXT_ASSERTION:
             ctap2_get_next_assertion_handle(service, buffer + 1, length - 1);
             break;
