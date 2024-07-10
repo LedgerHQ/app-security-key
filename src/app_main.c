@@ -110,6 +110,8 @@ void app_main() {
     ui_idle();
 
     for (;;) {
+        g.is_nfc = CMD_IS_OVER_U2F_NFC;
+
         // Receive command bytes in G_io_apdu_buffer
         if ((input_len = io_recv_command()) < 0) {
             PRINTF("=> io_recv_command failure\n");

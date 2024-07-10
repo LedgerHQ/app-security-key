@@ -689,7 +689,6 @@ static int u2f_handle_apdu_enroll(const uint8_t *rx, uint32_t data_length, const
             sizeof(reg_req->application_param));
 
     if (CMD_IS_OVER_U2F_NFC) {
-        g.is_nfc = true;
         uint16_t length = 0;
         uint16_t sw = u2f_prepare_enroll_response(responseBuffer, &length);
 
@@ -765,7 +764,6 @@ static int u2f_handle_apdu_sign(const uint8_t *rx, uint32_t data_length, uint8_t
     // following macros + `else if` was messing with clang until the `return`
 #ifdef HAVE_NFC
     if (CMD_IS_OVER_U2F_NFC) {
-        g.is_nfc = true;
         // Android doesn't support answering SW_MORE_DATA here...
         // so compute the real answer as fast as possible
         uint16_t length = 0;
@@ -826,7 +824,6 @@ static int u2f_handle_apdu_applet_select(uint8_t *rx, int data_length, const uin
 
 int u2f_handle_apdu(uint8_t *rx, int rx_length) {
     // PRINTF("=> RAW=%.*H\n", rx_length, rx);
-    g.is_nfc = false;
 
     uint8_t *data = NULL;
     uint32_t le = 0;
@@ -843,7 +840,6 @@ int u2f_handle_apdu(uint8_t *rx, int rx_length) {
     }
 
     if (CMD_IS_OVER_U2F_NFC) {
-        g.is_nfc = true;
         nfc_io_set_le(le);
     }
 
@@ -876,7 +872,6 @@ int u2f_handle_apdu(uint8_t *rx, int rx_length) {
                 if (!CMD_IS_OVER_U2F_NFC) {
                     return io_send_sw(SW_INS_NOT_SUPPORTED);
                 }
-                g.is_nfc = true;
                 return nfc_io_send_prepared_response();
 
             default:

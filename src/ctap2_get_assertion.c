@@ -385,7 +385,6 @@ void ctap2_get_assertion_handle(u2f_service_t *service, uint8_t *buffer, uint16_
         //  the user
         //  -> when credentials comes from rk, the spec ask to use authenticatorGetNextAssertion
         //  features
-        g.is_nfc = true;
         ctap2_get_assertion_confirm(1);
     } else if (!ctap2AssertData->userPresenceRequired && !ctap2AssertData->pinRequired) {
         // No up nor uv required, skip UX and reply immediately
