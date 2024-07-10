@@ -49,7 +49,6 @@ void prepare_display_status() {
         g.display_status[0] = '\0';
         return;
     }
-    g.is_nfc = false;
     strncpy(g.display_status, g.rpID, strlen(g.rpID));
     g.display_status[strlen(g.rpID)] = '\n';
     strncpy(g.display_status + strlen(g.rpID) + 1, g.verifyHash, strlen(g.verifyHash));

@@ -489,7 +489,6 @@ void ctap2_make_credential_handle(u2f_service_t *service, uint8_t *buffer, uint1
     if (CMD_IS_OVER_U2F_NFC) {
         // No up nor uv requested, skip UX and reply immediately
         // TODO: is this what we want?
-        g.is_nfc = true;
         ctap2_make_credential_confirm();
     } else {
         ctap2_make_credential_ux();
