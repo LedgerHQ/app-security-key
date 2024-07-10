@@ -250,7 +250,7 @@ static void controls_callback(int token, uint8_t index, int page) {
  * When no NFC, warning status page
  */
 
-#if defined(TARGET_STAX) && API_LEVEL <= 15
+#if defined(TARGET_STAX) && (API_LEVEL <= 15 && API_LEVEL != 0)
 #define C_Info_32px C_info_i_32px
 #endif  // defined(TARGET_STAX) && API_LEVEL <= 15
 
