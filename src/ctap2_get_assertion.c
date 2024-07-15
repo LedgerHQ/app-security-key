@@ -148,7 +148,7 @@ static int process_getAssert_authnr_allowList(cbipDecoder_t *decoder, cbipItem_t
     ctap2_assert_data_t *ctap2AssertData = globals_get_ctap2_assert_data();
     cbipItem_t tmpItem;
     int arrayLen;
-    int status;
+    int status = CBIPH_STATUS_NOT_FOUND;
     uint8_t *prevCredId = NULL;
     uint32_t prevCredIdLen = 0;
 
@@ -212,7 +212,7 @@ static int process_getAssert_authnr_allowList(cbipDecoder_t *decoder, cbipItem_t
 static int process_getAssert_authnr_extensions(cbipDecoder_t *decoder, cbipItem_t *mapItem) {
     ctap2_assert_data_t *ctap2AssertData = globals_get_ctap2_assert_data();
     cbipItem_t extensionsItem, hmacSecretItem;
-    int status;
+    int status = CBIPH_STATUS_NOT_FOUND;
 
     CHECK_MAP_KEY_ITEM_IS_VALID(decoder, mapItem, TAG_EXTENSIONS, extensionsItem, cbipMap);
     if (status == CBIPH_STATUS_FOUND) {
@@ -234,7 +234,7 @@ static int process_getAssert_authnr_extensions(cbipDecoder_t *decoder, cbipItem_
 static int process_getAssert_authnr_options(cbipDecoder_t *decoder, cbipItem_t *mapItem) {
     ctap2_assert_data_t *ctap2AssertData = globals_get_ctap2_assert_data();
     cbipItem_t optionsItem;
-    int status;
+    int status = CBIPH_STATUS_NOT_FOUND;
     bool boolValue;
 
     ctap2AssertData->userPresenceRequired = true;
