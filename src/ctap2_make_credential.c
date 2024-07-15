@@ -510,9 +510,10 @@ static int generate_pubkey(const uint8_t *nonce, int coseAlgorithm, cx_ecfp_publ
         return -1;
     }
     if (cx_ecfp_generate_pair_no_throw(bolosCurve, pubkey, &privateKey, 1) != CX_OK) {
+        explicit_bzero(&privateKey, sizeof(privateKey));
         return -1;
     }
-
+    explicit_bzero(&privateKey, sizeof(privateKey));
     return 0;
 }
 
