@@ -443,7 +443,7 @@ void app_nbgl_status(const char *message,
     };
     onQuit = on_quit;
     prepare_display_status();
-    PRINTF("Will be displayed: '%s'\n", display_status);
+    PRINTF("Will be displayed: '%s'\n", g.display_status);
     nbgl_pageInfoDescription_t info = {.bottomButtonStyle = NO_BUTTON_STYLE,
                                        .footerText = NULL,
                                        .centeredInfo.icon = &C_Denied_Circle_64px,

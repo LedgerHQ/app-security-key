@@ -36,7 +36,7 @@ uint8_t responseBuffer[IO_APDU_BUFFER_SIZE];
 
 void truncate_pairs_for_display() {
     truncate_for_nb_lines(g.rpID);
-    PRINTF("rpID after truncation: '%s'\n", glonal.rpID);
+    PRINTF("rpID after truncation: '%s'\n", g.rpID);
     truncate_for_nb_lines(g.verifyHash);
     PRINTF("verifyHash after truncation: '%s'\n", g.verifyHash);
 }
