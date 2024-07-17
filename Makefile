@@ -133,7 +133,8 @@ DEFINES += HAVE_NO_RESET_GENERATION_INCREMENT
 # during an app update which will erase their RK credentials with no possibility
 # to restore them.
 # Advanced users can still choose to completely disable this setting.
-DEFINES += HAVE_RK_SUPPORT_SETTING
+# /!\ disabled for 1.6 stable release
+# DEFINES += HAVE_RK_SUPPORT_SETTING
 
 DEFINES += HAVE_FIDO2_RPID_FILTER
 
