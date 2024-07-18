@@ -45,14 +45,18 @@ static void ctap2_ux_display_user_assertion(char buffer[static 36]) {
     } else {
         nameLength = MIN(credData.userIdLen, (36 / 2) - 1);
         format_hex(credData.userId, nameLength, buffer, 36);
+#if defined(HAVE_BAGL)
         nameLength = nameLength * 2;
+#endif  // HAVE_BAGL
     }
 
+#if defined(HAVE_BAGL)
     if (nameLength > 32) {
         memcpy(buffer + 32, "...", sizeof("..."));
     }
+#endif  // HAVE_BAGL
 
-    PRINTF("name %s\n", buffer);
+    PRINTF("GET_ASSERTION: name %s\n", buffer);
 }
 
 static void ctap_ux_on_user_choice(bool confirm, uint16_t idx) {
@@ -89,14 +93,14 @@ UX_STEP_NOCB(ux_ctap2_get_assertion_flow_domain_step,
              bnnn_paging,
              {
                  .title = "Website",
-                 .text = (char *) rpID,
+                 .text = (char *) g.rpID,
              });
 
 UX_STEP_NOCB(ux_ctap2_get_assertion_flow_user_step,
              bnnn_paging,
              {
                  .title = "User ID",
-                 .text = (char *) verifyHash,
+                 .text = (char *) g.verifyHash,
              });
 
 UX_STEP_CB(ux_ctap2_get_assertion_flow_accept_step,
@@ -137,12 +141,12 @@ static void display_next_multiple_flow_state(uint16_t idx) {
     ctap2_assert_data_t *ctap2AssertData = globals_get_ctap2_assert_data();
     ctap2_get_assertion_credential_idx(idx);
 
-    snprintf((char *) verifyName,
-             sizeof(verifyName),
+    snprintf((char *) g.verifyName,
+             sizeof(g.verifyName),
              "Log in user %d/%d",
              ctap2AssertData->currentCredentialIndex,
              ctap2AssertData->availableCredentials);
-    ctap2_ux_display_user_assertion(verifyHash);
+    ctap2_ux_display_user_assertion(g.verifyHash);
 }
 
 static void display_next_state(uint8_t state) {
@@ -183,8 +187,8 @@ UX_STEP_CB_INIT(ux_ctap2_get_assertion_multiple_user_border,
                 { display_next_state(STATE_VARIABLE); },
                 ctap_ux_on_user_choice(true, ux_step),
                 {
-                    .title = verifyName,
-                    .text = verifyHash,
+                    .title = g.verifyName,
+                    .text = g.verifyHash,
                 });
 #else
 UX_STEP_CB_INIT(ux_ctap2_get_assertion_multiple_user_border,
@@ -192,8 +196,8 @@ UX_STEP_CB_INIT(ux_ctap2_get_assertion_multiple_user_border,
                 { display_next_state(STATE_VARIABLE); },
                 ctap_ux_on_user_choice(true, ux_step),
                 {
-                    verifyName,
-                    verifyHash,
+                    g.verifyName,
+                    g.verifyHash,
                 });
 #endif
 
@@ -262,8 +266,9 @@ UX_FLOW(ux_ctap2_no_assertion_flow,
 
 static nbgl_page_t *pageContext;
 #define NB_OF_PAIRS 2
-static const nbgl_layoutTagValue_t pairs[NB_OF_PAIRS] = {{.item = "Website", .value = rpID},
-                                                         {.item = "User ID", .value = verifyHash}};
+static const nbgl_layoutTagValue_t pairs[NB_OF_PAIRS] = {
+    {.item = "Website", .value = g.rpID},
+    {.item = "User ID", .value = g.verifyHash}};
 
 #define SELECT_MAX_ID_NB      5
 #define SELECT_ID_BUFFER_SIZE 36
@@ -329,7 +334,7 @@ static void on_user_select_callback(int token, uint8_t index) {
     // change the current credential idx and relaunch the review
     selected_credential = idx;
     ctap2_get_assertion_credential_idx(selected_credential);
-    ctap2_ux_display_user_assertion(verifyHash);
+    ctap2_ux_display_user_assertion(g.verifyHash);
     app_nbgl_start_review(NB_OF_PAIRS, pairs, "Log in", on_user_choice, on_user_select);
 }
 
@@ -357,7 +362,7 @@ static void on_no_assertion_user_choice(int token, uint8_t index) {
 }
 
 static void app_nbgl_no_assertion(void) {
-    snprintf(verifyHash, sizeof(verifyHash), "Login details not found\nfor %s", rpID);
+    snprintf(g.verifyHash, sizeof(g.verifyHash), "Login details not found\nfor %s", g.rpID);
     nbgl_pageInfoDescription_t info = {
         .bottomButtonStyle = NO_BUTTON_STYLE,
         .footerText = NULL,
@@ -365,7 +370,7 @@ static void app_nbgl_no_assertion(void) {
         .centeredInfo.offsetY = 0,
         .centeredInfo.onTop = false,
         .centeredInfo.style = LARGE_CASE_INFO,
-        .centeredInfo.text1 = verifyHash,
+        .centeredInfo.text1 = g.verifyHash,
         .centeredInfo.text2 = "Make sure to log in\nusing the same Ledger\nyou registered with.",
         .centeredInfo.text3 = NULL,
         .tapActionText = "Tap to dismiss",
@@ -384,10 +389,11 @@ void ctap2_get_assertion_ux(ctap2_ux_state_t state) {
     ctap2_assert_data_t *ctap2AssertData = globals_get_ctap2_assert_data();
 
     // TODO show that rp.id is truncated if necessary
-    uint8_t len = MIN(sizeof(rpID) - 1, ctap2AssertData->rpIdLen);
-    memcpy(rpID, ctap2AssertData->rpId, len);
-    rpID[len] = '\0';
-    PRINTF("rpId %s\n", rpID);
+    uint8_t len = MIN(sizeof(g.rpID) - 1, ctap2AssertData->rpIdLen);
+    memcpy(g.rpID, ctap2AssertData->rpId, len);
+    g.rpID[len] = '\0';
+    PRINTF("GET_ASSERTION: rpId %s\n", g.rpID);
+    PRINTF("GET_ASSERTION: verifyHash %s\n", g.verifyHash);
 
     ctap2UxState = state;
 
@@ -402,7 +408,7 @@ void ctap2_get_assertion_ux(ctap2_ux_state_t state) {
 
     switch (state) {
         case CTAP2_UX_STATE_GET_ASSERTION: {
-            ctap2_ux_display_user_assertion(verifyHash);
+            ctap2_ux_display_user_assertion(g.verifyHash);
 #if defined(HAVE_BAGL)
             ux_flow_init(0, ux_ctap2_get_assertion_flow, NULL);
             break;
@@ -418,7 +424,7 @@ void ctap2_get_assertion_ux(ctap2_ux_state_t state) {
 #elif defined(HAVE_NBGL)
             available_credentials = ctap2AssertData->availableCredentials;
             ctap2_get_assertion_credential_idx(selected_credential);
-            ctap2_ux_display_user_assertion(verifyHash);
+            ctap2_ux_display_user_assertion(g.verifyHash);
             app_nbgl_start_review(NB_OF_PAIRS, pairs, "Log in", on_user_choice, on_user_select);
 #endif
             break;

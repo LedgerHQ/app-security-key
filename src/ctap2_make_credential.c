@@ -93,7 +93,7 @@ static int parse_makeCred_authnr_rp(cbipDecoder_t *decoder, cbipItem_t *mapItem)
     }
 
 #ifdef HAVE_FIDO2_RPID_FILTER
-    if (CMD_IS_OVER_U2F_CMD) {
+    if (CMD_IS_OVER_U2F_CMD && !CMD_IS_OVER_U2F_NFC) {
         if (ctap2_check_rpid_filter(ctap2RegisterData->rpId, ctap2RegisterData->rpIdLen)) {
             PRINTF("rpId denied by filter\n");
             return ERROR_PROP_RPID_MEDIA_DENIED;
@@ -169,11 +169,17 @@ static int parse_makeCred_authnr_user(cbipDecoder_t *decoder, cbipItem_t *mapIte
         // https://www.w3.org/TR/webauthn/#dom-publickeycredentialuserentity-displayname
         if (ctap2RegisterData->userStrLen > 64) {
             // TODO show that user.display is truncated
+            // TODO: on Flex, there is enough place for 3x18 characters (54), so it currently
+            //       overflows under the "Register" button. We'll need to clean that (new page?)
             ctap2RegisterData->userStrLen = 64;
         }
-        PRINTF("userStr %.*s\n", ctap2RegisterData->userStrLen, ctap2RegisterData->userStr);
+        PRINTF("MAKE_CREDENTIAL: userStr %.*s\n",
+               ctap2RegisterData->userStrLen,
+               ctap2RegisterData->userStr);
     } else {
-        PRINTF("userID %.*H\n", ctap2RegisterData->userIdLen, ctap2RegisterData->userId);
+        PRINTF("MAKE_CREDENTIAL: userID %.*H\n",
+               ctap2RegisterData->userIdLen,
+               ctap2RegisterData->userId);
     }
     return 0;
 }
@@ -480,7 +486,13 @@ void ctap2_make_credential_handle(u2f_service_t *service, uint8_t *buffer, uint1
         goto exit;
     }
 
-    ctap2_make_credential_ux();
+    if (CMD_IS_OVER_U2F_NFC) {
+        // No up nor uv requested, skip UX and reply immediately
+        // TODO: is this what we want?
+        ctap2_make_credential_confirm();
+    } else {
+        ctap2_make_credential_ux();
+    }
 
 exit:
     if (status != 0) {
@@ -490,23 +502,84 @@ exit:
     return;
 }
 
+static int generate_pubkey(const uint8_t *nonce, int coseAlgorithm, cx_ecfp_public_key_t *pubkey) {
+    cx_ecfp_private_key_t privateKey;
+    cx_curve_t bolosCurve = cose_alg_to_cx(coseAlgorithm);
+
+    if (crypto_generate_private_key(nonce, &privateKey, bolosCurve) != 0) {
+        return -1;
+    }
+    if (cx_ecfp_generate_pair_no_throw(bolosCurve, pubkey, &privateKey, 1) != CX_OK) {
+        explicit_bzero(&privateKey, sizeof(privateKey));
+        return -1;
+    }
+    explicit_bzero(&privateKey, sizeof(privateKey));
+    return 0;
+}
+
+#ifdef HAVE_NFC
+static bool nfc_nonce_and_pubkey_ready;
+static uint8_t nfc_nonce[CREDENTIAL_NONCE_SIZE];
+static cx_ecfp_public_key_t nfc_pubkey_ES256;
+static cx_ecfp_public_key_t nfc_pubkey_ES256K;
+static cx_ecfp_public_key_t nfc_pubkey_EDDSA;
+
+void nfc_idle_work2(void) {
+    // Generate a new nonce/pubkey pair only if not already available and in idle
+    if (nfc_nonce_and_pubkey_ready) {
+        return;
+    }
+
+    cx_rng_no_throw(nfc_nonce, CREDENTIAL_NONCE_SIZE);
+
+    if (generate_pubkey(nfc_nonce, COSE_ALG_ES256, &nfc_pubkey_ES256) != 0) {
+        return;
+    }
+
+    if (generate_pubkey(nfc_nonce, COSE_ALG_ES256K, &nfc_pubkey_ES256K) != 0) {
+        return;
+    }
+
+    if (generate_pubkey(nfc_nonce, COSE_ALG_EDDSA, &nfc_pubkey_EDDSA) != 0) {
+        return;
+    }
+
+    nfc_nonce_and_pubkey_ready = true;
+}
+#endif
+
 static int encode_makeCred_public_key(const uint8_t *nonce,
                                       int coseAlgorithm,
                                       uint8_t *buffer,
                                       uint32_t bufferLength) {
     cbipEncoder_t encoder;
-    cx_ecfp_private_key_t privateKey;
     cx_ecfp_public_key_t publicKey;
-    cx_curve_t bolosCurve;
     int status;
 
-    bolosCurve = cose_alg_to_cx(coseAlgorithm);
+#ifdef HAVE_NFC
+    // Spare response time by pre-generating part of the answer
+    if (nfc_nonce_and_pubkey_ready) {
+        switch (coseAlgorithm) {
+            case COSE_ALG_ES256:
+                memcpy(&publicKey, &nfc_pubkey_ES256, sizeof(publicKey));
+                break;
+            case COSE_ALG_ES256K:
+                memcpy(&publicKey, &nfc_pubkey_ES256K, sizeof(publicKey));
+                break;
+            case COSE_ALG_EDDSA:
+                memcpy(&publicKey, &nfc_pubkey_EDDSA, sizeof(publicKey));
+                break;
+            default:
+                return -1;
+        }
 
-    if (crypto_generate_private_key(nonce, &privateKey, bolosCurve) != 0) {
-        return -1;
-    }
-    if (cx_ecfp_generate_pair_no_throw(bolosCurve, &publicKey, &privateKey, 1) != CX_OK) {
-        return -1;
+        nfc_nonce_and_pubkey_ready = false;
+    } else
+#endif
+    {
+        if (generate_pubkey(nonce, coseAlgorithm, &publicKey) != 0) {
+            return -1;
+        }
     }
 
     cbip_encoder_init(&encoder, buffer, bufferLength);
@@ -670,7 +743,15 @@ void ctap2_make_credential_confirm() {
     ctap2_send_keepalive_processing();
 
     // Generate nonce
-    cx_rng_no_throw(nonce, CREDENTIAL_NONCE_SIZE);
+#ifdef HAVE_NFC
+    // Spare response time by pre-generating part of the answer
+    if (nfc_nonce_and_pubkey_ready) {
+        memcpy(nonce, nfc_nonce, CREDENTIAL_NONCE_SIZE);
+    } else
+#endif
+    {
+        cx_rng_no_throw(nonce, CREDENTIAL_NONCE_SIZE);
+    }
 
     // Build auth data
     status =
@@ -692,7 +773,7 @@ void ctap2_make_credential_confirm() {
     // Compute standard attestation then build CBOR response
     status = sign_and_build_makeCred_response(shared_ctx.sharedBuffer,
                                               dataLen,
-                                              G_io_apdu_buffer + 1,
+                                              responseBuffer + 1,
                                               CUSTOM_IO_APDU_BUFFER_SIZE - 1);
     if (status < 0) {
         status = ERROR_OTHER;
@@ -701,7 +782,7 @@ void ctap2_make_credential_confirm() {
     dataLen = status;
     status = 0;
 
-    G_io_apdu_buffer[0] = ERROR_NONE;
+    responseBuffer[0] = ERROR_NONE;
 
 exit:
     if (status == 0) {

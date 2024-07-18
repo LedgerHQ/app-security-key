@@ -21,7 +21,7 @@ endif
 include $(BOLOS_SDK)/Makefile.defines
 
 $(info TARGET_NAME=$(TARGET_NAME))
-ifneq ($(TARGET_NAME),$(filter $(TARGET_NAME),TARGET_NANOS TARGET_NANOX TARGET_NANOS2 TARGET_STAX))
+ifneq ($(TARGET_NAME),$(filter $(TARGET_NAME),TARGET_NANOS TARGET_NANOX TARGET_NANOS2 TARGET_STAX TARGET_FLEX))
 $(error Environment variable TARGET_NAME is not valid or not supported)
 endif
 
@@ -32,14 +32,15 @@ PATH_APP_LOAD_PARAMS = "5722689'"  # int("WRA".encode("ascii").hex(), 16)
 PATH_APP_LOAD_PARAMS += "5262163'"  # int("PKS".encode("ascii").hex(), 16)
 
 APPVERSION_M=1
-APPVERSION_N=5
-APPVERSION_P=1
+APPVERSION_N=6
+APPVERSION_P=3
 APPVERSION=$(APPVERSION_M).$(APPVERSION_N).$(APPVERSION_P)
 
 ICON_NANOS=icons/icon_security_key_nanos.gif
 ICON_NANOX=icons/icon_security_key.gif
 ICON_NANOSP=icons/icon_security_key.gif
 ICON_STAX=icons/icon_security_key_stax.gif
+ICON_FLEX=icons/icon_security_key_flex.gif
 
 ################
 # Attestations #
@@ -84,6 +85,16 @@ ifneq ($(PROD_FIDO2_STAX_PRIVATE_KEY),0)
     DEFINES += PROD_FIDO2_STAX_PRIVATE_KEY=${PROD_FIDO2_STAX_PRIVATE_KEY}
 endif
 
+PROD_U2F_FLEX_PRIVATE_KEY?=0
+ifneq ($(PROD_U2F_FLEX_PRIVATE_KEY),0)
+    DEFINES += PROD_U2F_FLEX_PRIVATE_KEY=${PROD_U2F_FLEX_PRIVATE_KEY}
+endif
+
+PROD_FIDO2_FLEX_PRIVATE_KEY?=0
+ifneq ($(PROD_FIDO2_FLEX_PRIVATE_KEY),0)
+    DEFINES += PROD_FIDO2_FLEX_PRIVATE_KEY=${PROD_FIDO2_FLEX_PRIVATE_KEY}
+endif
+
 ############
 # Platform #
 ############
@@ -114,14 +125,16 @@ ENABLE_NOCRC_APP_LOAD_PARAMS = 1
 # then reinstall flow), and this reset was causing even more issues
 DEFINES += HAVE_NO_RESET_GENERATION_INCREMENT
 
-# Disable by default rk support and expose a setting to enable it
-# This means that by default user won't be able to create "Resident Keys",
-# which are also named "Discoverable Credentials".
-# This has been implemented to protect user from the nvram wipe mostly happening
-# during an app update which will erase their RK credentials we no possibility
+# Adds the Resident Key support and exposes a setting to enable/disable it.
+# Currently the settings default value is `False`, which means that by default
+# users will need to activate the setting before being able to create "Resident
+# Keys", also named "Discoverable Credentials".
+# This has been implemented to protect user from the NVRAM wipe mostly happening
+# during an app update which will erase their RK credentials with no possibility
 # to restore them.
-# Advanced user can still choose to enable this setting at their own risk.
-DEFINES += HAVE_RK_SUPPORT_SETTING
+# Advanced users can still choose to completely disable this setting.
+# /!\ disabled for 1.6 stable release
+# DEFINES += HAVE_RK_SUPPORT_SETTING
 
 DEFINES += HAVE_FIDO2_RPID_FILTER
 
@@ -134,6 +147,9 @@ endif
 DEFINES += HAVE_DEBUG_THROWS
 
 #DEFINES  += HAVE_CBOR_DEBUG
+
+
+ENABLE_NFC = 1
 
 ##############
 # Compiler #

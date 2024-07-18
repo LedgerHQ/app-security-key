@@ -19,7 +19,10 @@
 #ifndef __U2F_PROCESS_H__
 #define __U2F_PROCESS_H__
 
+#include "credential.h"
+
 typedef struct u2f_data_t {
+    uint8_t ins;
     uint8_t challenge_param[32];
     uint8_t application_param[32];
     uint8_t nonce[CREDENTIAL_NONCE_SIZE];
@@ -27,4 +30,8 @@ typedef struct u2f_data_t {
 
 int u2f_handle_apdu(uint8_t *rx, int length);
 
-#endif
+#ifdef HAVE_NFC
+void nfc_idle_work(void);
+#endif  // HAVE_NFC
+
+#endif  // __U2F_PROCESS_H__

@@ -57,7 +57,7 @@ static int parse_getAssert_authnr_rpid(cbipDecoder_t *decoder, cbipItem_t *mapIt
     }
 
 #ifdef HAVE_FIDO2_RPID_FILTER
-    if (CMD_IS_OVER_U2F_CMD) {
+    if (CMD_IS_OVER_U2F_CMD && !CMD_IS_OVER_U2F_NFC) {
         if (ctap2_check_rpid_filter(ctap2AssertData->rpId, ctap2AssertData->rpIdLen)) {
             PRINTF("rpId denied by filter\n");
             return ERROR_PROP_RPID_MEDIA_DENIED;
@@ -148,7 +148,7 @@ static int process_getAssert_authnr_allowList(cbipDecoder_t *decoder, cbipItem_t
     ctap2_assert_data_t *ctap2AssertData = globals_get_ctap2_assert_data();
     cbipItem_t tmpItem;
     int arrayLen;
-    int status;
+    int status = CBIPH_STATUS_NOT_FOUND;
     uint8_t *prevCredId = NULL;
     uint32_t prevCredIdLen = 0;
 
@@ -212,7 +212,7 @@ static int process_getAssert_authnr_allowList(cbipDecoder_t *decoder, cbipItem_t
 static int process_getAssert_authnr_extensions(cbipDecoder_t *decoder, cbipItem_t *mapItem) {
     ctap2_assert_data_t *ctap2AssertData = globals_get_ctap2_assert_data();
     cbipItem_t extensionsItem, hmacSecretItem;
-    int status;
+    int status = CBIPH_STATUS_NOT_FOUND;
 
     CHECK_MAP_KEY_ITEM_IS_VALID(decoder, mapItem, TAG_EXTENSIONS, extensionsItem, cbipMap);
     if (status == CBIPH_STATUS_FOUND) {
@@ -234,7 +234,7 @@ static int process_getAssert_authnr_extensions(cbipDecoder_t *decoder, cbipItem_
 static int process_getAssert_authnr_options(cbipDecoder_t *decoder, cbipItem_t *mapItem) {
     ctap2_assert_data_t *ctap2AssertData = globals_get_ctap2_assert_data();
     cbipItem_t optionsItem;
-    int status;
+    int status = CBIPH_STATUS_NOT_FOUND;
     bool boolValue;
 
     ctap2AssertData->userPresenceRequired = true;
@@ -311,10 +311,7 @@ static int process_getAssert_authnr_pin(cbipDecoder_t *decoder, cbipItem_t *mapI
     return 0;
 }
 
-void ctap2_get_assertion_handle(u2f_service_t *service,
-                                uint8_t *buffer,
-                                uint16_t length,
-                                bool *immediateReply) {
+void ctap2_get_assertion_handle(u2f_service_t *service, uint8_t *buffer, uint16_t length) {
     ctap2_assert_data_t *ctap2AssertData = globals_get_ctap2_assert_data();
     cbipDecoder_t decoder;
     cbipItem_t mapItem;
@@ -322,7 +319,6 @@ void ctap2_get_assertion_handle(u2f_service_t *service,
 
     PRINTF("ctap2_get_assertion_handle\n");
 
-    *immediateReply = false;
     memset(ctap2AssertData, 0, sizeof(ctap2_assert_data_t));
     ctap2AssertData->buffer = buffer;
 
@@ -380,9 +376,19 @@ void ctap2_get_assertion_handle(u2f_service_t *service,
         goto exit;
     }
 
-    if (!ctap2AssertData->userPresenceRequired && !ctap2AssertData->pinRequired) {
+    if (CMD_IS_OVER_U2F_NFC) {
+        // No up nor uv requested, skip UX and reply immediately
+        // TODO: is this what we want?
+        // TODO: Handle cases where availableCredentials is != 1
+        //  -> which credentials should be chosen?
+        //  -> when credentials comes from allowListPresent, I think the spec allow to choose for
+        //  the user
+        //  -> when credentials comes from rk, the spec ask to use authenticatorGetNextAssertion
+        //  features
+        ctap2_get_assertion_confirm(1);
+    } else if (!ctap2AssertData->userPresenceRequired && !ctap2AssertData->pinRequired) {
         // No up nor uv required, skip UX and reply immediately
-        *immediateReply = true;
+        ctap2_get_assertion_confirm(1);
     } else {
         // Look for a potential rk entry if no allow list was provided
         if (!ctap2AssertData->allowListPresent) {
@@ -881,7 +887,7 @@ void ctap2_get_assertion_confirm(uint16_t idx) {
     // Build the response
     status = sign_and_build_getAssert_authData(shared_ctx.sharedBuffer,
                                                dataLen,
-                                               G_io_apdu_buffer + 1,
+                                               responseBuffer + 1,
                                                CUSTOM_IO_APDU_BUFFER_SIZE - 1,
                                                &credData);
     if (status < 0) {
@@ -890,7 +896,7 @@ void ctap2_get_assertion_confirm(uint16_t idx) {
     dataLen = status;
     status = 0;
 
-    G_io_apdu_buffer[0] = ERROR_NONE;
+    responseBuffer[0] = ERROR_NONE;
 
 exit:
     if (status == 0) {

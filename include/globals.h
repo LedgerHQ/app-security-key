@@ -16,8 +16,7 @@
 *   limitations under the License.
 ********************************************************************************/
 
-#ifndef __GLOBALS_H__
-#define __GLOBALS_H__
+#pragma once
 
 #include "u2f_service.h"
 
@@ -25,11 +24,24 @@
 #include "u2f_process.h"
 #include "ctap2.h"
 
-extern char verifyHash[65];
-extern char verifyName[20];
-extern char rpID[65];
+typedef struct global_s {
+    char verifyHash[65];
+    char verifyName[20];
+    char rpID[65];
+    char display_status[131];
+    bool is_nfc;
+} global_t;
+
+extern global_t g;
 
 extern u2f_service_t G_io_u2f;
+
+#ifdef TARGET_NANOS
+// Spare RAM on Nanos
+#define responseBuffer G_io_apdu_buffer
+#else
+extern uint8_t responseBuffer[IO_APDU_BUFFER_SIZE];
+#endif
 
 typedef struct ctap2_data_t {
     union ctap2_data_u {
@@ -65,4 +77,5 @@ static inline ctap2_assert_data_t *globals_get_ctap2_assert_data(void) {
     return &shared_ctx.u.ctap2Data.u.ctap2AssertData;
 }
 
-#endif
+void truncate_pairs_for_display(void);
+void prepare_display_status(void);

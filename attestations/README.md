@@ -31,7 +31,7 @@ You can start from a copy of an other model and should update:
 
 ## Device private key and certificate generation
 
-Then you can run `./createKeyAndCert.sh <env> <version> <model>` to generate the device key and certificate.
+Then you can run `./createDeviceKeyAndCert.sh <env> <version> <model>` to generate the device key and certificate.
 It takes three parameters:
 - `<env>`: an env (`test`, `prod`, ...) that is used when retrieving the CA inputs and generating the outputs.
 - `<version>`: either `U2F` or `FIDO2`

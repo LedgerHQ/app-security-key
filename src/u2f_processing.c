@@ -30,6 +30,7 @@
 #include "u2f_transport.h"
 #include "u2f_impl.h"
 
+#include "u2f_process.h"
 #include "config.h"
 #include "crypto.h"
 #include "crypto_data.h"
@@ -38,66 +39,78 @@
 #include "globals.h"
 #include "fido_known_apps.h"
 #include "ctap2.h"
+#include "nfc_io.h"
+#include "sw_code.h"
 
 #define U2F_VERSION      "U2F_V2"
 #define U2F_VERSION_SIZE (sizeof(U2F_VERSION) - 1)
 
-#define OFFSET_CLA  0
-#define OFFSET_INS  1
-#define OFFSET_P1   2
-#define OFFSET_P2   3
-#define OFFSET_DATA 7
+#define FIDO2_VERSION      "FIDO_2_0"
+#define FIDO2_VERSION_SIZE (sizeof(FIDO2_VERSION) - 1)
 
-#define FIDO_CLA             0x00
-#define FIDO_INS_ENROLL      0x01
-#define FIDO_INS_SIGN        0x02
-#define FIDO_INS_GET_VERSION 0x03
-#define FIDO_INS_CTAP2_PROXY 0x10
+#define FIDO_AID_SIZE 8
+static const uint8_t FIDO_AID[FIDO_AID_SIZE] = {0xA0, 0x00, 0x00, 0x06, 0x47, 0x2F, 0x00, 0x01};
+
+#define OFFSET_CLA 0
+#define OFFSET_INS 1
+#define OFFSET_P1  2
+#define OFFSET_P2  3
+
+#define FIDO_CLA               0x00
+#define FIDO_INS_ENROLL        0x01
+#define FIDO_INS_SIGN          0x02
+#define FIDO_INS_GET_VERSION   0x03
+#define FIDO_INS_CTAP2_PROXY   0x10
+#define FIDO_INS_APPLET_SELECT 0xA4
+
+#define FIDO2_NFC_CLA                 0x80
+#define FIDO2_NFC_CHAINING_CLA        0x90
+#define FIDO2_NFC_INS_CTAP2_PROXY     0x10
+#define FIDO2_NFC_INS_APPLET_DESELECT 0x12
 
 #define P1_U2F_CHECK_IS_REGISTERED    0x07
 #define P1_U2F_REQUEST_USER_PRESENCE  0x03
 #define P1_U2F_OPTIONAL_USER_PRESENCE 0x08
-
-#define SW_NO_ERROR                 0x9000
-#define SW_WRONG_LENGTH             0x6700
-#define SW_CONDITIONS_NOT_SATISFIED 0x6985
-#define SW_WRONG_DATA               0x6A80
-#define SW_INCORRECT_P1P2           0x6A86
-#define SW_INS_NOT_SUPPORTED        0x6D00
-#define SW_CLA_NOT_SUPPORTED        0x6E00
-#define SW_PROPRIETARY_INTERNAL     0x6FFF
 
 #define U2F_ENROLL_RESERVED 0x05
 static const uint8_t DUMMY_ZERO[] = {0x00};
 #define SIGN_USER_PRESENCE_MASK 0x01
 static const uint8_t DUMMY_USER_PRESENCE[] = {SIGN_USER_PRESENCE_MASK};
 
-/********************************************************************/
-/*  Temporary definition of u2f_get_cmd_msg_data_length             */
-/*                                                                  */
-/* This is necessary until all SDK are updated to expose it.        */
-/* As some SDK already exposes it, this redefinition is a weak one. */
-/********************************************************************/
+#define U2F_ENROLL_USER_KEY_SIZE 65
 
-#define APDU_MIN_HEADER      4
-#define LC_FIRST_BYTE_OFFSET 4
-#define LONG_ENC_LC_SIZE     3
-#define LONG_ENC_LE_SIZE     2  // considering only scenarios where Lc is present
+#define APDU_MIN_HEADER       4
+#define LC_FIRST_BYTE_OFFSET  4
+#define SHORT_ENC_LC_SIZE     1
+#define SHORT_ENC_LE_SIZE     1
+#define EXT_ENC_LC_SIZE       3
+#define EXT_ENC_LE_SIZE       2  // considering only scenarios where Lc is present
+#define SHORT_ENC_DATA_OFFSET 5
+#define EXT_ENC_DATA_OFFSET   7
 
-__attribute__((weak)) int u2f_get_cmd_msg_data_length(const uint8_t *buffer, uint16_t length) {
+#define SHORT_ENC_DEFAULT_LE \
+    253  // Should be 256, stax-rc4 MCU only support 255, so use 253 + 2 for now here
+#define EXT_ENC_DEFAULT_LE 65536
+
+static int u2f_get_cmd_msg_data(uint8_t *rx, uint16_t rx_length, uint8_t **data, uint32_t *le) {
+    uint32_t data_length;
     /* Parse buffer to retrieve the data length.
-       Only Extended encoding is supported */
+       Both Short and Extended encodings are supported */
 
-    if (length < APDU_MIN_HEADER) {
+    // By default, if absent, le == 0
+    *le = 0;
+
+    if (rx_length < APDU_MIN_HEADER) {
         return -1;
     }
 
-    if (length == APDU_MIN_HEADER) {
-        // Either short or extended encoding with Lc and Le omitted
+    if (rx_length == APDU_MIN_HEADER) {
+        // Short encoding with Lc and Le omitted
+        *le = SHORT_ENC_DEFAULT_LE;
         return 0;
     }
 
-    if (length == APDU_MIN_HEADER + 1) {
+    if (rx_length == APDU_MIN_HEADER + 1) {
         // Short encoding, with next byte either Le or Lc with the other one omitted
         // There is no way to tell so no way to check the value
         // but anyway the data length is 0
@@ -105,48 +118,113 @@ __attribute__((weak)) int u2f_get_cmd_msg_data_length(const uint8_t *buffer, uin
         // Support this particular short encoding APDU as Fido Conformance Tool v1.7.0
         // is using it even though spec requires that short encoding should not be used
         // over HID.
+        if (rx[APDU_MIN_HEADER] != 0) {
+            *le = rx[APDU_MIN_HEADER];
+        }
+
+        if (*le == 0) {
+            *le = SHORT_ENC_DEFAULT_LE;
+        }
         return 0;
     }
 
-    if (length < APDU_MIN_HEADER + 3) {
-        // Short encoding or bad length
-        // We don't support short encoding
-        return -1;
-    }
-
-    if (length == APDU_MIN_HEADER + 3) {
-        if (buffer[4] != 0) {
-            // Short encoding or bad length
-            // We don't support short encoding
+    if (rx_length == APDU_MIN_HEADER + 2) {
+        // Short encoding
+        data_length = rx[LC_FIRST_BYTE_OFFSET];
+        if (data_length == 0) {
+            // next byte is LE
+            *le = rx[LC_FIRST_BYTE_OFFSET + 1];
+        } else if (data_length == 1) {
+            *data = rx + SHORT_ENC_DATA_OFFSET;
+        } else {
             return -1;
         }
-        // Can't be short encoding as Lc = 0x00 would lead to invalid length
-        // so extended encoding and either:
-        // - Lc = 0x00 0x00 0x00 and Le is omitted
-        // - Lc omitted and Le = 0x00 0xyy 0xzz
-        // so no way to check the value
-        // but anyway the data length is 0
-        return 0;
+
+        if (*le == 0) {
+            *le = SHORT_ENC_DEFAULT_LE;
+        }
+        return data_length;
     }
 
-    if (buffer[LC_FIRST_BYTE_OFFSET] != 0) {
-        // Short encoding or bad length
-        // We don't support short encoding
-        return -1;
+    if (rx_length == APDU_MIN_HEADER + 3) {
+        if (rx[4] != 0) {
+            // Short encoding, Lc (1B) and data present, with two next bytes either:
+            // - Lc = 0x01, data = 0xyy and Le = 0xzz
+            // - Lc = 0x02, data = 0xyyzz and Le is omitted
+            data_length = rx[LC_FIRST_BYTE_OFFSET];
+            *data = rx + SHORT_ENC_DATA_OFFSET;
+
+            // Ensure that Lc value is consistent and retrieve Le
+            if (SHORT_ENC_DATA_OFFSET + data_length == rx_length) {
+                /* Lc = 0x02, data = 0xyyzz and Le is omitted*/
+            } else if (SHORT_ENC_DATA_OFFSET + data_length + SHORT_ENC_LE_SIZE == rx_length) {
+                /* Lc = 0x01, data = 0xyy and Le = 0xzz */
+                *le = rx[SHORT_ENC_DATA_OFFSET + data_length];
+            } else {
+                return -1;
+            }
+
+            if (*le == 0) {
+                *le = SHORT_ENC_DEFAULT_LE;
+            }
+            return data_length;
+        } else {
+            // Can't be short encoding as Lc = 0x00 would lead to invalid length
+            // so extended encoding and either:
+            // - Lc = 0x00 0x00 0x00 and Le is omitted
+            // - Lc omitted and Le = 0x00 0xyy 0xzz
+            // so no way to check the value
+            // but anyway the data length is 0
+            *le = (rx[APDU_MIN_HEADER + 1] << 8) + rx[APDU_MIN_HEADER + 2];
+
+            if (*le == 0) {
+                *le = EXT_ENC_DEFAULT_LE;
+            }
+
+            return 0;
+        }
     }
 
-    // Can't be short encoding as Lc = 0 would lead to invalid length
-    // so extended encoding with Lc field present, optionally Le (2B) is present too
-    uint32_t dataLength =
-        (buffer[LC_FIRST_BYTE_OFFSET + 1] << 8) | (buffer[LC_FIRST_BYTE_OFFSET + 2]);
+    if (rx[LC_FIRST_BYTE_OFFSET] != 0) {
+        // Short encoding, Lc and data present, optionally Le (1B) is present too
+        data_length = rx[LC_FIRST_BYTE_OFFSET];
+        *data = rx + SHORT_ENC_DATA_OFFSET;
 
-    // Ensure that Lc value is consistent
-    if ((APDU_MIN_HEADER + LONG_ENC_LC_SIZE + dataLength != length) &&
-        (APDU_MIN_HEADER + LONG_ENC_LC_SIZE + dataLength + LONG_ENC_LE_SIZE != length)) {
-        return -1;
+        // Ensure that Lc value is consistent and retrieve Le
+        if (SHORT_ENC_DATA_OFFSET + data_length == rx_length) {
+            /* Le is omitted*/
+        } else if (SHORT_ENC_DATA_OFFSET + data_length + SHORT_ENC_LE_SIZE == rx_length) {
+            /* Le is present*/
+            *le = rx[SHORT_ENC_DATA_OFFSET + data_length];
+        } else {
+            return -1;
+        }
+
+        if (*le == 0) {
+            *le = SHORT_ENC_DEFAULT_LE;
+        }
+        return data_length;
+    } else {
+        // Can't be short encoding as Lc = 0 would lead to invalid length
+        // so extended encoding with Lc field present, optionally Le (2B) is present too
+        data_length = (rx[LC_FIRST_BYTE_OFFSET + 1] << 8) | (rx[LC_FIRST_BYTE_OFFSET + 2]);
+        *data = rx + EXT_ENC_DATA_OFFSET;
+
+        // Ensure that Lc value is consistent and retrieve Le
+        if (APDU_MIN_HEADER + EXT_ENC_LC_SIZE + data_length == rx_length) {
+            /* Le is omitted*/
+        } else if (APDU_MIN_HEADER + EXT_ENC_LC_SIZE + data_length + EXT_ENC_LE_SIZE == rx_length) {
+            /* Le is present*/
+            *le = (rx[EXT_ENC_DATA_OFFSET + data_length] << 8) +
+                  rx[EXT_ENC_DATA_OFFSET + data_length + 1];
+        } else {
+            return -1;
+        }
+        if (*le == 0) {
+            *le = EXT_ENC_DEFAULT_LE;
+        }
+        return data_length;
     }
-
-    return dataLength;
 }
 
 /******************************************/
@@ -178,7 +256,7 @@ typedef struct u2f_reg_req_t {
 // __attribute__((__packed__)) not necessary as we use only uint8_t
 typedef struct u2f_reg_resp_base_t {
     uint8_t reserved_byte;
-    uint8_t user_key[65];
+    uint8_t user_key[U2F_ENROLL_USER_KEY_SIZE];
     uint8_t key_handle_length;
     uint8_t key_handle[CREDENTIAL_MINIMAL_SIZE];  // We generate fix size key handles
     // attestation certificate: not in this base struct due to not const length
@@ -248,35 +326,70 @@ static void u2f_compute_enroll_response_hash(u2f_reg_resp_base_t *reg_resp_base,
                 CX_SHA256_SIZE);
 }
 
-static int u2f_prepare_enroll_response(void) {
+static int u2f_generate_pubkey(const uint8_t *nonce,
+                               uint8_t user_key[static U2F_ENROLL_USER_KEY_SIZE]) {
+    cx_ecfp_private_key_t private_key;
+
+    if (crypto_generate_private_key(nonce, &private_key, CX_CURVE_SECP256R1) != 0) {
+        return -1;
+    }
+    if (crypto_generate_public_key(&private_key, user_key, CX_CURVE_SECP256R1) <= 0) {
+        explicit_bzero(&private_key, sizeof(private_key));
+        return -1;
+    }
+    explicit_bzero(&private_key, sizeof(private_key));
+    return 0;
+}
+
+#ifdef HAVE_NFC
+static bool nfc_nonce_and_pubkey_ready;
+static uint8_t nfc_nonce[CREDENTIAL_NONCE_SIZE];
+static uint8_t nfc_pubkey[U2F_ENROLL_USER_KEY_SIZE];
+
+void nfc_idle_work(void) {
+    // Generate a new nonce/pubkey pair only if not already available and in idle
+    if (nfc_nonce_and_pubkey_ready || nfc_io_is_response_pending()) {
+        return;
+    }
+
+    cx_rng_no_throw(nfc_nonce, CREDENTIAL_NONCE_SIZE);
+    if (u2f_generate_pubkey(nfc_nonce, nfc_pubkey) != 0) {
+        return;
+    }
+
+    nfc_nonce_and_pubkey_ready = true;
+}
+#endif
+
+static uint16_t u2f_prepare_enroll_response(uint8_t *buffer, uint16_t *length) {
     int offset = 0;
     int result;
     int key_handle_length;
 
-    u2f_reg_resp_base_t *reg_resp_base = (u2f_reg_resp_base_t *) G_io_apdu_buffer;
+    *length = 0;
+
+    u2f_reg_resp_base_t *reg_resp_base = (u2f_reg_resp_base_t *) buffer;
     offset += sizeof(u2f_reg_resp_base_t);
 
     // Fill reserved byte
     reg_resp_base->reserved_byte = U2F_ENROLL_RESERVED;
 
-    // Generate nonce
-    cx_rng_no_throw(globals_get_u2f_data()->nonce, CREDENTIAL_NONCE_SIZE);
-
-    // Generate private and public key and fill public key
+#ifdef HAVE_NFC
+    // Spare response time by pre-generating part of the answer
+    if (nfc_nonce_and_pubkey_ready) {
+        memcpy(globals_get_u2f_data()->nonce, nfc_nonce, CREDENTIAL_NONCE_SIZE);
+        memcpy(reg_resp_base->user_key, nfc_pubkey, U2F_ENROLL_USER_KEY_SIZE);
+        nfc_nonce_and_pubkey_ready = false;
+    } else
+#endif
     {
-        cx_ecfp_private_key_t private_key;
+        // Generate nonce
+        cx_rng_no_throw(globals_get_u2f_data()->nonce, CREDENTIAL_NONCE_SIZE);
 
-        if (crypto_generate_private_key(globals_get_u2f_data()->nonce,
-                                        &private_key,
-                                        CX_CURVE_SECP256R1) != 0) {
-            return io_send_sw(SW_PROPRIETARY_INTERNAL);
+        // Generate and fill public key
+        if (u2f_generate_pubkey(globals_get_u2f_data()->nonce, reg_resp_base->user_key) != 0) {
+            return SW_PROPRIETARY_INTERNAL;
         }
-        if (crypto_generate_public_key(&private_key, reg_resp_base->user_key, CX_CURVE_SECP256R1) <=
-            0) {
-            explicit_bzero(&private_key, sizeof(private_key));
-            return io_send_sw(SW_PROPRIETARY_INTERNAL);
-        }
-        explicit_bzero(&private_key, sizeof(private_key));
     }
 
     // Generate key handle
@@ -291,14 +404,14 @@ static int u2f_prepare_enroll_response(void) {
 
     // We only support generating key_handle with fixed length
     if (key_handle_length != sizeof(reg_resp_base->key_handle)) {
-        return io_send_sw(SW_PROPRIETARY_INTERNAL);
+        return SW_PROPRIETARY_INTERNAL;
     }
 
     // Fill key handle length
     reg_resp_base->key_handle_length = key_handle_length;
 
     // Fill attestation certificate
-    memmove(G_io_apdu_buffer + offset, ATTESTATION_CERT, sizeof(ATTESTATION_CERT));
+    memmove(buffer + offset, ATTESTATION_CERT, sizeof(ATTESTATION_CERT));
     offset += sizeof(ATTESTATION_CERT);
 
     // Prepare signature
@@ -306,14 +419,14 @@ static int u2f_prepare_enroll_response(void) {
     u2f_compute_enroll_response_hash(reg_resp_base, key_handle_length, data_hash);
 
     // Fill signature
-    uint8_t *signature = (G_io_apdu_buffer + offset);
+    uint8_t *signature = (buffer + offset);
     result = crypto_sign_attestation(data_hash, signature, false);
 
     if (result > 0) {
-        offset += result;
-        return io_send_response_pointer(G_io_apdu_buffer, offset, SW_NO_ERROR);
+        *length = offset + result;
+        return SW_NO_ERROR;
     } else {
-        return io_send_sw(SW_PROPRIETARY_INTERNAL);
+        return SW_PROPRIETARY_INTERNAL;
     }
 }
 
@@ -338,11 +451,13 @@ static void u2f_compute_sign_response_hash(u2f_auth_resp_base_t *auth_resp_base,
                 CX_SHA256_SIZE);
 }
 
-static int u2f_prepare_sign_response(void) {
+static uint16_t u2f_prepare_sign_response(uint8_t *buffer, uint16_t *length) {
     int offset = 0;
     int result;
 
-    u2f_auth_resp_base_t *auth_resp_base = (u2f_auth_resp_base_t *) G_io_apdu_buffer;
+    *length = 0;
+
+    u2f_auth_resp_base_t *auth_resp_base = (u2f_auth_resp_base_t *) buffer;
     offset += sizeof(u2f_auth_resp_base_t);
 
     // Fill user presence byte
@@ -357,12 +472,12 @@ static int u2f_prepare_sign_response(void) {
 
     // Generate private key and fill signature
     cx_ecfp_private_key_t private_key;
-    uint8_t *signature = (G_io_apdu_buffer + offset);
+    uint8_t *signature = (buffer + offset);
 
     if (crypto_generate_private_key(globals_get_u2f_data()->nonce,
                                     &private_key,
                                     CX_CURVE_SECP256R1) != 0) {
-        return io_send_sw(SW_PROPRIETARY_INTERNAL);
+        return SW_PROPRIETARY_INTERNAL;
     }
 
     result = crypto_sign_application(data_hash, &private_key, signature);
@@ -371,24 +486,30 @@ static int u2f_prepare_sign_response(void) {
 
     if (result > 0) {
         offset += result;
-        return io_send_response_pointer(G_io_apdu_buffer, offset, SW_NO_ERROR);
+        *length = offset;
+        return SW_NO_ERROR;
     } else {
-        return io_send_sw(SW_PROPRIETARY_INTERNAL);
+        return SW_PROPRIETARY_INTERNAL;
     }
 }
 
 static int u2f_process_user_presence_confirmed(void) {
-    switch (G_io_apdu_buffer[OFFSET_INS]) {
+    uint16_t sw = SW_PROPRIETARY_INTERNAL;
+    uint16_t length = 0;
+
+    switch (globals_get_u2f_data()->ins) {
         case FIDO_INS_ENROLL:
-            return u2f_prepare_enroll_response();
+            sw = u2f_prepare_enroll_response(responseBuffer, &length);
+            break;
 
         case FIDO_INS_SIGN:
-            return u2f_prepare_sign_response();
+            sw = u2f_prepare_sign_response(responseBuffer, &length);
+            break;
 
         default:
             break;
     }
-    return io_send_sw(SW_PROPRIETARY_INTERNAL);
+    return io_send_response_pointer(responseBuffer, length, sw);
 }
 
 /******************************************/
@@ -416,13 +537,13 @@ UX_STEP_CB(ux_register_flow_0_step,
            {
                &C_icon_validate_14,
                "Register",
-               verifyName,
+               g.verifyName,
            });
 UX_STEP_NOCB(ux_register_flow_1_step,
              bnnn_paging,
              {
                  .title = "Identifier",
-                 .text = verifyHash,
+                 .text = g.verifyHash,
              });
 UX_STEP_CB(ux_register_flow_2_step,
            pbb,
@@ -446,13 +567,13 @@ UX_STEP_CB(ux_login_flow_0_step,
            {
                &C_icon_validate_14,
                "Login",
-               verifyName,
+               g.verifyName,
            });
 UX_STEP_NOCB(ux_login_flow_1_step,
              bnnn_paging,
              {
                  .title = "Identifier",
-                 .text = verifyHash,
+                 .text = g.verifyHash,
              });
 UX_STEP_CB(ux_login_flow_2_step,
            pbb,
@@ -476,11 +597,11 @@ UX_FLOW(ux_login_flow,
 #define NB_OF_PAIRS 2
 static const nbgl_layoutTagValue_t pairs[NB_OF_PAIRS] = {{
                                                              .item = "Website",
-                                                             .value = verifyName,
+                                                             .value = g.verifyName,
                                                          },
                                                          {
                                                              .item = "Website ID",
-                                                             .value = verifyHash,
+                                                             .value = g.verifyHash,
                                                          }};
 
 static void on_register_choice(bool confirm) {
@@ -508,12 +629,12 @@ static void on_login_choice(bool confirm) {
 static void u2f_prompt_user_presence(bool enroll, uint8_t *applicationParameter) {
     UX_WAKE_UP();
 
-    format_hex(applicationParameter, 32, verifyHash, sizeof(verifyHash));
-    strcpy(verifyName, "Unknown");
+    format_hex(applicationParameter, 32, g.verifyHash, sizeof(g.verifyHash));
+    strcpy(g.verifyName, "Unknown");
 
     const char *name = fido_match_known_appid(applicationParameter);
     if (name != NULL) {
-        strlcpy(verifyName, name, sizeof(verifyName));
+        strlcpy(g.verifyName, name, sizeof(g.verifyName));
     }
 
 #if defined(HAVE_BAGL)
@@ -535,9 +656,9 @@ static void u2f_prompt_user_presence(bool enroll, uint8_t *applicationParameter)
 /*           U2F APDU handlers            */
 /******************************************/
 
-static int u2f_handle_apdu_enroll(uint8_t *rx, uint32_t data_length) {
+static int u2f_handle_apdu_enroll(const uint8_t *rx, uint32_t data_length, const uint8_t *data) {
     // Parse request and check length validity
-    u2f_reg_req_t *reg_req = (u2f_reg_req_t *) (rx + OFFSET_DATA);
+    u2f_reg_req_t *reg_req = (u2f_reg_req_t *) data;
     if (data_length != sizeof(u2f_reg_req_t)) {
         return io_send_sw(SW_WRONG_LENGTH);
     }
@@ -558,7 +679,8 @@ static int u2f_handle_apdu_enroll(uint8_t *rx, uint32_t data_length) {
         return io_send_sw(SW_INCORRECT_P1P2);
     }
 
-    // Backup challenge and application parameters to be used if user accept the request
+    // Backup ins, challenge and application parameters to be used if user accept the request
+    globals_get_u2f_data()->ins = FIDO_INS_ENROLL;
     memmove(globals_get_u2f_data()->challenge_param,
             reg_req->challenge_param,
             sizeof(reg_req->challenge_param));
@@ -566,23 +688,30 @@ static int u2f_handle_apdu_enroll(uint8_t *rx, uint32_t data_length) {
             reg_req->application_param,
             sizeof(reg_req->application_param));
 
-    if (G_io_u2f.media == U2F_MEDIA_USB) {
+    if (CMD_IS_OVER_U2F_NFC) {
+        uint16_t length = 0;
+        uint16_t sw = u2f_prepare_enroll_response(responseBuffer, &length);
+
+        nfc_io_set_response_ready(sw, length, "Registration details\nsent");
+
+        return nfc_io_send_prepared_response();
+    } else if (CMD_IS_OVER_U2F_USB) {
         u2f_message_set_autoreply_wait_user_presence(&G_io_u2f, true);
     }
     u2f_prompt_user_presence(true, globals_get_u2f_data()->application_param);
     return 0;
 }
 
-static int u2f_handle_apdu_sign(uint8_t *rx, uint32_t data_length) {
+static int u2f_handle_apdu_sign(const uint8_t *rx, uint32_t data_length, uint8_t *data) {
     uint8_t *nonce;
     // Parse request base and check length validity
-    u2f_auth_req_base_t *auth_req_base = (u2f_auth_req_base_t *) (rx + OFFSET_DATA);
+    u2f_auth_req_base_t *auth_req_base = (u2f_auth_req_base_t *) data;
     if (data_length < sizeof(u2f_auth_req_base_t)) {
         return io_send_sw(SW_WRONG_LENGTH);
     }
 
     // Parse request key handle and check length validity
-    uint8_t *key_handle = rx + OFFSET_DATA + sizeof(u2f_auth_req_base_t);
+    uint8_t *key_handle = data + sizeof(u2f_auth_req_base_t);
     if (data_length != sizeof(u2f_auth_req_base_t) + auth_req_base->key_handle_length) {
         return io_send_sw(SW_WRONG_LENGTH);
     }
@@ -621,7 +750,8 @@ static int u2f_handle_apdu_sign(uint8_t *rx, uint32_t data_length) {
         return io_send_sw(SW_CONDITIONS_NOT_SATISFIED);
     }
 
-    // Backup nonce, challenge and application parameters to be used if user accept the request
+    // Backup ins, nonce, challenge and application parameters to be used if user accept the request
+    globals_get_u2f_data()->ins = FIDO_INS_SIGN;
     memmove(globals_get_u2f_data()->nonce, nonce, CREDENTIAL_NONCE_SIZE);
     memmove(globals_get_u2f_data()->challenge_param,
             auth_req_base->challenge_param,
@@ -630,16 +760,36 @@ static int u2f_handle_apdu_sign(uint8_t *rx, uint32_t data_length) {
             auth_req_base->application_param,
             sizeof(auth_req_base->application_param));
 
-    if (G_io_u2f.media == U2F_MEDIA_USB) {
+    // clang-format off
+    // following macros + `else if` was messing with clang until the `return`
+#ifdef HAVE_NFC
+    if (CMD_IS_OVER_U2F_NFC) {
+        // Android doesn't support answering SW_MORE_DATA here...
+        // so compute the real answer as fast as possible
+        uint16_t length = 0;
+        uint16_t sw = u2f_prepare_sign_response(responseBuffer, &length);
+
+        // Message fit in a single response, answer directly without nfc_io features
+        io_send_response_pointer(responseBuffer, length, sw);
+
+        app_nbgl_status("Login request signed", true, ui_idle, TUNE_SUCCESS);
+        return 0;
+    } else
+#endif  // HAVE_NFC
+    if (CMD_IS_OVER_U2F_USB) {
         u2f_message_set_autoreply_wait_user_presence(&G_io_u2f, true);
     }
+
     u2f_prompt_user_presence(false, globals_get_u2f_data()->application_param);
     return 0;
+
+    // clang-format on
 }
 
-static int u2f_handle_apdu_get_version(uint8_t *rx, uint32_t data_length) {
-    int offset = 0;
-
+static int u2f_handle_apdu_get_version(const uint8_t *rx,
+                                       uint32_t data_length,
+                                       const uint8_t *data) {
+    UNUSED(data);
     if (data_length != 0) {
         return io_send_sw(SW_WRONG_LENGTH);
     }
@@ -648,66 +798,120 @@ static int u2f_handle_apdu_get_version(uint8_t *rx, uint32_t data_length) {
         return io_send_sw(SW_INCORRECT_P1P2);
     }
 
-    // Fill version
-    memmove(G_io_apdu_buffer, U2F_VERSION, U2F_VERSION_SIZE);
-    offset += U2F_VERSION_SIZE;
-
-    return io_send_response_pointer(G_io_apdu_buffer, offset, SW_NO_ERROR);
+    return io_send_response_pointer((const uint8_t *) U2F_VERSION, U2F_VERSION_SIZE, SW_NO_ERROR);
 }
 
-static int u2f_handle_apdu_ctap2_proxy(uint8_t *rx, int data_length) {
+static int u2f_handle_apdu_ctap2_proxy(uint8_t *rx, int data_length, uint8_t *data) {
     if ((rx[OFFSET_P1] != 0) || (rx[OFFSET_P2] != 0)) {
         return io_send_sw(SW_INCORRECT_P1P2);
     }
 
-    ctap2_handle_cmd_cbor(&G_io_u2f, rx + OFFSET_DATA, data_length);
+    ctap2_handle_cmd_cbor(&G_io_u2f, data, data_length);
     return 0;
 }
 
-int u2f_handle_apdu(uint8_t *rx, int data_length) {
-    PRINTF("Media handleApdu %d\n", G_io_app.apdu_state);
+static int u2f_handle_apdu_applet_select(uint8_t *rx, int data_length, const uint8_t *data) {
+    if ((rx[OFFSET_P1] != 0x04) || (rx[OFFSET_P2] != 0)) {
+        return io_send_sw(SW_INCORRECT_P1P2);
+    }
+
+    if ((data_length != FIDO_AID_SIZE) || (memcmp(data, FIDO_AID, FIDO_AID_SIZE) != 0)) {
+        return io_send_sw(SW_WRONG_DATA);
+    }
+
+    return io_send_response_pointer((const uint8_t *) U2F_VERSION, U2F_VERSION_SIZE, SW_NO_ERROR);
+}
+
+int u2f_handle_apdu(uint8_t *rx, int rx_length) {
+    // PRINTF("=> RAW=%.*H\n", rx_length, rx);
+
+    uint8_t *data = NULL;
+    uint32_t le = 0;
+    // PRINTF("Media handleApdu %d\n", G_io_app.apdu_state);
 
     // Make sure cmd is detected as over U2F_CMD and not as CMD_IS_OVER_CTAP2_CBOR_CMD
     if (!CMD_IS_OVER_U2F_CMD) {
         return io_send_sw(SW_CONDITIONS_NOT_SATISFIED);
     }
 
-    data_length = u2f_get_cmd_msg_data_length(rx, data_length);
+    int data_length = u2f_get_cmd_msg_data(rx, rx_length, &data, &le);
     if (data_length < 0) {
         return io_send_sw(SW_WRONG_LENGTH);
     }
 
-    if (G_io_apdu_buffer[OFFSET_CLA] != FIDO_CLA) {
-        return io_send_sw(SW_CLA_NOT_SUPPORTED);
+    if (CMD_IS_OVER_U2F_NFC) {
+        nfc_io_set_le(le);
     }
 
-    PRINTF("INS %d, P1 %d P2 %d L %d\n",
-           G_io_apdu_buffer[OFFSET_INS],
-           G_io_apdu_buffer[OFFSET_P1],
-           G_io_apdu_buffer[OFFSET_P2],
-           data_length);
+    PRINTF("INS %d, P1 %d P2 %d L %d\n", rx[OFFSET_INS], rx[OFFSET_P1], rx[OFFSET_P2], data_length);
 
-    switch (G_io_apdu_buffer[OFFSET_INS]) {
-        case FIDO_INS_ENROLL:
-            PRINTF("enroll\n");
-            return u2f_handle_apdu_enroll(rx, data_length);
-            break;
-        case FIDO_INS_SIGN:
-            PRINTF("sign\n");
-            return u2f_handle_apdu_sign(rx, data_length);
-            break;
-        case FIDO_INS_GET_VERSION:
-            PRINTF("version\n");
-            return u2f_handle_apdu_get_version(rx, data_length);
-            break;
+    if (rx[OFFSET_CLA] == FIDO_CLA) {
+        switch (rx[OFFSET_INS]) {
+            case FIDO_INS_ENROLL:
+                PRINTF("enroll\n");
+                return u2f_handle_apdu_enroll(rx, data_length, data);
 
-        case FIDO_INS_CTAP2_PROXY:
-            PRINTF("ctap2_proxy\n");
-            return u2f_handle_apdu_ctap2_proxy(rx, data_length);
-            break;
+            case FIDO_INS_SIGN:
+                PRINTF("sign\n");
+                return u2f_handle_apdu_sign(rx, data_length, data);
 
-        default:
-            PRINTF("unsupported\n");
-            return io_send_sw(SW_INS_NOT_SUPPORTED);
+            case FIDO_INS_GET_VERSION:
+                PRINTF("version\n");
+                return u2f_handle_apdu_get_version(rx, data_length, data);
+
+            case FIDO_INS_CTAP2_PROXY:
+                PRINTF("ctap2_proxy\n");
+                return u2f_handle_apdu_ctap2_proxy(rx, data_length, data);
+
+            case FIDO_INS_APPLET_SELECT:
+                PRINTF("applet_select\n");
+                // return io_send_sw(SW_INS_NOT_SUPPORTED);
+                return u2f_handle_apdu_applet_select(rx, data_length, data);
+
+            case 0xc0:
+                if (!CMD_IS_OVER_U2F_NFC) {
+                    return io_send_sw(SW_INS_NOT_SUPPORTED);
+                }
+                return nfc_io_send_prepared_response();
+
+            default:
+                PRINTF("unsupported\n");
+                return io_send_sw(SW_INS_NOT_SUPPORTED);
+        }
+    } else if (CMD_IS_OVER_U2F_NFC && (rx[OFFSET_CLA] == FIDO2_NFC_CLA)) {
+        switch (rx[OFFSET_INS]) {
+            case FIDO2_NFC_INS_CTAP2_PROXY:
+                PRINTF("ctap2_proxy\n");
+                return u2f_handle_apdu_ctap2_proxy(rx, data_length, data);
+
+            case 0x11:
+                PRINTF("NFCCTAP_GETRESPONSE\n");
+                return nfc_io_send_prepared_response();
+
+            case FIDO2_NFC_INS_APPLET_DESELECT:
+                PRINTF("unsupported\n");
+                return io_send_sw(SW_INS_NOT_SUPPORTED);
+
+            case 0xc0:
+                return nfc_io_send_prepared_response();
+
+            default:
+                PRINTF("unsupported\n");
+                return io_send_sw(SW_INS_NOT_SUPPORTED);
+        }
+    } else if (CMD_IS_OVER_U2F_NFC && (rx[OFFSET_CLA] == FIDO2_NFC_CHAINING_CLA)) {
+        // TODO but as of now it's not used neither on:
+        // - iOS: using extended encoding
+        // - Android: using U2F only
+        switch (rx[OFFSET_INS]) {
+            case 0x60:
+                return io_send_sw(0x9000);
+
+            default:
+                PRINTF("unsupported\n");
+                return io_send_sw(SW_INS_NOT_SUPPORTED);
+        }
+    } else {
+        return io_send_sw(SW_CLA_NOT_SUPPORTED);
     }
 }

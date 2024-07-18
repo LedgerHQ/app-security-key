@@ -69,7 +69,6 @@ def enable_rk_option(client):
         instructions = [
             # Enter in the settings
             NavInsID.USE_CASE_HOME_SETTINGS,
-            NavInsID.USE_CASE_SETTINGS_NEXT,
 
             # Enable and skip "Enabling" message
             NavIns(NavInsID.CHOICE_CHOOSE, (1,)),

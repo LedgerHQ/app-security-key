@@ -45,7 +45,12 @@ def test_register_certificate(client):
     assert cert.extensions[0].critical is False
 
     # Check that value correspond to exposed transports
-    assert cert.extensions[0].value.value == bytes.fromhex("03020520")
+    if client.model.startswith("nano"):
+        # USB
+        assert cert.extensions[0].value.value == bytes.fromhex("03020520")
+    else:
+        # USB + NFC
+        assert cert.extensions[0].value.value == bytes.fromhex("03020430")
 
 
 def test_register_user_refused(client, test_name):
