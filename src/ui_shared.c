@@ -28,7 +28,7 @@ static void app_quit(void) {
 #include "ui_shared.h"
 
 #if defined(HAVE_BAGL)
-#ifdef HAVE_RK_SUPPORT_SETTING
+#ifdef ENABLE_RK_CONFIG_UI_SETTING
 
 static void display_warning();
 static void display_settings();
@@ -108,7 +108,7 @@ static void display_settings() {
         ux_flow_init(0, ux_settings_disabled_flow, NULL);
     }
 }
-#endif  // HAVE_RK_SUPPORT_SETTING
+#endif  // ENABLE_RK_CONFIG_UI_SETTING
 
 UX_STEP_NOCB(ux_idle_flow_1_step, pn, {&C_icon_security_key, "Security Key"});
 
@@ -132,7 +132,7 @@ UX_STEP_NOCB(ux_idle_flow_3_step,
                  APPVERSION,
              });
 
-#ifdef HAVE_RK_SUPPORT_SETTING
+#ifdef ENABLE_RK_CONFIG_UI_SETTING
 UX_STEP_VALID(ux_idle_flow_4_step,
               pb,
               display_settings(),
@@ -140,7 +140,7 @@ UX_STEP_VALID(ux_idle_flow_4_step,
                   &C_icon_coggle,
                   "Settings",
               });
-#endif  // HAVE_RK_SUPPORT_SETTING
+#endif  // ENABLE_RK_CONFIG_UI_SETTING
 
 UX_STEP_CB(ux_idle_flow_5_step,
            pb,
@@ -153,9 +153,9 @@ UX_FLOW(ux_idle_flow,
         &ux_idle_flow_1_step,
         &ux_idle_flow_2_step,
         &ux_idle_flow_3_step,
-#ifdef HAVE_RK_SUPPORT_SETTING
+#ifdef ENABLE_RK_CONFIG_UI_SETTING
         &ux_idle_flow_4_step,
-#endif  // HAVE_RK_SUPPORT_SETTING
+#endif  // ENABLE_RK_CONFIG_UI_SETTING
         &ux_idle_flow_5_step);
 
 void ui_idle(void) {
@@ -176,10 +176,10 @@ void ui_idle(void) {
  * 'Info' / 'Settings' menu
  */
 
-#ifdef HAVE_RK_SUPPORT_SETTING
+#ifdef ENABLE_RK_CONFIG_UI_SETTING
 static uint8_t initSettingPage;
 static nbgl_layoutSwitch_t switches[1] = {0};
-#endif  // HAVE_RK_SUPPORT_SETTING
+#endif  // ENABLE_RK_CONFIG_UI_SETTING
 static const char *const INFO_TYPES[] = {"Version", "Developer", "Copyright"};
 static const char *const INFO_CONTENTS[] = {APPVERSION, "Ledger", "(c) 2022-2024 Ledger"};
 
@@ -189,7 +189,7 @@ static const nbgl_contentInfoList_t infoList = {
     .infoContents = INFO_CONTENTS,
 };
 
-#ifdef HAVE_RK_SUPPORT_SETTING
+#ifdef ENABLE_RK_CONFIG_UI_SETTING
 
 static void controls_callback(int token, uint8_t index, int page);
 
@@ -244,7 +244,7 @@ static void controls_callback(int token, uint8_t index, int page) {
     }
     switches[0].initState = config_get_rk_enabled();
 }
-#endif  // HAVE_RK_SUPPORT_SETTING
+#endif  // ENABLE_RK_CONFIG_UI_SETTING
 
 /*
  * When no NFC, warning status page
@@ -294,7 +294,7 @@ void ui_idle(void) {
     }
 #endif  // ENABLE_NFC
 
-#ifdef HAVE_RK_SUPPORT_SETTING
+#ifdef ENABLE_RK_CONFIG_UI_SETTING
     switches[0].text = "Resident keys";
     switches[0].subText =
         "Stores login info on this\n"
@@ -308,17 +308,17 @@ void ui_idle(void) {
     switches[0].token = FIRST_USER_TOKEN;
     switches[0].tuneId = TUNE_TAP_CASUAL;
     switches[0].initState = config_get_rk_enabled();
-#endif  //  HAVE_RK_SUPPORT_SETTING
+#endif  //  ENABLE_RK_CONFIG_UI_SETTING
     nbgl_useCaseHomeAndSettings(
         APPNAME,
         &C_icon_security_key_64px,
         "Use this app for two-factor\nauthentication and\npassword-less log ins.",
         INIT_HOME_PAGE,
-#ifdef HAVE_RK_SUPPORT_SETTING
+#ifdef ENABLE_RK_CONFIG_UI_SETTING
         &settingContents,
 #else
         NULL,
-#endif  // HAVE_RK_SUPPORT_SETTING
+#endif  // ENABLE_RK_CONFIG_UI_SETTING
         &infoList,
         home_button,
         app_quit);

@@ -34,7 +34,7 @@ typedef struct config_t {
     uint8_t pin[16];
     uint8_t pinSet;
     uint8_t pinRetries;
-#ifdef HAVE_RK_SUPPORT_SETTING
+#ifdef ENABLE_RK_CONFIG
     uint8_t rk_enabled;
 #endif
 } config_t;
@@ -52,7 +52,7 @@ void config_set_ctap2_pin(uint8_t *pin);
 void config_decrease_ctap2_pin_retry_counter(void);
 void config_reset_ctap2_pin_retry_counter(void);
 
-#ifdef HAVE_RK_SUPPORT_SETTING
+#ifdef ENABLE_RK_CONFIG
 void config_set_rk_enabled(bool enabled);
 bool config_get_rk_enabled(void);
 #endif
