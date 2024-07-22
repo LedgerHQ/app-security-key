@@ -33,7 +33,7 @@ PATH_APP_LOAD_PARAMS += "5262163'"  # int("PKS".encode("ascii").hex(), 16)
 
 APPVERSION_M=1
 APPVERSION_N=6
-APPVERSION_P=3
+APPVERSION_P=4
 APPVERSION=$(APPVERSION_M).$(APPVERSION_N).$(APPVERSION_P)
 
 ICON_NANOS=icons/icon_security_key_nanos.gif
@@ -125,16 +125,23 @@ ENABLE_NOCRC_APP_LOAD_PARAMS = 1
 # then reinstall flow), and this reset was causing even more issues
 DEFINES += HAVE_NO_RESET_GENERATION_INCREMENT
 
-# Adds the Resident Key support and exposes a setting to enable/disable it.
-# Currently the settings default value is `False`, which means that by default
-# users will need to activate the setting before being able to create "Resident
-# Keys", also named "Discoverable Credentials".
-# This has been implemented to protect user from the NVRAM wipe mostly happening
-# during an app update which will erase their RK credentials with no possibility
-# to restore them.
-# Advanced users can still choose to completely disable this setting.
-# /!\ disabled for 1.6 stable release
-# DEFINES += HAVE_RK_SUPPORT_SETTING
+# These 2 flags allow to enable/disable the RK feature and expose an app setting for it.
+# This has been implemented to protect user from the NVRAM wipe mostly happening during
+# an app update which will erase their RK credentials with no possibility  to restore them.
+#
+# ENABLE_RK_CONFIG activates the internal code which allows to activate and deactivate
+# the feature. It sets the feature as deactivated by default.
+# ENABLE_RK_CONFIG_UI_SETTING activates the UI settings which allows a user to enable or
+# disable the feature.
+#
+# So the expected behaviors are the following:
+# - No flags -> RK are enabled by default and a user can not deactivate the feature,
+# - ENABLE_RK_CONFIG only -> RK are disabled by default and a user can not activate the feature,
+# - ENABLE_RK_CONFIG_UI_SETTING only -> compilation fails at link,
+# - ENABLE_RK_CONFIG & ENABLE_RK_CONFIG_UI_SETTING -> RK are disabled by default but a user can
+#   enable or disable the feature through the app's settings.
+DEFINES += ENABLE_RK_CONFIG
+# DEFINES += ENABLE_RK_CONFIG_UI_SETTING
 
 DEFINES += HAVE_FIDO2_RPID_FILTER
 

@@ -7,12 +7,12 @@ from fido2.webauthn import AttestedCredentialData
 from client import TESTS_SPECULOS_DIR
 from utils import generate_random_bytes, generate_make_credentials_params
 from utils import generate_get_assertion_params
-from utils import HAVE_RK_SUPPORT_SETTING
+from utils import ENABLE_RK_CONFIG_UI_SETTING
 
 from ragger.navigator import NavInsID, NavIns
 
 
-@pytest.mark.skipif(not HAVE_RK_SUPPORT_SETTING,
+@pytest.mark.skipif(not ENABLE_RK_CONFIG_UI_SETTING,
                     reason="settings not enable")
 def test_option_rk_disabled(client):
     info = client.ctap2.info
@@ -36,7 +36,7 @@ def enable_rk_option(client):
     if info.options["rk"]:
         return
 
-    if not HAVE_RK_SUPPORT_SETTING:
+    if not ENABLE_RK_CONFIG_UI_SETTING:
         raise ValueError("rk and setting not enabled")
 
     if client.model.startswith("nano"):
@@ -85,6 +85,8 @@ def enable_rk_option(client):
     client.ctap2._info = client.ctap2.get_info()
 
 
+@pytest.mark.skipif(not ENABLE_RK_CONFIG_UI_SETTING,
+                    reason="settings not enable")
 def test_option_rk_enabled(client):
     enable_rk_option(client)
 
@@ -92,6 +94,8 @@ def test_option_rk_enabled(client):
     assert info.options["rk"]
 
 
+@pytest.mark.skipif(not ENABLE_RK_CONFIG_UI_SETTING,
+                    reason="settings not enable")
 def test_option_rk_make_cred_exclude_refused(client, test_name):
     enable_rk_option(client)
 
@@ -141,6 +145,8 @@ def test_option_rk_make_cred_exclude_refused(client, test_name):
     client.ctap2.reset()
 
 
+@pytest.mark.skipif(not ENABLE_RK_CONFIG_UI_SETTING,
+                    reason="settings not enable")
 def test_option_rk_get_assertion(client, test_name):
     enable_rk_option(client)
 
@@ -205,6 +211,8 @@ def test_option_rk_get_assertion(client, test_name):
     "--fast" in sys.argv,
     reason="running in fast mode",
 )
+@pytest.mark.skipif(not ENABLE_RK_CONFIG_UI_SETTING,
+                    reason="settings not enable")
 def test_option_rk_key_store_full(client):
     enable_rk_option(client)
 
@@ -231,6 +239,8 @@ def test_option_rk_key_store_full(client):
     "--fast" in sys.argv,
     reason="running in fast mode",
 )
+@pytest.mark.skipif(not ENABLE_RK_CONFIG_UI_SETTING,
+                    reason="settings not enable")
 def test_option_rk_overwrite_get_assertion(client, test_name):
     enable_rk_option(client)
 

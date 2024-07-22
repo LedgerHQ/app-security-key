@@ -349,7 +349,7 @@ static int process_makeCred_authnr_options(cbipDecoder_t *decoder, cbipItem_t *m
 
         status = cbiph_get_map_key_str_bool(decoder, &optionsItem, OPTION_RESIDENT_KEY, &boolValue);
         if (status == CBIPH_STATUS_FOUND) {
-#ifdef HAVE_RK_SUPPORT_SETTING
+#ifdef ENABLE_RK_CONFIG
             if (boolValue && !config_get_rk_enabled()) {
                 PRINTF("RK disabled\n");
                 return ERROR_UNSUPPORTED_OPTION;

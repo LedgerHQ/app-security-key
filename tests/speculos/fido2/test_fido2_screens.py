@@ -6,12 +6,12 @@ from fido2.webauthn import AttestedCredentialData
 from client import TESTS_SPECULOS_DIR
 from utils import generate_random_bytes
 from utils import generate_make_credentials_params
-from utils import HAVE_RK_SUPPORT_SETTING
+from utils import ENABLE_RK_CONFIG_UI_SETTING
 
 from ragger.navigator import NavInsID, NavIns
 
 
-@pytest.mark.skipif(not HAVE_RK_SUPPORT_SETTING, reason="settings not enable")
+@pytest.mark.skipif(not ENABLE_RK_CONFIG_UI_SETTING, reason="settings not enable")
 def test_fido_screens_settings(client, test_name):
 
     if client.model.startswith("nano"):
