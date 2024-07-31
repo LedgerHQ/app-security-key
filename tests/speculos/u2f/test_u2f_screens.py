@@ -6,7 +6,7 @@ from ragger.navigator import NavInsID
 
 from client import TESTS_SPECULOS_DIR
 from utils import generate_random_bytes, fido_known_appid
-from utils import HAVE_RK_SUPPORT_SETTING
+from utils import ENABLE_RK_CONFIG_UI_SETTING
 
 
 def test_u2f_screens_idle(client, test_name, firmware):
@@ -23,7 +23,7 @@ def test_u2f_screens_idle(client, test_name, firmware):
         # Screen 2 -> 3
         instructions.append(NavInsID.RIGHT_CLICK)
 
-        if HAVE_RK_SUPPORT_SETTING:
+        if ENABLE_RK_CONFIG_UI_SETTING:
             # Screen 3 -> 4
             instructions.append(NavInsID.RIGHT_CLICK)
     else:
