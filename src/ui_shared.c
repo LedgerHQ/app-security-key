@@ -377,23 +377,17 @@ void app_nbgl_start_review(uint8_t nb_pairs,
 
     layout = nbgl_layoutGet(&layoutDescription);
 
-    nbgl_layoutBar_t bar;
-    bar.text = APPNAME;
-    bar.subText = NULL;
-    bar.iconRight = NULL;
-    bar.iconLeft = NULL;
-    bar.token = TITLE_TOKEN;
-    bar.centered = true;
-    bar.inactive = false;
-    bar.tuneId = NBGL_NO_TUNE;
-    nbgl_layoutAddTouchableBar(layout, &bar);
-    nbgl_layoutAddSeparationLine(layout);
+    nbgl_layoutHeader_t bar;
+    bar.type = HEADER_TITLE;
+    bar.separationLine = true;
+    bar.title.text = APPNAME;
+    nbgl_layoutAddHeader(layout, &bar);
 
-    const nbgl_layoutTagValueList_t tagValueList = {.nbPairs = nb_pairs,
-                                                    .pairs = pairs,
-                                                    .smallCaseForValue = false,
-                                                    .nbMaxLinesForValue = 0,
-                                                    .wrapping = false};
+    const nbgl_contentTagValueList_t tagValueList = {.nbPairs = nb_pairs,
+                                                     .pairs = pairs,
+                                                     .smallCaseForValue = false,
+                                                     .nbMaxLinesForValue = 0,
+                                                     .wrapping = false};
 
     nbgl_layoutAddTagValueList(layout, &tagValueList);
 
