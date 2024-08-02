@@ -270,14 +270,23 @@ static const nbgl_layoutTagValue_t pairs[NB_OF_PAIRS] = {
     {.item = "Website", .value = g.rpID},
     {.item = "User ID", .value = g.verifyHash}};
 
-#define SELECT_MAX_ID_NB      5
+#if defined(TARGET_STAX)
+#define SELECT_MAX_ID_NB 5
+#elif defined(TARGET_FLEX)
+#define SELECT_MAX_ID_NB 4
+#endif
+
 #define SELECT_ID_BUFFER_SIZE 36
 static char user_id_list[SELECT_MAX_ID_NB][SELECT_ID_BUFFER_SIZE];
-static const char *const bar_texts[SELECT_MAX_ID_NB] = {user_id_list[0],
-                                                        user_id_list[1],
-                                                        user_id_list[2],
-                                                        user_id_list[3],
-                                                        user_id_list[4]};
+static const char *const bar_texts[SELECT_MAX_ID_NB] = {
+    user_id_list[0],
+    user_id_list[1],
+    user_id_list[2],
+    user_id_list[3],
+#if defined(TARGET_STAX)
+    user_id_list[4],
+#endif  // TARGET_STAX
+};
 static uint8_t token_list[SELECT_MAX_ID_NB];
 uint8_t available_credentials;
 uint8_t selected_credential;
@@ -342,7 +351,7 @@ static void on_user_select(void) {
     // Reuse useCaseSettings which fit our needs
     nbgl_useCaseSettings("User IDs",
                          0,
-                         (available_credentials - 1 / SELECT_MAX_ID_NB) + 1,
+                         (available_credentials - 1) / SELECT_MAX_ID_NB + 1,
                          false,
                          on_user_select_exit,
                          on_user_select_navigation_callback,
