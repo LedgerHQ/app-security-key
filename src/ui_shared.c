@@ -377,24 +377,17 @@ void app_nbgl_start_review(uint8_t nb_pairs,
 
     layout = nbgl_layoutGet(&layoutDescription);
 
-    nbgl_layoutBar_t bar;
-    bar.text = APPNAME;
-    bar.subText = NULL;
-    bar.iconRight = NULL;
-    bar.iconLeft = NULL;
-    bar.token = TITLE_TOKEN;
-    bar.centered = true;
-    bar.inactive = false;
-    bar.tuneId = NBGL_NO_TUNE;
-    nbgl_layoutAddTouchableBar(layout, &bar);
-    nbgl_layoutAddSeparationLine(layout);
+    nbgl_layoutHeader_t bar;
+    bar.type = HEADER_TITLE;
+    bar.separationLine = true;
+    bar.title.text = APPNAME;
+    nbgl_layoutAddHeader(layout, &bar);
 
-    const nbgl_layoutTagValueList_t tagValueList = {.nbPairs = nb_pairs,
-                                                    .pairs = pairs,
-                                                    .smallCaseForValue = false,
-                                                    .nbMaxLinesForValue = 0,
-                                                    .wrapping = false};
-
+    const nbgl_contentTagValueList_t tagValueList = {.nbPairs = nb_pairs,
+                                                     .pairs = pairs,
+                                                     .smallCaseForValue = false,
+                                                     .nbMaxLinesForValue = 0,
+                                                     .wrapping = false};
     nbgl_layoutAddTagValueList(layout, &tagValueList);
 
     if (onSelect) {
@@ -444,20 +437,22 @@ void app_nbgl_status(const char *message,
     onQuit = on_quit;
     prepare_display_status();
     PRINTF("Will be displayed: '%s'\n", g.display_status);
-    nbgl_pageInfoDescription_t info = {.bottomButtonStyle = NO_BUTTON_STYLE,
-                                       .footerText = NULL,
-                                       .centeredInfo.icon = &C_Denied_Circle_64px,
-                                       .centeredInfo.offsetY = 0,
-                                       .centeredInfo.onTop = false,
-                                       .centeredInfo.style = LARGE_CASE_INFO,
-                                       .centeredInfo.text1 = message,
-                                       .centeredInfo.text2 = "",
-                                       .centeredInfo.text3 = &g.display_status[0],
-                                       .tapActionText = "",
-                                       .tapActionToken = QUIT_TOKEN,
-                                       .topRightStyle = NO_BUTTON_STYLE,
-                                       .actionButtonText = NULL,
-                                       .tuneId = TUNE_TAP_CASUAL};
+    nbgl_pageInfoDescription_t info = {
+        .bottomButtonStyle = NO_BUTTON_STYLE,
+        .footerText = NULL,
+        .centeredInfo.icon = &C_Denied_Circle_64px,
+        .centeredInfo.offsetY = 0,
+        .centeredInfo.onTop = false,
+        .centeredInfo.style = LARGE_CASE_INFO,
+        .centeredInfo.text1 = message,
+        .centeredInfo.text2 = NULL,
+        .centeredInfo.text3 = g.display_status[0] == 0 ? NULL : &g.display_status[0],
+        .tapActionText = NULL,
+        .tapActionToken = QUIT_TOKEN,
+        .topRightStyle = NO_BUTTON_STYLE,
+        .actionButtonText = NULL,
+        .tuneId = TUNE_TAP_CASUAL,
+    };
 
     if (is_success) {
         info.centeredInfo.icon = &C_Check_Circle_64px;
