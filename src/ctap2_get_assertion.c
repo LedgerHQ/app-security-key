@@ -21,6 +21,7 @@
 #include "os.h"
 #include "cx.h"
 #include "os_io_seproxyhal.h"
+#include "app_storage.h"
 
 #include "ctap2.h"
 #include "cbip_helper.h"
@@ -282,7 +283,7 @@ static int process_getAssert_authnr_pin(cbipDecoder_t *decoder, cbipItem_t *mapI
 
     status = cbiph_get_map_key_bytes(decoder, mapItem, TAG_PIN_AUTH, &pinAuth, &pinAuthLen);
     if (status > 0) {
-        if (!N_u2f.pinSet) {
+        if (!N_app_storage.data.config.pinSet) {
             PRINTF("PIN not set\n");
             return ERROR_PIN_NOT_SET;
         }

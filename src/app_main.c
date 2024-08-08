@@ -20,6 +20,7 @@
 #include "os_io_seproxyhal.h"
 #include "ux.h"
 #include "io.h"
+#include "app_storage.h"
 
 #include "globals.h"
 #include "config.h"
@@ -90,6 +91,30 @@ uint8_t io_event(uint8_t channel) {
     return 1;
 }
 
+static bool init_persistent_storage(void) {
+    app_storage_data_t storage_data = {0};
+
+    if (!app_storage_is_initalized()) {
+        PRINTF("Not initialized yet!\n");
+        app_storage_init(1);
+#ifdef ENABLE_RK_CONFIG
+        storage_data.rk_enabled = 0;
+#endif
+        storage_data.initialized = true;
+        nvm_write((void *) &N_app_storage.data, (void *) &storage_data, sizeof(storage_data));
+
+        if (config_init() != 0) {
+            PRINTF("=> config_init failure\n");
+            return false;
+        }
+    } else {
+        PRINTF("Initialized with struct/data versions: %d/%d\n",
+               app_storage_get_struct_version(),
+               app_storage_get_data_version());
+    }
+    return true;
+}
+
 /**
  * Handle APDU command received and send back APDU response using handlers.
  */
@@ -99,10 +124,11 @@ void app_main() {
 
     io_init();
 
-    if (config_init() != 0) {
-        PRINTF("=> config_init failure\n");
+    if (!init_persistent_storage()) {
+        PRINTF("Error while configuring the storage - aborting\n");
         return;
     }
+
     rk_storage_init();
     ctap2UxState = CTAP2_UX_STATE_NONE;
     ctap2_client_pin_reset_ctx();

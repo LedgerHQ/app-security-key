@@ -19,6 +19,7 @@
 #include "os.h"
 #include "cx.h"
 #include "ledger_assert.h"
+#include "app_storage.h"
 
 #include "ctap2.h"
 #include "config.h"
@@ -61,7 +62,7 @@ static cx_ecfp_private_key_t ctap2KeyAgreement;
 /******************************************/
 #define CHECK_PIN_SET()                                       \
     do {                                                      \
-        if (!N_u2f.pinSet) {                                  \
+        if (!N_app_storage.data.config.pinSet) {              \
             PRINTF("PIN not set\n");                          \
             send_cbor_error(service, ERROR_PIN_AUTH_INVALID); \
             return;                                           \
@@ -70,7 +71,7 @@ static cx_ecfp_private_key_t ctap2KeyAgreement;
 
 #define CHECK_PIN_NOT_SET()                                   \
     do {                                                      \
-        if (N_u2f.pinSet) {                                   \
+        if (N_app_storage.data.config.pinSet) {               \
             PRINTF("PIN already set\n");                      \
             send_cbor_error(service, ERROR_PIN_AUTH_INVALID); \
             return;                                           \
@@ -79,7 +80,7 @@ static cx_ecfp_private_key_t ctap2KeyAgreement;
 
 #define CHECK_PIN_RETRIES()                              \
     do {                                                 \
-        if (N_u2f.pinRetries == 0) {                     \
+        if (N_app_storage.data.config.pinRetries == 0) { \
             PRINTF("PIN blocked\n");                     \
             send_cbor_error(service, ERROR_PIN_BLOCKED); \
             return;                                      \
@@ -406,14 +407,14 @@ static int check_pin_hash(int protocol,
         return ERROR_PIN_INVALID;
     }
 
-    if (!crypto_compare(pinHashEnc, (uint8_t *) N_u2f.pin, PIN_HASH_SIZE)) {
+    if (!crypto_compare(pinHashEnc, (uint8_t *) N_app_storage.data.config.pin, PIN_HASH_SIZE)) {
         PRINTF("Computed PIN hash %.*H\n", PIN_HASH_SIZE, pinHashEnc);
-        PRINTF("Stored PIN hash %.*H\n", PIN_HASH_SIZE, N_u2f.pin);
+        PRINTF("Stored PIN hash %.*H\n", PIN_HASH_SIZE, N_app_storage.data.config.pin);
         if (ctap2_client_pin_regenerate() != 0) {
             return ERROR_OTHER;
         }
         ctap2TransientPinAuths++;
-        if (N_u2f.pinRetries == 0) {
+        if (N_app_storage.data.config.pinRetries == 0) {
             return ERROR_PIN_BLOCKED;
         }
         if (ctap2TransientPinAuths == MAX_TRANSIENT_PIN_AUTH_FAILURES) {
@@ -447,7 +448,7 @@ static void ctap2_handle_get_pin_retries(u2f_service_t *service,
     cbip_encoder_init(&encoder, responseBuffer + 1, CUSTOM_IO_APDU_BUFFER_SIZE - 1);
     cbip_add_map_header(&encoder, 1);
     cbip_add_int(&encoder, TAG_RESP_RETRIES);
-    cbip_add_int(&encoder, N_u2f.pinRetries);
+    cbip_add_int(&encoder, N_app_storage.data.config.pinRetries);
 
     responseBuffer[0] = ERROR_NONE;
     send_cbor_response(&G_io_u2f, 1 + encoder.offset);
