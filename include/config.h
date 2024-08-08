@@ -34,9 +34,6 @@ typedef struct config_t {
     uint8_t pin[16];
     uint8_t pinSet;
     uint8_t pinRetries;
-#ifdef ENABLE_RK_CONFIG
-    uint8_t rk_enabled;
-#endif
 } config_t;
 
 extern config_t const N_u2f_real;
