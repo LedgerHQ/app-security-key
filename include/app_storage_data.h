@@ -12,10 +12,10 @@
 #define APP_STORAGE_PROPERTIES (APP_STORAGE_PROP_SETTINGS | APP_STORAGE_PROP_DATA)
 
 typedef struct {
+    bool initialized;
 #ifdef ENABLE_RK_CONFIG
     uint8_t rk_enabled;
-#endif
-    bool initialized;
-    config_t config;
     rk_storage_t rk;
+#endif
+    config_t config;
 } app_storage_data_t;

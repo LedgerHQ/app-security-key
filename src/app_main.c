@@ -91,7 +91,7 @@ uint8_t io_event(uint8_t channel) {
     return 1;
 }
 
-static bool init_app_storage(void) {
+static bool init_persistent_storage(void) {
     app_storage_data_t storage_data = {0};
 
     if (!app_storage_is_initalized()) {
@@ -124,8 +124,8 @@ void app_main() {
 
     io_init();
 
-    if (!init_app_storage()) {
-        PRINTF("Error while configuring the storage\n");
+    if (!init_persistent_storage()) {
+        PRINTF("Error while configuring the storage - aborting\n");
         return;
     }
 
