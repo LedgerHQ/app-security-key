@@ -20,43 +20,10 @@
 
 #include "os.h"
 #include "os_utils.h"
+#include "app_storage.h"
 
 #include "rk_storage.h"
-#include "ctap2.h"
 #include "crypto.h"
-#include "credential.h"
-
-typedef struct __attribute__((__packed__)) rk_header_s {
-    uint8_t rpIdHash[RP_ID_HASH_SIZE];
-    uint8_t nonce[CREDENTIAL_NONCE_SIZE];
-    uint8_t credentialLen;
-    uint8_t unused;
-    uint16_t idx;
-} rk_header_t;
-
-#define SLOT_SIZE             256
-#define CREDENTIAL_MAX_NUMBER (RK_SIZE / SLOT_SIZE)
-#define CREDENTIAL_MAX_SIZE   (SLOT_SIZE - sizeof(rk_header_t))
-CCASSERT("credentialLen should fit in an uint8_t", CREDENTIAL_MAX_SIZE <= 0xFF);
-
-typedef struct __attribute__((__packed__)) rk_slot_s {
-    rk_header_t header;
-    uint8_t credential[CREDENTIAL_MAX_SIZE];
-} rk_slot_t;
-
-CCASSERT("Slot size alignment", SLOT_SIZE == sizeof(rk_slot_t));
-
-#define UNUSED_IDX_VALUE     0  // default value
-#define MAX_IDX_VALUE        0xFFFF
-#define SLOT_IS_USED(slot)   (slot->header.idx != UNUSED_IDX_VALUE)
-#define SLOT_IS_UNUSED(slot) (slot->header.idx == UNUSED_IDX_VALUE)
-
-typedef struct rk_storage_t {
-    rk_slot_t rk[CREDENTIAL_MAX_NUMBER];
-} rk_storage_t;
-
-rk_storage_t const N_rk_storage_real;
-#define N_rk_storage (*(volatile rk_storage_t *) PIC(&N_rk_storage_real))
 
 static int nextIdx = 0;
 
@@ -65,7 +32,7 @@ static rk_slot_t *get_slot_addr(uint8_t rkSlotIdx) {
         return NULL;
     }
 
-    return (rk_slot_t *) &N_rk_storage.rk[rkSlotIdx];
+    return (rk_slot_t *) &N_app_storage.data.rk.rk[rkSlotIdx];
 }
 
 static rk_slot_t *find_free_slot(void) {
@@ -92,6 +59,7 @@ static void erase_slot(uint8_t rkSlotIdx) {
         rk_header_t header;
         header.idx = UNUSED_IDX_VALUE;
         nvm_write(&slot->header, (uint8_t *) &header, sizeof(header));
+        app_storage_set_data_version(app_storage_get_data_version() + 1);
     }
 }
 
@@ -145,6 +113,7 @@ int rk_storage_store(const uint8_t *rpIdHash,
     nextIdx += 1;
     nvm_write(&slot->header, (uint8_t *) &header, sizeof(header));
     nvm_write(&slot->credential, (uint8_t *) credential, credentialLen);
+    app_storage_set_data_version(app_storage_get_data_version() + 1);
     PRINTF("rk_storage_store idx %d size %d\n", header.idx, credentialLen);
 
     return 0;

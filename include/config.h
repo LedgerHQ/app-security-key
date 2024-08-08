@@ -16,15 +16,14 @@
 *   limitations under the License.
 ********************************************************************************/
 
-#ifndef __CONFIG_H__
-#define __CONFIG_H__
+#pragma once
 
 #include "os.h"
 
 #define WRAPPING_KEY_PATH     0x80575241  // "WRA".encode("ascii").hex()
 #define PRIVATE_KEY_SEED_PATH 0x80504b53  // "PKS".encode("ascii").hex()
 
-typedef struct config_t {
+typedef struct config_s {
     uint32_t authentificationCounter;
     uint8_t initialized;
     uint8_t wrappingKeyU2F[32];
@@ -35,10 +34,6 @@ typedef struct config_t {
     uint8_t pinSet;
     uint8_t pinRetries;
 } config_t;
-
-extern config_t const N_u2f_real;
-
-#define N_u2f (*(volatile config_t *) PIC(&N_u2f_real))
 
 int config_init(void);
 
@@ -52,6 +47,4 @@ void config_reset_ctap2_pin_retry_counter(void);
 #ifdef ENABLE_RK_CONFIG
 void config_set_rk_enabled(bool enabled);
 bool config_get_rk_enabled(void);
-#endif
-
 #endif

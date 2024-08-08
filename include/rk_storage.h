@@ -16,11 +16,42 @@
 *   limitations under the License.
 ********************************************************************************/
 
-#ifndef __RK_STORAGE_H__
-#define __RK_STORAGE_H__
+#pragma once
+
+#include "ctap2.h"
+#include "credential.h"
 
 #define RK_STORAGE_FULL -2
 #define RK_NOT_FOUND    0
+
+typedef struct __attribute__((__packed__)) rk_header_s {
+    uint8_t rpIdHash[RP_ID_HASH_SIZE];
+    uint8_t nonce[CREDENTIAL_NONCE_SIZE];
+    uint8_t credentialLen;
+    uint8_t unused;
+    uint16_t idx;
+} rk_header_t;
+
+#define SLOT_SIZE             256
+#define CREDENTIAL_MAX_NUMBER (RK_SIZE / SLOT_SIZE)
+#define CREDENTIAL_MAX_SIZE   (SLOT_SIZE - sizeof(rk_header_t))
+CCASSERT("credentialLen should fit in an uint8_t", CREDENTIAL_MAX_SIZE <= 0xFF);
+
+typedef struct __attribute__((__packed__)) rk_slot_s {
+    rk_header_t header;
+    uint8_t credential[CREDENTIAL_MAX_SIZE];
+} rk_slot_t;
+
+CCASSERT("Slot size alignment", SLOT_SIZE == sizeof(rk_slot_t));
+
+#define UNUSED_IDX_VALUE     0  // default value
+#define MAX_IDX_VALUE        0xFFFF
+#define SLOT_IS_USED(slot)   (slot->header.idx != UNUSED_IDX_VALUE)
+#define SLOT_IS_UNUSED(slot) (slot->header.idx == UNUSED_IDX_VALUE)
+
+typedef struct rk_storage_s {
+    rk_slot_t rk[CREDENTIAL_MAX_NUMBER];
+} rk_storage_t;
 
 /**
  * Initialise the rk storage
@@ -68,5 +99,3 @@ int rk_storage_find_account(const uint8_t *rpIdHash,
  * Erase a credential associated to a rpIdHash and userId.
  */
 int rk_storage_erase_account(const uint8_t *rpIdHash, const uint8_t *userId, uint32_t userIdLen);
-
-#endif

@@ -21,6 +21,7 @@
 #include "os.h"
 #include "cx.h"
 #include "lcx_aes_siv.h"
+#include "app_storage.h"
 
 #include "ctap2.h"
 #include "credential.h"
@@ -187,9 +188,9 @@ static int credential_handle_ciphering(bool is_encrypt,
     cipher_key_t cipher_key;
 
     if (isCtap2) {
-        key = (uint8_t *) N_u2f.wrappingKeyCTAP2;
+        key = (uint8_t *) N_app_storage.data.config.wrappingKeyCTAP2;
     } else {
-        key = (uint8_t *) N_u2f.wrappingKeyU2F;
+        key = (uint8_t *) N_app_storage.data.config.wrappingKeyU2F;
     }
 
     siv_ctx.cipher_ctx = &cipher;

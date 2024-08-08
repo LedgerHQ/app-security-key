@@ -91,7 +91,7 @@ uint8_t io_event(uint8_t channel) {
     return 1;
 }
 
-static void init_app_storage(void) {
+static bool init_app_storage(void) {
     app_storage_data_t storage_data = {0};
 
     if (!app_storage_is_initalized()) {
@@ -103,11 +103,16 @@ static void init_app_storage(void) {
         storage_data.initialized = true;
         nvm_write((void *) &N_app_storage.data, (void *) &storage_data, sizeof(storage_data));
 
+        if (config_init() != 0) {
+            PRINTF("=> config_init failure\n");
+            return false;
+        }
     } else {
         PRINTF("Initialized with struct/data versions: %d/%d\n",
                app_storage_get_struct_version(),
                app_storage_get_data_version());
     }
+    return true;
 }
 
 /**
@@ -119,12 +124,11 @@ void app_main() {
 
     io_init();
 
-    init_app_storage();
-
-    if (config_init() != 0) {
-        PRINTF("=> config_init failure\n");
+    if (!init_app_storage()) {
+        PRINTF("Error while configuring the storage\n");
         return;
     }
+
     rk_storage_init();
     ctap2UxState = CTAP2_UX_STATE_NONE;
     ctap2_client_pin_reset_ctx();

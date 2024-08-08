@@ -26,8 +26,6 @@
 #include "rk_storage.h"
 #include "crypto.h"
 
-config_t const N_u2f_real;
-
 static int derive_and_store_keys(uint32_t resetGeneration) {
     cx_err_t error;
     uint8_t key[64];
@@ -44,11 +42,11 @@ static int derive_and_store_keys(uint32_t resetGeneration) {
     if (error != CX_OK) {
         return -1;
     }
-    if (memcmp(key, (uint8_t *) N_u2f.privateKeySeed, sizeof(N_u2f.privateKeySeed)) == 0) {
+    if (memcmp(key, (uint8_t *) N_app_storage.data.config.privateKeySeed, sizeof(N_app_storage.data.config.privateKeySeed)) == 0) {
         // Keys are already initialized with the proper seed and resetGeneration
         return 0;
     }
-    nvm_write((void *) N_u2f.privateKeySeed, (void *) key, sizeof(N_u2f.privateKeySeed));
+    nvm_write((void *) N_app_storage.data.config.privateKeySeed, (void *) key, sizeof(N_app_storage.data.config.privateKeySeed));
 
     // wrappingKey
     keyPath[0] = WRAPPING_KEY_PATH;
@@ -60,14 +58,15 @@ static int derive_and_store_keys(uint32_t resetGeneration) {
     // wrappingKeyU2F: aes_key = SHA256(VERSION || wrappingKeys)
     version = CREDENTIAL_VERSION_U2F;
     crypto_compute_sha256(&version, sizeof(version), key, sizeof(key), derivateKey);
-    nvm_write((void *) N_u2f.wrappingKeyU2F, (void *) derivateKey, sizeof(N_u2f.wrappingKeyU2F));
+    nvm_write((void *) N_app_storage.data.config.wrappingKeyU2F, (void *) derivateKey, sizeof(N_app_storage.data.config.wrappingKeyU2F));
 
     // wrappingKeyCTAP2: aes_key = SHA256(VERSION || wrappingKeys)
     version = CREDENTIAL_VERSION_CTAP2;
     crypto_compute_sha256(&version, sizeof(version), key, sizeof(key), derivateKey);
-    nvm_write((void *) N_u2f.wrappingKeyCTAP2,
+    nvm_write((void *) N_app_storage.data.config.wrappingKeyCTAP2,
               (void *) derivateKey,
-              sizeof(N_u2f.wrappingKeyCTAP2));
+              sizeof(N_app_storage.data.config.wrappingKeyCTAP2));
+    app_storage_set_data_version(app_storage_get_data_version() + 1);
 
     return 0;
 }
@@ -76,38 +75,40 @@ int config_init(void) {
     int ret = 0;
     uint32_t tmp32;
     uint8_t tmp8;
-    if (N_u2f.initialized != 1) {
+    if (N_app_storage.data.config.initialized != 1) {
 #ifdef HAVE_COUNTER_MARKER
         tmp32 = 0xF1D0C001;
 #else
         tmp32 = 1;
 #endif
-        nvm_write((void *) &N_u2f.authentificationCounter, (void *) &tmp32, sizeof(uint32_t));
+        nvm_write((void *) &N_app_storage.data.config.authentificationCounter, (void *) &tmp32, sizeof(uint32_t));
 
         tmp32 = 0;
-        nvm_write((void *) &N_u2f.resetGeneration, (void *) &tmp32, sizeof(uint32_t));
+        nvm_write((void *) &N_app_storage.data.config.resetGeneration, (void *) &tmp32, sizeof(uint32_t));
 
         // Initialize keys derived from seed
-        derive_and_store_keys(N_u2f.resetGeneration);
+        derive_and_store_keys(N_app_storage.data.config.resetGeneration);
 
         tmp8 = 0;
-        nvm_write((void *) &N_u2f.pinSet, (void *) &tmp8, sizeof(uint8_t));
+        nvm_write((void *) &N_app_storage.data.config.pinSet, (void *) &tmp8, sizeof(uint8_t));
 
         tmp8 = 1;
-        nvm_write((void *) &N_u2f.initialized, (void *) &tmp8, sizeof(uint8_t));
+        nvm_write((void *) &N_app_storage.data.config.initialized, (void *) &tmp8, sizeof(uint8_t));
+    app_storage_set_data_version(app_storage_get_data_version() + 1);
     } else {
         // Check that the seed did not change - if it did, overwrite the keys
-        ret = derive_and_store_keys(N_u2f.resetGeneration);
+        ret = derive_and_store_keys(N_app_storage.data.config.resetGeneration);
     }
     return ret;
 }
 
 uint8_t config_increase_and_get_authentification_counter(uint8_t *buffer) {
-    uint32_t counter = N_u2f.authentificationCounter;
+    uint32_t counter = N_app_storage.data.config.authentificationCounter;
     // Increase the counter by a random value according to WebAuthN privacy requirements
     // Draw a number between 1 and 5 (included), in a uniform way.
     counter += cx_rng_u32_range_func(1, 6, cx_rng_u32);
-    nvm_write((void *) &N_u2f.authentificationCounter, &counter, sizeof(uint32_t));
+    nvm_write((void *) &N_app_storage.data.config.authentificationCounter, &counter, sizeof(uint32_t));
+    app_storage_set_data_version(app_storage_get_data_version() + 1);
     buffer[0] = ((counter >> 24) & 0xff);
     buffer[1] = ((counter >> 16) & 0xff);
     buffer[2] = ((counter >> 8) & 0xff);
@@ -117,16 +118,17 @@ uint8_t config_increase_and_get_authentification_counter(uint8_t *buffer) {
 
 void config_process_ctap2_reset(void) {
 #ifndef HAVE_NO_RESET_GENERATION_INCREMENT
-    uint32_t resetGeneration = N_u2f.resetGeneration + 1;
+    uint32_t resetGeneration = N_app_storage.data.config.resetGeneration + 1;
 
-    nvm_write((void *) &N_u2f.resetGeneration, (void *) &resetGeneration, sizeof(uint32_t));
+    nvm_write((void *) &N_app_storage.data.config.resetGeneration, (void *) &resetGeneration, sizeof(uint32_t));
 
     // Update keys derived from seed
-    derive_and_store_keys(N_u2f.resetGeneration);
+    derive_and_store_keys(N_app_storage.data.config.resetGeneration);
 #endif
 
     uint8_t pinSet = 0;
-    nvm_write((void *) &N_u2f.pinSet, (void *) &pinSet, sizeof(uint8_t));
+    nvm_write((void *) &N_app_storage.data.config.pinSet, (void *) &pinSet, sizeof(uint8_t));
+    app_storage_set_data_version(app_storage_get_data_version() + 1);
 
     ctap2_client_pin_reset_ctx();
     rk_storage_erase_all();
@@ -136,24 +138,27 @@ void config_process_ctap2_reset(void) {
 
 void config_set_ctap2_pin(uint8_t *pin) {
     uint8_t tmp;
-    nvm_write((void *) &N_u2f.pin, (void *) pin, sizeof(N_u2f.pin));
+    nvm_write((void *) &N_app_storage.data.config.pin, (void *) pin, sizeof(N_app_storage.data.config.pin));
     tmp = CTAP2_PIN_RETRIES;
-    nvm_write((void *) &N_u2f.pinRetries, (void *) &tmp, sizeof(uint8_t));
+    nvm_write((void *) &N_app_storage.data.config.pinRetries, (void *) &tmp, sizeof(uint8_t));
     tmp = 1;
-    nvm_write((void *) &N_u2f.pinSet, (void *) &tmp, sizeof(uint8_t));
+    nvm_write((void *) &N_app_storage.data.config.pinSet, (void *) &tmp, sizeof(uint8_t));
+    app_storage_set_data_version(app_storage_get_data_version() + 1);
 }
 
 void config_decrease_ctap2_pin_retry_counter(void) {
-    uint8_t tmp = N_u2f.pinRetries;
+    uint8_t tmp = N_app_storage.data.config.pinRetries;
     if (tmp != 0) {
         tmp--;
     }
-    nvm_write((void *) &N_u2f.pinRetries, (void *) &tmp, sizeof(uint8_t));
+    nvm_write((void *) &N_app_storage.data.config.pinRetries, (void *) &tmp, sizeof(uint8_t));
+    app_storage_set_data_version(app_storage_get_data_version() + 1);
 }
 
 void config_reset_ctap2_pin_retry_counter(void) {
     uint8_t tmp = CTAP2_PIN_RETRIES;
-    nvm_write((void *) &N_u2f.pinRetries, (void *) &tmp, sizeof(uint8_t));
+    nvm_write((void *) &N_app_storage.data.config.pinRetries, (void *) &tmp, sizeof(uint8_t));
+    app_storage_set_data_version(app_storage_get_data_version() + 1);
 }
 
 #ifdef ENABLE_RK_CONFIG

@@ -21,6 +21,7 @@
 #include "os.h"
 #include "cx.h"
 #include "os_io_seproxyhal.h"
+#include "app_storage.h"
 
 #include "ctap2.h"
 #include "cbip_helper.h"
@@ -379,7 +380,7 @@ static int process_makeCred_authnr_pin(cbipDecoder_t *decoder, cbipItem_t *mapIt
 
     status = cbiph_get_map_key_bytes(decoder, mapItem, TAG_PIN_AUTH, &pinAuth, &pinAuthLen);
     if (status == CBIPH_STATUS_FOUND) {
-        if (!N_u2f.pinSet) {
+        if (!N_app_storage.data.config.pinSet) {
             PRINTF("PIN not set\n");
             return ERROR_PIN_NOT_SET;
         }
@@ -404,7 +405,7 @@ static int process_makeCred_authnr_pin(cbipDecoder_t *decoder, cbipItem_t *mapIt
         ctap2RegisterData->clientPinAuthenticated = 1;
         PRINTF("Client PIN authenticated\n");
     } else {
-        if (N_u2f.pinSet) {
+        if (N_app_storage.data.config.pinSet) {
             PRINTF("PIN set and no PIN authentication provided\n");
             return ERROR_PIN_REQUIRED;
         }
