@@ -81,25 +81,27 @@ int config_init(void) {
 #else
         tmp32 = 1;
 #endif
-        nvm_write((void *) &N_u2f.authentificationCounter, (void *) &tmp32, sizeof(uint32_t));
+        nvm_write((void *) &N_u2f.authentificationCounter,
+                  (void *) &tmp32,
+                  sizeof(N_u2f.authentificationCounter));
 
         tmp32 = 0;
-        nvm_write((void *) &N_u2f.resetGeneration, (void *) &tmp32, sizeof(uint32_t));
+        nvm_write((void *) &N_u2f.resetGeneration, (void *) &tmp32, sizeof(N_u2f.resetGeneration));
 
         // Initialize keys derived from seed
         derive_and_store_keys(N_u2f.resetGeneration);
 
         tmp8 = 0;
-        nvm_write((void *) &N_u2f.pinSet, (void *) &tmp8, sizeof(uint8_t));
+        nvm_write((void *) &N_u2f.pinSet, (void *) &tmp8, sizeof(N_u2f.pinSet));
 
 #ifdef ENABLE_RK_CONFIG
         // Initialize rk_enable value: Disabled by default
         tmp8 = 0;
-        nvm_write((void *) &N_u2f.rk_enabled, (void *) &tmp8, sizeof(uint8_t));
+        nvm_write((void *) &N_u2f.rk_enabled, (void *) &tmp8, sizeof(N_u2f.rk_enabled));
 #endif
 
         tmp8 = 1;
-        nvm_write((void *) &N_u2f.initialized, (void *) &tmp8, sizeof(uint8_t));
+        nvm_write((void *) &N_u2f.initialized, (void *) &tmp8, sizeof(N_u2f.initialized));
     } else {
         // Check that the seed did not change - if it did, overwrite the keys
         ret = derive_and_store_keys(N_u2f.resetGeneration);
@@ -112,7 +114,9 @@ uint8_t config_increase_and_get_authentification_counter(uint8_t *buffer) {
     // Increase the counter by a random value according to WebAuthN privacy requirements
     // Draw a number between 1 and 5 (included), in a uniform way.
     counter += cx_rng_u32_range_func(1, 6, cx_rng_u32);
-    nvm_write((void *) &N_u2f.authentificationCounter, &counter, sizeof(uint32_t));
+    nvm_write((void *) &N_u2f.authentificationCounter,
+              &counter,
+              sizeof(N_u2f.authentificationCounter));
     buffer[0] = ((counter >> 24) & 0xff);
     buffer[1] = ((counter >> 16) & 0xff);
     buffer[2] = ((counter >> 8) & 0xff);
@@ -124,14 +128,16 @@ void config_process_ctap2_reset(void) {
 #ifndef HAVE_NO_RESET_GENERATION_INCREMENT
     uint32_t resetGeneration = N_u2f.resetGeneration + 1;
 
-    nvm_write((void *) &N_u2f.resetGeneration, (void *) &resetGeneration, sizeof(uint32_t));
+    nvm_write((void *) &N_u2f.resetGeneration,
+              (void *) &resetGeneration,
+              sizeof(N_u2f.resetGeneration));
 
     // Update keys derived from seed
     derive_and_store_keys(N_u2f.resetGeneration);
 #endif
 
     uint8_t pinSet = 0;
-    nvm_write((void *) &N_u2f.pinSet, (void *) &pinSet, sizeof(uint8_t));
+    nvm_write((void *) &N_u2f.pinSet, (void *) &pinSet, sizeof(N_u2f.pinSet));
 
     ctap2_client_pin_reset_ctx();
     rk_storage_erase_all();
@@ -143,9 +149,9 @@ void config_set_ctap2_pin(uint8_t *pin) {
     uint8_t tmp;
     nvm_write((void *) &N_u2f.pin, (void *) pin, sizeof(N_u2f.pin));
     tmp = CTAP2_PIN_RETRIES;
-    nvm_write((void *) &N_u2f.pinRetries, (void *) &tmp, sizeof(uint8_t));
+    nvm_write((void *) &N_u2f.pinRetries, (void *) &tmp, sizeof(N_u2f.pinRetries));
     tmp = 1;
-    nvm_write((void *) &N_u2f.pinSet, (void *) &tmp, sizeof(uint8_t));
+    nvm_write((void *) &N_u2f.pinSet, (void *) &tmp, sizeof(N_u2f.pinSet));
 }
 
 void config_decrease_ctap2_pin_retry_counter(void) {
@@ -153,18 +159,18 @@ void config_decrease_ctap2_pin_retry_counter(void) {
     if (tmp != 0) {
         tmp--;
     }
-    nvm_write((void *) &N_u2f.pinRetries, (void *) &tmp, sizeof(uint8_t));
+    nvm_write((void *) &N_u2f.pinRetries, (void *) &tmp, sizeof(N_u2f.pinRetries));
 }
 
 void config_reset_ctap2_pin_retry_counter(void) {
     uint8_t tmp = CTAP2_PIN_RETRIES;
-    nvm_write((void *) &N_u2f.pinRetries, (void *) &tmp, sizeof(uint8_t));
+    nvm_write((void *) &N_u2f.pinRetries, (void *) &tmp, sizeof(N_u2f.pinRetries));
 }
 
 #ifdef ENABLE_RK_CONFIG
 void config_set_rk_enabled(bool enabled) {
     uint8_t tmp8 = enabled ? 1 : 0;
-    nvm_write((void *) &N_u2f.rk_enabled, (void *) &tmp8, sizeof(uint8_t));
+    nvm_write((void *) &N_u2f.rk_enabled, (void *) &tmp8, sizeof(N_u2f.rk_enabled));
 }
 
 bool config_get_rk_enabled(void) {
