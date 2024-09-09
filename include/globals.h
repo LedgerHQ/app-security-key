@@ -24,6 +24,49 @@
 #include "u2f_process.h"
 #include "ctap2.h"
 
+#define U2F_VERSION      "U2F_V2"
+#define U2F_VERSION_SIZE (sizeof(U2F_VERSION) - 1)
+
+#define FIDO2_VERSION      "FIDO_2_0"
+#define FIDO2_VERSION_SIZE (sizeof(FIDO2_VERSION) - 1)
+
+#define FIDO_AID_SIZE 8
+static const uint8_t FIDO_AID[FIDO_AID_SIZE] = {0xA0, 0x00, 0x00, 0x06, 0x47, 0x2F, 0x00, 0x01};
+
+#define OFFSET_CLA 0
+#define OFFSET_INS 1
+#define OFFSET_P1  2
+#define OFFSET_P2  3
+
+#define FIDO_CLA               0x00
+#define FIDO_INS_ENROLL        0x01
+#define FIDO_INS_SIGN          0x02
+#define FIDO_INS_GET_VERSION   0x03
+#define FIDO_INS_CTAP2_PROXY   0x10
+#define FIDO_INS_APPLET_SELECT 0xA4
+
+#define FIDO2_NFC_CLA                 0x80
+#define FIDO2_NFC_CHAINING_CLA        0x90
+#define FIDO2_NFC_INS_CTAP2_PROXY     0x10
+#define FIDO2_NFC_INS_APPLET_DESELECT 0x12
+
+#define P1_U2F_CHECK_IS_REGISTERED    0x07
+#define P1_U2F_REQUEST_USER_PRESENCE  0x03
+#define P1_U2F_OPTIONAL_USER_PRESENCE 0x08
+
+#define APDU_MIN_HEADER       4
+#define LC_FIRST_BYTE_OFFSET  4
+#define SHORT_ENC_LC_SIZE     1
+#define SHORT_ENC_LE_SIZE     1
+#define EXT_ENC_LC_SIZE       3
+#define EXT_ENC_LE_SIZE       2  // considering only scenarios where Lc is present
+#define SHORT_ENC_DATA_OFFSET 5
+#define EXT_ENC_DATA_OFFSET   7
+
+#define SHORT_ENC_DEFAULT_LE \
+    253  // Should be 256, stax-rc4 MCU only support 255, so use 253 + 2 for now here
+#define EXT_ENC_DEFAULT_LE 65536
+
 typedef struct global_s {
     char verifyHash[65];
     char buffer_20[20];
