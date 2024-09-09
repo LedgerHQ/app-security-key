@@ -37,22 +37,22 @@ uint8_t responseBuffer[IO_APDU_BUFFER_SIZE];
 void truncate_pairs_for_display() {
     truncate_for_nb_lines(g.buffer_20);
     PRINTF("buffer_20 after truncation: '%s'\n", g.buffer_20);
-    truncate_for_nb_lines(g.rpID);
-    PRINTF("rpID after truncation: '%s'\n", g.rpID);
-    truncate_for_nb_lines(g.verifyHash);
-    PRINTF("verifyHash after truncation: '%s'\n", g.verifyHash);
+    truncate_for_nb_lines(g.buffer1_65);
+    PRINTF("buffer1_65 after truncation: '%s'\n", g.buffer1_65);
+    truncate_for_nb_lines(g.buffer2_65);
+    PRINTF("buffer2_65 after truncation: '%s'\n", g.buffer2_65);
 }
 
 void prepare_display_status() {
     if (!g.is_nfc) {
-        PRINTF("NOT NFC so no display status for rpID '%s' and verifyHash '%s'\n",
-               g.rpID,
-               g.verifyHash);
+        PRINTF("NOT NFC so no display status for buffer1_65 '%s' and buffer2_65 '%s'\n",
+               g.buffer1_65,
+               g.buffer2_65);
         g.display_status[0] = '\0';
         return;
     }
-    strncpy(g.display_status, g.rpID, strlen(g.rpID));
-    g.display_status[strlen(g.rpID)] = '\n';
-    strncpy(g.display_status + strlen(g.rpID) + 1, g.verifyHash, strlen(g.verifyHash));
+    strncpy(g.display_status, g.buffer1_65, strlen(g.buffer1_65));
+    g.display_status[strlen(g.buffer1_65)] = '\n';
+    strncpy(g.display_status + strlen(g.buffer1_65) + 1, g.buffer2_65, strlen(g.buffer2_65));
     PRINTF("NFC so display status is: '%s'\n", g.display_status);
 }

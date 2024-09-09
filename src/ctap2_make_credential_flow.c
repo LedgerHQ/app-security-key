@@ -31,14 +31,14 @@ static void ctap2_ux_get_display_user(void) {
 
     // TODO show that user.id is truncated if necessary
     if (ctap2RegisterData->userStr) {
-        uint8_t nameLength = MIN(ctap2RegisterData->userStrLen, sizeof(g.verifyHash) - 1);
+        uint8_t nameLength = MIN(ctap2RegisterData->userStrLen, sizeof(g.buffer2_65) - 1);
 
-        memcpy(g.verifyHash, ctap2RegisterData->userStr, nameLength);
-        g.verifyHash[nameLength] = '\0';
+        memcpy(g.buffer2_65, ctap2RegisterData->userStr, nameLength);
+        g.buffer2_65[nameLength] = '\0';
     } else {
-        uint8_t nameLength = MIN(ctap2RegisterData->userIdLen, (sizeof(g.verifyHash) - 1) / 2);
+        uint8_t nameLength = MIN(ctap2RegisterData->userIdLen, (sizeof(g.buffer2_65) - 1) / 2);
 
-        format_hex(ctap2RegisterData->userId, nameLength, g.verifyHash, sizeof(g.verifyHash));
+        format_hex(ctap2RegisterData->userId, nameLength, g.buffer2_65, sizeof(g.buffer2_65));
     }
 }
 
@@ -76,14 +76,14 @@ UX_STEP_NOCB(ux_ctap2_make_cred_flow_domain_step,
              bnnn_paging,
              {
                  .title = "Website",
-                 .text = g.rpID,
+                 .text = g.buffer1_65,
              });
 
 UX_STEP_NOCB(ux_ctap2_make_cred_flow_user_step,
              bnnn_paging,
              {
                  .title = "User ID",
-                 .text = g.verifyHash,
+                 .text = g.buffer2_65,
              });
 
 UX_STEP_CB(ux_ctap2_make_cred_flow_accept_step,
@@ -133,11 +133,11 @@ UX_FLOW(ux_ctap2_make_cred_resident_flow,
 #define NB_OF_PAIRS 2
 static const nbgl_layoutTagValue_t pairs[NB_OF_PAIRS] = {{
                                                              .item = "Website",
-                                                             .value = g.rpID,
+                                                             .value = g.buffer1_65,
                                                          },
                                                          {
                                                              .item = "User ID",
-                                                             .value = g.verifyHash,
+                                                             .value = g.buffer2_65,
                                                          }};
 
 #endif
@@ -148,10 +148,10 @@ void ctap2_make_credential_ux(void) {
     ctap2UxState = CTAP2_UX_STATE_MAKE_CRED;
 
     // TODO show that rp.id is truncated if necessary
-    uint8_t len = MIN(sizeof(g.rpID) - 1, ctap2RegisterData->rpIdLen);
-    memcpy(g.rpID, ctap2RegisterData->rpId, len);
+    uint8_t len = MIN(sizeof(g.buffer1_65) - 1, ctap2RegisterData->rpIdLen);
+    memcpy(g.buffer1_65, ctap2RegisterData->rpId, len);
 
-    g.rpID[len] = '\0';
+    g.buffer1_65[len] = '\0';
     ctap2_ux_get_display_user();
 
     UX_WAKE_UP();

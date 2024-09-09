@@ -68,9 +68,9 @@ static const uint8_t FIDO_AID[FIDO_AID_SIZE] = {0xA0, 0x00, 0x00, 0x06, 0x47, 0x
 #define EXT_ENC_DEFAULT_LE 65536
 
 typedef struct global_s {
-    char verifyHash[65];
     char buffer_20[20];
-    char rpID[65];
+    char buffer1_65[65];
+    char buffer2_65[65];
     char display_status[131];
     bool is_nfc;
 } global_t;

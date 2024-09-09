@@ -280,7 +280,7 @@ UX_STEP_NOCB(ux_register_flow_1_step,
              bnnn_paging,
              {
                  .title = "Identifier",
-                 .text = g.verifyHash,
+                 .text = g.buffer2_65,
              });
 UX_STEP_CB(ux_register_flow_2_step,
            pbb,
@@ -310,7 +310,7 @@ UX_STEP_NOCB(ux_login_flow_1_step,
              bnnn_paging,
              {
                  .title = "Identifier",
-                 .text = g.verifyHash,
+                 .text = g.buffer2_65,
              });
 UX_STEP_CB(ux_login_flow_2_step,
            pbb,
@@ -338,7 +338,7 @@ static const nbgl_layoutTagValue_t pairs[NB_OF_PAIRS] = {{
                                                          },
                                                          {
                                                              .item = "Website ID",
-                                                             .value = g.verifyHash,
+                                                             .value = g.buffer2_65,
                                                          }};
 
 static void on_register_choice(bool confirm) {
@@ -366,7 +366,7 @@ static void on_login_choice(bool confirm) {
 void u2f_prompt_user_presence(bool enroll, uint8_t *applicationParameter) {
     UX_WAKE_UP();
 
-    format_hex(applicationParameter, 32, g.verifyHash, sizeof(g.verifyHash));
+    format_hex(applicationParameter, 32, g.buffer2_65, sizeof(g.buffer2_65));
     strcpy(g.buffer_20, "Unknown");
 
     const char *name = fido_match_known_appid(applicationParameter);
