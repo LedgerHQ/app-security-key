@@ -48,14 +48,14 @@ static void ctap_ux_on_user_choice(bool confirm) {
     if (confirm) {
         ctap2_make_credential_confirm();
 #ifdef HAVE_NBGL
-        app_nbgl_status("Registration details\nsent", true, ui_idle, TUNE_SUCCESS);
+        app_nbgl_status("Registration details\nsent", true, ui_idle);
 #else
         ui_idle();
 #endif
     } else {
         ctap2_make_credential_user_cancel();
 #ifdef HAVE_NBGL
-        app_nbgl_status("Registration cancelled", false, ui_idle, NBGL_NO_TUNE);
+        app_nbgl_status("Registration cancelled", false, ui_idle);
 #else
         ui_idle();
 #endif

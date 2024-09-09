@@ -110,13 +110,18 @@ void app_main() {
     ui_idle();
 
     for (;;) {
-        g.is_nfc = CMD_IS_OVER_U2F_NFC;
-
+        g.is_nfc = false;
         // Receive command bytes in G_io_apdu_buffer
-        if ((input_len = io_recv_command()) < 0) {
+        input_len = io_recv_command();
+        // WARNING - For most basic U2F usages on USB, the SDK proxies U2F calls and directly calls
+        // the `ctap2_handle_cmd_cbor` or `ctap2_handle_cmd_cancel` functions (implemented in SK) by
+        // itself.
+        // This means that in these cases this position is not even reached.
+        if (input_len < 0) {
             PRINTF("=> io_recv_command failure\n");
             return;
         }
+        g.is_nfc = CMD_IS_OVER_U2F_NFC;
 
         // Dispatch APDU command to handler
         if (u2f_handle_apdu(G_io_apdu_buffer, input_len) < 0) {

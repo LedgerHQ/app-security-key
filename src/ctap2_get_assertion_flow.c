@@ -65,14 +65,14 @@ static void ctap_ux_on_user_choice(bool confirm, uint16_t idx) {
     if (confirm) {
         ctap2_get_assertion_confirm(idx);
 #ifdef HAVE_NBGL
-        app_nbgl_status("Login request signed", true, ui_idle, TUNE_SUCCESS);
+        app_nbgl_status("Login request signed", true, ui_idle);
 #else
         ui_idle();
 #endif
     } else {
         ctap2_get_assertion_user_cancel();
 #ifdef HAVE_NBGL
-        app_nbgl_status("Login cancelled", false, ui_idle, NBGL_NO_TUNE);
+        app_nbgl_status("Login cancelled", false, ui_idle);
 #else
         ui_idle();
 #endif
@@ -141,8 +141,10 @@ static void display_next_multiple_flow_state(uint16_t idx) {
     ctap2_assert_data_t *ctap2AssertData = globals_get_ctap2_assert_data();
     ctap2_get_assertion_credential_idx(idx);
 
-    snprintf((char *) g.verifyName,
-             sizeof(g.verifyName),
+    snprintf((char *) g.buffer_20,
+             sizeof(g.buffer_20),
+             // Max number will be 999: 'Log in user 999/999\n' -> 20 char.
+             // As the parameters are uint16_t, this could overflow, but it is very unlikely
              "Log in user %d/%d",
              ctap2AssertData->currentCredentialIndex,
              ctap2AssertData->availableCredentials);
@@ -187,7 +189,7 @@ UX_STEP_CB_INIT(ux_ctap2_get_assertion_multiple_user_border,
                 { display_next_state(STATE_VARIABLE); },
                 ctap_ux_on_user_choice(true, ux_step),
                 {
-                    .title = g.verifyName,
+                    .title = g.buffer_20,
                     .text = g.verifyHash,
                 });
 #else
@@ -196,7 +198,7 @@ UX_STEP_CB_INIT(ux_ctap2_get_assertion_multiple_user_border,
                 { display_next_state(STATE_VARIABLE); },
                 ctap_ux_on_user_choice(true, ux_step),
                 {
-                    g.verifyName,
+                    g.buffer_20,
                     g.verifyHash,
                 });
 #endif

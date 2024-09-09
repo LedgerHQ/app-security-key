@@ -537,7 +537,7 @@ UX_STEP_CB(ux_register_flow_0_step,
            {
                &C_icon_validate_14,
                "Register",
-               g.verifyName,
+               g.buffer_20,
            });
 UX_STEP_NOCB(ux_register_flow_1_step,
              bnnn_paging,
@@ -567,7 +567,7 @@ UX_STEP_CB(ux_login_flow_0_step,
            {
                &C_icon_validate_14,
                "Login",
-               g.verifyName,
+               g.buffer_20,
            });
 UX_STEP_NOCB(ux_login_flow_1_step,
              bnnn_paging,
@@ -597,7 +597,7 @@ UX_FLOW(ux_login_flow,
 #define NB_OF_PAIRS 2
 static const nbgl_layoutTagValue_t pairs[NB_OF_PAIRS] = {{
                                                              .item = "Website",
-                                                             .value = g.verifyName,
+                                                             .value = g.buffer_20,
                                                          },
                                                          {
                                                              .item = "Website ID",
@@ -607,20 +607,20 @@ static const nbgl_layoutTagValue_t pairs[NB_OF_PAIRS] = {{
 static void on_register_choice(bool confirm) {
     if (confirm) {
         u2f_process_user_presence_confirmed();
-        app_nbgl_status("Registration details\nsent", true, ui_idle, TUNE_SUCCESS);
+        app_nbgl_status("Registration details\nsent", true, ui_idle);
     } else {
         io_send_sw(SW_PROPRIETARY_INTERNAL);
-        app_nbgl_status("Registration cancelled", false, ui_idle, NBGL_NO_TUNE);
+        app_nbgl_status("Registration cancelled", false, ui_idle);
     }
 }
 
 static void on_login_choice(bool confirm) {
     if (confirm) {
         u2f_process_user_presence_confirmed();
-        app_nbgl_status("Login request signed", true, ui_idle, TUNE_SUCCESS);
+        app_nbgl_status("Login request signed", true, ui_idle);
     } else {
         io_send_sw(SW_PROPRIETARY_INTERNAL);
-        app_nbgl_status("Log in cancelled", false, ui_idle, NBGL_NO_TUNE);
+        app_nbgl_status("Log in cancelled", false, ui_idle);
     }
 }
 
@@ -630,11 +630,11 @@ static void u2f_prompt_user_presence(bool enroll, uint8_t *applicationParameter)
     UX_WAKE_UP();
 
     format_hex(applicationParameter, 32, g.verifyHash, sizeof(g.verifyHash));
-    strcpy(g.verifyName, "Unknown");
+    strcpy(g.buffer_20, "Unknown");
 
     const char *name = fido_match_known_appid(applicationParameter);
     if (name != NULL) {
-        strlcpy(g.verifyName, name, sizeof(g.verifyName));
+        strlcpy(g.buffer_20, name, sizeof(g.buffer_20));
     }
 
 #if defined(HAVE_BAGL)
@@ -768,11 +768,10 @@ static int u2f_handle_apdu_sign(const uint8_t *rx, uint32_t data_length, uint8_t
         // so compute the real answer as fast as possible
         uint16_t length = 0;
         uint16_t sw = u2f_prepare_sign_response(responseBuffer, &length);
-
         // Message fit in a single response, answer directly without nfc_io features
         io_send_response_pointer(responseBuffer, length, sw);
 
-        app_nbgl_status("Login request signed", true, ui_idle, TUNE_SUCCESS);
+        app_nbgl_status("Login request signed", true, ui_idle);
         return 0;
     } else
 #endif  // HAVE_NFC

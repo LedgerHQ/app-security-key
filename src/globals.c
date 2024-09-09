@@ -35,6 +35,8 @@ uint8_t responseBuffer[IO_APDU_BUFFER_SIZE];
 #include "string_utils.h"
 
 void truncate_pairs_for_display() {
+    truncate_for_nb_lines(g.buffer_20);
+    PRINTF("buffer_20 after truncation: '%s'\n", g.buffer_20);
     truncate_for_nb_lines(g.rpID);
     PRINTF("rpID after truncation: '%s'\n", g.rpID);
     truncate_for_nb_lines(g.verifyHash);

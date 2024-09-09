@@ -32,10 +32,7 @@ void app_nbgl_start_review(uint8_t nb_pairs,
                            nbgl_choiceCallback_t on_choice,
                            nbgl_callback_t on_select);
 
-void app_nbgl_status(const char *message,
-                     bool is_success,
-                     nbgl_callback_t on_quit,
-                     tune_index_e tune);
+void app_nbgl_status(const char *message, bool is_success, nbgl_callback_t on_quit);
 #endif
 
 #endif

@@ -26,7 +26,7 @@
 
 typedef struct global_s {
     char verifyHash[65];
-    char verifyName[20];
+    char buffer_20[20];
     char rpID[65];
     char display_status[131];
     bool is_nfc;

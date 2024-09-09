@@ -82,7 +82,7 @@ int nfc_io_send_prepared_response(void) {
 
     int ret = io_send_response_pointer(responseBuffer + start, size, sw);
     if (sw == SW_NO_ERROR && nfc_status != NULL) {
-        app_nbgl_status(nfc_status, true, ui_idle, TUNE_SUCCESS);
+        app_nbgl_status(nfc_status, true, ui_idle);
     }
 
     return ret;
