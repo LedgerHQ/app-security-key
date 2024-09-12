@@ -68,7 +68,7 @@ void send_cbor_response(u2f_service_t *service, uint32_t length) {
             status = "Login request signed";
         }
         nfc_io_set_response_ready(SW_NO_ERROR, length, status);
-        nfc_io_send_prepared_response();
+        nfc_io_send_prepared_response(true);
     } else if (CMD_IS_OVER_U2F_CMD) {
         io_send_response_pointer(responseBuffer, length, SW_NO_ERROR);
     } else {

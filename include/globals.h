@@ -120,5 +120,29 @@ static inline ctap2_assert_data_t *globals_get_ctap2_assert_data(void) {
     return &shared_ctx.u.ctap2Data.u.ctap2AssertData;
 }
 
-void truncate_pairs_for_display(void);
-void prepare_display_status(void);
+/*
+ * Truncate strings stored in global buffers to fit screen width. Truncation depends on police size:
+ * - on classic review screens, the police is larger, argument `large` should be `true` .
+ * - on status screens (buffer display when NFC transport is used), the police is smaller, argument
+ *   `large` should be `false`.
+ */
+void truncate_pairs_for_display(bool large);
+
+/*
+ * Formats strings stored in global buffers into a single global buffer
+ *
+ * This functions copies the global buffers `g.buffer1_65` and `g.buffer2_65` into
+ * `g.display_status`. This `g.display_status` is used by `app_nbgl_status` to display
+ * additional informations (RP name, username, ...).
+ * These information are copied only if:
+ * - the current transport is NFC
+ * - AND `clean_buffer` is `false`.
+ * In this case, the formatting is the following: `<g.buffer1_65>\n<g.buffer2_65>`.
+ * Else, '\0' is inserted at the beginning of the buffer.
+ * The input buffers should have been previously truncated to fit the NBGL page width.
+ *
+ * @param clean_buffer: always insert a '\0' character at the beginning of the buffer
+ */
+void prepare_display_status(bool clean_buffer);
+
+void ctap2_copy_info_on_buffers(void);

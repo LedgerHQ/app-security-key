@@ -98,4 +98,4 @@ typedef struct u2f_auth_resp_base_t {
 
 uint16_t u2f_prepare_enroll_response(uint8_t *buffer, uint16_t *length);
 uint16_t u2f_prepare_sign_response(uint8_t *buffer, uint16_t *length);
-void u2f_prompt_user_presence(bool enroll, uint8_t *applicationParameter);
+void u2f_prompt_user_presence(bool enroll);

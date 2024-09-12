@@ -222,7 +222,7 @@ void app_nbgl_start_review(uint8_t nb_pairs,
                            nbgl_choiceCallback_t on_choice,
                            nbgl_callback_t on_select) {
     // only NBGL screens has such needs
-    truncate_pairs_for_display();
+    truncate_pairs_for_display(true);
 
     nbgl_layoutDescription_t layoutDescription;
     onChoice = on_choice;
@@ -281,6 +281,15 @@ static void tickerCallback(void) {
 }
 
 void app_nbgl_status(const char *message, bool is_success, nbgl_callback_t on_quit) {
+    if (is_success) {
+        // Truncate display buffers for small police (hence `false`) then format them into the
+        // display buffer (which is then used in `centeredInfo.text3`)
+        truncate_pairs_for_display(false);
+        prepare_display_status(false);
+    } else {
+        prepare_display_status(true);
+    }
+
     if (is_success == true) {
         io_seproxyhal_play_tune(TUNE_SUCCESS);
     }
@@ -291,7 +300,6 @@ void app_nbgl_status(const char *message, bool is_success, nbgl_callback_t on_qu
         .tickerValue = 3000    // 3 seconds
     };
     onQuit = on_quit;
-    prepare_display_status();
     PRINTF("Will be displayed: '%s'\n", g.display_status);
     nbgl_pageInfoDescription_t info = {
         .bottomButtonStyle = NO_BUTTON_STYLE,

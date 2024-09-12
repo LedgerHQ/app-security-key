@@ -363,15 +363,15 @@ static void on_login_choice(bool confirm) {
 
 #endif
 
-void u2f_prompt_user_presence(bool enroll, uint8_t *applicationParameter) {
+void u2f_prompt_user_presence(bool enroll) {
     UX_WAKE_UP();
 
-    format_hex(applicationParameter, 32, g.buffer2_65, sizeof(g.buffer2_65));
-    strcpy(g.buffer_20, "Unknown");
-
-    const char *name = fido_match_known_appid(applicationParameter);
+    format_hex(globals_get_u2f_data()->application_param, 32, g.buffer2_65, sizeof(g.buffer2_65));
+    const char *name = fido_match_known_appid(globals_get_u2f_data()->application_param);
     if (name != NULL) {
         strlcpy(g.buffer_20, name, sizeof(g.buffer_20));
+    } else {
+        strcpy(g.buffer_20, "Unknown");
     }
 
 #if defined(HAVE_BAGL)

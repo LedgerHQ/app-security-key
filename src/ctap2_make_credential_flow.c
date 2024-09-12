@@ -20,27 +20,10 @@
 
 #include "os.h"
 #include "ux.h"
-#include "format.h"
 
 #include "ctap2.h"
 #include "globals.h"
 #include "ui_shared.h"
-
-static void ctap2_ux_get_display_user(void) {
-    ctap2_register_data_t *ctap2RegisterData = globals_get_ctap2_register_data();
-
-    // TODO show that user.id is truncated if necessary
-    if (ctap2RegisterData->userStr) {
-        uint8_t nameLength = MIN(ctap2RegisterData->userStrLen, sizeof(g.buffer2_65) - 1);
-
-        memcpy(g.buffer2_65, ctap2RegisterData->userStr, nameLength);
-        g.buffer2_65[nameLength] = '\0';
-    } else {
-        uint8_t nameLength = MIN(ctap2RegisterData->userIdLen, (sizeof(g.buffer2_65) - 1) / 2);
-
-        format_hex(ctap2RegisterData->userId, nameLength, g.buffer2_65, sizeof(g.buffer2_65));
-    }
-}
 
 static void ctap_ux_on_user_choice(bool confirm) {
     ctap2UxState = CTAP2_UX_STATE_NONE;
@@ -144,15 +127,9 @@ static const nbgl_layoutTagValue_t pairs[NB_OF_PAIRS] = {{
 
 void ctap2_make_credential_ux(void) {
     ctap2_register_data_t *ctap2RegisterData = globals_get_ctap2_register_data();
-
     ctap2UxState = CTAP2_UX_STATE_MAKE_CRED;
 
-    // TODO show that rp.id is truncated if necessary
-    uint8_t len = MIN(sizeof(g.buffer1_65) - 1, ctap2RegisterData->rpIdLen);
-    memcpy(g.buffer1_65, ctap2RegisterData->rpId, len);
-
-    g.buffer1_65[len] = '\0';
-    ctap2_ux_get_display_user();
+    ctap2_copy_info_on_buffers();
 
     UX_WAKE_UP();
 

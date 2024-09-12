@@ -204,11 +204,11 @@ static int u2f_handle_apdu_enroll(const uint8_t *rx, uint32_t data_length, const
 
         nfc_io_set_response_ready(sw, length, "Registration details\nsent");
 
-        return nfc_io_send_prepared_response();
+        return nfc_io_send_prepared_response(false);
     } else if (CMD_IS_OVER_U2F_USB) {
         u2f_message_set_autoreply_wait_user_presence(&G_io_u2f, true);
     }
-    u2f_prompt_user_presence(true, globals_get_u2f_data()->application_param);
+    u2f_prompt_user_presence(true);
     return 0;
 }
 
@@ -289,7 +289,7 @@ static int u2f_handle_apdu_sign(const uint8_t *rx, uint32_t data_length, uint8_t
         u2f_message_set_autoreply_wait_user_presence(&G_io_u2f, true);
     }
 
-    u2f_prompt_user_presence(false, globals_get_u2f_data()->application_param);
+    u2f_prompt_user_presence(false);
     return 0;
 
     // clang-format on
@@ -381,7 +381,7 @@ int u2f_handle_apdu(uint8_t *rx, int rx_length) {
                 if (!CMD_IS_OVER_U2F_NFC) {
                     return io_send_sw(SW_INS_NOT_SUPPORTED);
                 }
-                return nfc_io_send_prepared_response();
+                return nfc_io_send_prepared_response(false);
 
             default:
                 PRINTF("unsupported\n");
@@ -395,14 +395,14 @@ int u2f_handle_apdu(uint8_t *rx, int rx_length) {
 
             case 0x11:
                 PRINTF("NFCCTAP_GETRESPONSE\n");
-                return nfc_io_send_prepared_response();
+                return nfc_io_send_prepared_response(false);
 
             case FIDO2_NFC_INS_APPLET_DESELECT:
                 PRINTF("unsupported\n");
                 return io_send_sw(SW_INS_NOT_SUPPORTED);
 
             case 0xc0:
-                return nfc_io_send_prepared_response();
+                return nfc_io_send_prepared_response(false);
 
             default:
                 PRINTF("unsupported\n");
