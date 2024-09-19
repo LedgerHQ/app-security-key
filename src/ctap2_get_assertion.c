@@ -378,6 +378,7 @@ void ctap2_get_assertion_handle(u2f_service_t *service, uint8_t *buffer, uint16_
 
     if (CMD_IS_OVER_U2F_NFC) {
         // No up nor uv requested, skip UX and reply immediately
+        ctap2_copy_info_on_buffers();
         // TODO: is this what we want?
         // TODO: Handle cases where availableCredentials is != 1
         //  -> which credentials should be chosen?

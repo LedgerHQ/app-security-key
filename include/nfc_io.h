@@ -20,7 +20,15 @@
 void nfc_io_set_le(uint32_t le);
 void nfc_io_set_response_ready(uint16_t sw, uint16_t len, const char *status);
 bool nfc_io_is_response_pending(void);
-int nfc_io_send_prepared_response(void);
+
+/*
+ * Sends a previously prepared response through NFC, then (if successful) displays a status screen
+ * (usgin app_nbgl_status). Depending on `display_infos`, this screen will contain additional
+ * information such as the relying party name and/or the user credential.
+ *
+ * @param display_infos If the displayed status screen should contain RP/user information or not.
+ */
+int nfc_io_send_prepared_response(bool display_infos);
 
 #else
 static inline void nfc_io_set_le(uint32_t le __attribute__((unused))) {
@@ -38,7 +46,8 @@ static inline bool nfc_io_is_response_pending(void) {
     return false;
 }
 
-static inline int nfc_io_send_prepared_response(void) {
+static inline int nfc_io_send_prepared_response(bool display_infos) {
+    UNUSED(display_infos);
     return -1;
 }
 #endif

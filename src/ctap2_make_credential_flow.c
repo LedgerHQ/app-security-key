@@ -20,27 +20,10 @@
 
 #include "os.h"
 #include "ux.h"
-#include "format.h"
 
 #include "ctap2.h"
 #include "globals.h"
 #include "ui_shared.h"
-
-static void ctap2_ux_get_display_user(void) {
-    ctap2_register_data_t *ctap2RegisterData = globals_get_ctap2_register_data();
-
-    // TODO show that user.id is truncated if necessary
-    if (ctap2RegisterData->userStr) {
-        uint8_t nameLength = MIN(ctap2RegisterData->userStrLen, sizeof(g.verifyHash) - 1);
-
-        memcpy(g.verifyHash, ctap2RegisterData->userStr, nameLength);
-        g.verifyHash[nameLength] = '\0';
-    } else {
-        uint8_t nameLength = MIN(ctap2RegisterData->userIdLen, (sizeof(g.verifyHash) - 1) / 2);
-
-        format_hex(ctap2RegisterData->userId, nameLength, g.verifyHash, sizeof(g.verifyHash));
-    }
-}
 
 static void ctap_ux_on_user_choice(bool confirm) {
     ctap2UxState = CTAP2_UX_STATE_NONE;
@@ -48,14 +31,14 @@ static void ctap_ux_on_user_choice(bool confirm) {
     if (confirm) {
         ctap2_make_credential_confirm();
 #ifdef HAVE_NBGL
-        app_nbgl_status("Registration details\nsent", true, ui_idle, TUNE_SUCCESS);
+        app_nbgl_status("Registration details\nsent", true, ui_idle);
 #else
         ui_idle();
 #endif
     } else {
         ctap2_make_credential_user_cancel();
 #ifdef HAVE_NBGL
-        app_nbgl_status("Registration cancelled", false, ui_idle, NBGL_NO_TUNE);
+        app_nbgl_status("Registration cancelled", false, ui_idle);
 #else
         ui_idle();
 #endif
@@ -76,14 +59,14 @@ UX_STEP_NOCB(ux_ctap2_make_cred_flow_domain_step,
              bnnn_paging,
              {
                  .title = "Website",
-                 .text = g.rpID,
+                 .text = g.buffer1_65,
              });
 
 UX_STEP_NOCB(ux_ctap2_make_cred_flow_user_step,
              bnnn_paging,
              {
                  .title = "User ID",
-                 .text = g.verifyHash,
+                 .text = g.buffer2_65,
              });
 
 UX_STEP_CB(ux_ctap2_make_cred_flow_accept_step,
@@ -133,26 +116,20 @@ UX_FLOW(ux_ctap2_make_cred_resident_flow,
 #define NB_OF_PAIRS 2
 static const nbgl_layoutTagValue_t pairs[NB_OF_PAIRS] = {{
                                                              .item = "Website",
-                                                             .value = g.rpID,
+                                                             .value = g.buffer1_65,
                                                          },
                                                          {
                                                              .item = "User ID",
-                                                             .value = g.verifyHash,
+                                                             .value = g.buffer2_65,
                                                          }};
 
 #endif
 
 void ctap2_make_credential_ux(void) {
     ctap2_register_data_t *ctap2RegisterData = globals_get_ctap2_register_data();
-
     ctap2UxState = CTAP2_UX_STATE_MAKE_CRED;
 
-    // TODO show that rp.id is truncated if necessary
-    uint8_t len = MIN(sizeof(g.rpID) - 1, ctap2RegisterData->rpIdLen);
-    memcpy(g.rpID, ctap2RegisterData->rpId, len);
-
-    g.rpID[len] = '\0';
-    ctap2_ux_get_display_user();
+    ctap2_copy_info_on_buffers();
 
     UX_WAKE_UP();
 

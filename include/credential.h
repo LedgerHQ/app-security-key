@@ -19,6 +19,8 @@
 #ifndef __CREDENTIAL_H__
 #define __CREDENTIAL_H__
 
+#include "lcx_aes_siv.h"
+
 #define STATUS_RK_CREDENTIAL 0x01
 
 #define CREDENTIAL_VERSION_U2F   0x01

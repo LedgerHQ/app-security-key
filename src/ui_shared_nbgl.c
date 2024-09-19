@@ -16,6 +16,8 @@
 *   limitations under the License.
 ********************************************************************************/
 
+#if defined(HAVE_NBGL)
+
 #include "ux.h"
 
 static void app_quit(void) {
@@ -26,147 +28,6 @@ static void app_quit(void) {
 #include "config.h"
 #include "globals.h"
 #include "ui_shared.h"
-
-#if defined(HAVE_BAGL)
-#ifdef ENABLE_RK_CONFIG_UI_SETTING
-
-static void display_warning();
-static void display_settings();
-static void toggle_settings();
-
-UX_STEP_NOCB(ux_settings_enabling_flow_warning_step,
-             bn_paging,
-             {.title = "Warning",
-              .text = "Enabling resident\n"
-                      "keys will store login\n"
-                      "details on this device.\n"
-                      "An OS or app update\n"
-                      "will delete those\n"
-                      "login details.\n"
-                      "This will cause login\n"
-                      "issues for your\n"
-                      "connected accounts.\n"
-                      "Are you sure you\n"
-                      "want to enable\n"
-                      "resident keys?"});
-
-UX_STEP_CB(ux_settings_warning_flow_cancel_step,
-           pb,
-           display_settings(),
-           {
-               &C_icon_crossmark,
-               "Cancel",
-           });
-
-UX_STEP_CB(ux_settings_enabling_flow_confirm_step,
-           pbb,
-           toggle_settings(),
-           {
-               &C_icon_validate_14,
-               "Enable",
-               "resident keys",
-           });
-
-UX_FLOW(ux_settings_enabling_flow,
-        &ux_settings_enabling_flow_warning_step,
-        &ux_settings_warning_flow_cancel_step,
-        &ux_settings_enabling_flow_confirm_step);
-
-static void display_warning() {
-    ux_flow_init(0, ux_settings_enabling_flow, NULL);
-}
-
-static void toggle_settings() {
-    if (config_get_rk_enabled()) {
-        config_set_rk_enabled(false);
-    } else {
-        config_set_rk_enabled(true);
-    }
-    display_settings();
-}
-
-UX_STEP_CB(ux_settings_flow_1_enabled_step, bn, toggle_settings(), {"Resident keys", "Enabled"});
-
-UX_STEP_CB(ux_settings_flow_1_disabled_step, bn, display_warning(), {"Resident keys", "Disabled"});
-
-UX_STEP_CB(ux_settings_flow_2_step,
-           pb,
-           ui_idle(),
-           {
-               &C_icon_back_x,
-               "Back",
-           });
-
-UX_DEF(ux_settings_enabled_flow, &ux_settings_flow_1_enabled_step, &ux_settings_flow_2_step);
-
-UX_DEF(ux_settings_disabled_flow, &ux_settings_flow_1_disabled_step, &ux_settings_flow_2_step);
-
-static void display_settings() {
-    if (config_get_rk_enabled()) {
-        ux_flow_init(0, ux_settings_enabled_flow, NULL);
-    } else {
-        ux_flow_init(0, ux_settings_disabled_flow, NULL);
-    }
-}
-#endif  // ENABLE_RK_CONFIG_UI_SETTING
-
-UX_STEP_NOCB(ux_idle_flow_1_step, pn, {&C_icon_security_key, "Security Key"});
-
-#ifndef TARGET_NANOS
-UX_STEP_NOCB(ux_idle_flow_2_step,
-             nnnn,
-             {"Use for two-factor", "authentication and", "password-less", "log ins."});
-#else
-UX_STEP_NOCB(ux_idle_flow_2_step,
-             nn,
-             {
-                 "Use for 2FA and",
-                 "password-less log ins.",
-             });
-#endif
-
-UX_STEP_NOCB(ux_idle_flow_3_step,
-             bn,
-             {
-                 "Version",
-                 APPVERSION,
-             });
-
-#ifdef ENABLE_RK_CONFIG_UI_SETTING
-UX_STEP_VALID(ux_idle_flow_4_step,
-              pb,
-              display_settings(),
-              {
-                  &C_icon_coggle,
-                  "Settings",
-              });
-#endif  // ENABLE_RK_CONFIG_UI_SETTING
-
-UX_STEP_CB(ux_idle_flow_5_step,
-           pb,
-           app_quit(),
-           {
-               &C_icon_dashboard_x,
-               "Quit app",
-           });
-UX_FLOW(ux_idle_flow,
-        &ux_idle_flow_1_step,
-        &ux_idle_flow_2_step,
-        &ux_idle_flow_3_step,
-#ifdef ENABLE_RK_CONFIG_UI_SETTING
-        &ux_idle_flow_4_step,
-#endif  // ENABLE_RK_CONFIG_UI_SETTING
-        &ux_idle_flow_5_step);
-
-void ui_idle(void) {
-    // reserve a display stack slot if none yet
-    if (G_ux.stack_count == 0) {
-        ux_stack_push();
-    }
-    ux_flow_init(0, ux_idle_flow, NULL);
-}
-
-#elif defined(HAVE_NBGL)
 
 #include "nbgl_use_case.h"
 #include "nbgl_page.h"
@@ -218,7 +79,7 @@ static void ui_back_from_menu_choice(void) {
 static void warning_choice(bool accept) {
     if (accept) {
         config_set_rk_enabled(true);
-        app_nbgl_status("Resident keys enabled", true, ui_back_from_menu_choice, NBGL_NO_TUNE);
+        app_nbgl_status("Resident keys enabled", true, ui_back_from_menu_choice);
     } else {
         ui_back_from_menu_choice();
     }
@@ -360,10 +221,8 @@ void app_nbgl_start_review(uint8_t nb_pairs,
                            const char *confirm_text,
                            nbgl_choiceCallback_t on_choice,
                            nbgl_callback_t on_select) {
-#if defined(HAVE_NBGL)
     // only NBGL screens has such needs
-    truncate_pairs_for_display();
-#endif
+    truncate_pairs_for_display(true);
 
     nbgl_layoutDescription_t layoutDescription;
     onChoice = on_choice;
@@ -421,12 +280,18 @@ static void tickerCallback(void) {
     }
 }
 
-void app_nbgl_status(const char *message,
-                     bool is_success,
-                     nbgl_callback_t on_quit,
-                     tune_index_e tune) {
-    if (tune != NBGL_NO_TUNE) {
-        io_seproxyhal_play_tune(tune);
+void app_nbgl_status(const char *message, bool is_success, nbgl_callback_t on_quit) {
+    if (is_success) {
+        // Truncate display buffers for small police (hence `false`) then format them into the
+        // display buffer (which is then used in `centeredInfo.text3`)
+        truncate_pairs_for_display(false);
+        prepare_display_status(false);
+    } else {
+        prepare_display_status(true);
+    }
+
+    if (is_success == true) {
+        io_seproxyhal_play_tune(TUNE_SUCCESS);
     }
 
     nbgl_screenTickerConfiguration_t ticker = {
@@ -435,7 +300,6 @@ void app_nbgl_status(const char *message,
         .tickerValue = 3000    // 3 seconds
     };
     onQuit = on_quit;
-    prepare_display_status();
     PRINTF("Will be displayed: '%s'\n", g.display_status);
     nbgl_pageInfoDescription_t info = {
         .bottomButtonStyle = NO_BUTTON_STYLE,
