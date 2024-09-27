@@ -26,6 +26,7 @@ class APDU(IntEnum):
 
     # Vendor specific status codes
     SW_INTERNAL_EXCEPTION = 0X6F00,
+    SW_USER_REFUSED = 0x6F01,
     SW_PROPRIETARY_INTERNAL = 0x6FFF,
 
 
