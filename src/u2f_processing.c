@@ -190,7 +190,7 @@ static int u2f_handle_apdu_enroll(const uint8_t *rx, uint32_t data_length, const
     }
 
     // Backup ins, challenge and application parameters to be used if user accept the request
-    globals_get_u2f_data()->ins = FIDO_INS_ENROLL;
+    globals_get_u2f_data()->ins = FIDO_INS_REGISTER;
     memmove(globals_get_u2f_data()->challenge_param,
             reg_req->challenge_param,
             sizeof(reg_req->challenge_param));
@@ -356,7 +356,7 @@ int u2f_handle_apdu(uint8_t *rx, int rx_length) {
 
     if (rx[OFFSET_CLA] == FIDO_CLA) {
         switch (rx[OFFSET_INS]) {
-            case FIDO_INS_ENROLL:
+            case FIDO_INS_REGISTER:
                 PRINTF("enroll\n");
                 return u2f_handle_apdu_enroll(rx, data_length, data);
 

@@ -23,7 +23,7 @@ bool nfc_io_is_response_pending(void);
 
 /*
  * Sends a previously prepared response through NFC, then (if successful) displays a status screen
- * (usgin app_nbgl_status). Depending on `display_infos`, this screen will contain additional
+ * (using `app_nbgl_status`). Depending on `display_infos`, this screen will contain additional
  * information such as the relying party name and/or the user credential.
  *
  * @param display_infos If the displayed status screen should contain RP/user information or not.

@@ -235,7 +235,7 @@ static int u2f_process_user_presence_confirmed(void) {
     uint16_t length = 0;
 
     switch (globals_get_u2f_data()->ins) {
-        case FIDO_INS_ENROLL:
+        case FIDO_INS_REGISTER:
             sw = u2f_prepare_enroll_response(responseBuffer, &length);
             break;
 
