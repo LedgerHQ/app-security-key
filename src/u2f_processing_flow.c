@@ -235,7 +235,7 @@ static int u2f_process_user_presence_confirmed(void) {
     uint16_t length = 0;
 
     switch (globals_get_u2f_data()->ins) {
-        case FIDO_INS_ENROLL:
+        case FIDO_INS_REGISTER:
             sw = u2f_prepare_enroll_response(responseBuffer, &length);
             break;
 
@@ -256,7 +256,7 @@ static int u2f_process_user_presence_confirmed(void) {
 #if defined(HAVE_BAGL)
 
 static unsigned int u2f_callback_cancel(void) {
-    io_send_sw(SW_PROPRIETARY_INTERNAL);
+    io_send_sw(SW_USER_REFUSED);
     ui_idle();
     return 0;
 }
@@ -346,7 +346,7 @@ static void on_register_choice(bool confirm) {
         u2f_process_user_presence_confirmed();
         app_nbgl_status("Registration details\nsent", true, ui_idle);
     } else {
-        io_send_sw(SW_PROPRIETARY_INTERNAL);
+        io_send_sw(SW_USER_REFUSED);
         app_nbgl_status("Registration cancelled", false, ui_idle);
     }
 }
@@ -356,7 +356,7 @@ static void on_login_choice(bool confirm) {
         u2f_process_user_presence_confirmed();
         app_nbgl_status("Login request signed", true, ui_idle);
     } else {
-        io_send_sw(SW_PROPRIETARY_INTERNAL);
+        io_send_sw(SW_USER_REFUSED);
         app_nbgl_status("Log in cancelled", false, ui_idle);
     }
 }

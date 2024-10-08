@@ -39,7 +39,7 @@ static const uint8_t FIDO_AID[FIDO_AID_SIZE] = {0xA0, 0x00, 0x00, 0x06, 0x47, 0x
 #define OFFSET_P2  3
 
 #define FIDO_CLA               0x00
-#define FIDO_INS_ENROLL        0x01
+#define FIDO_INS_REGISTER      0x01
 #define FIDO_INS_SIGN          0x02
 #define FIDO_INS_GET_VERSION   0x03
 #define FIDO_INS_CTAP2_PROXY   0x10

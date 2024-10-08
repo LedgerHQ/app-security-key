@@ -27,6 +27,12 @@
 #include "nfc_io.h"
 #include "sw_code.h"
 
+// These are used by some services to perform fake register in order to check for user presence
+// As this could be disruptive, we are going to immediately return an error on such request.
+static const uint8_t bogusSize = 32;
+static const uint8_t bogusAppParamValue = 0x41;
+static const uint8_t bogusChallengeParamValue = 0x42;
+
 static int u2f_get_cmd_msg_data(uint8_t *rx, uint16_t rx_length, uint8_t **data, uint32_t *le) {
     uint32_t data_length;
     /* Parse buffer to retrieve the data length.
@@ -189,8 +195,26 @@ static int u2f_handle_apdu_enroll(const uint8_t *rx, uint32_t data_length, const
         return io_send_sw(SW_INCORRECT_P1P2);
     }
 
+    // Hacky behavior in U2F: some browser send this gibberish 'register' command while
+    // waiting answers for authentication.
+    if (sizeof(reg_req->challenge_param) == bogusSize &&
+        sizeof(reg_req->application_param) == bogusSize) {
+        bool fake_register = true;
+        // checking app & challenge parameters are only 0x41s and 0x42s
+        for (int i = 0; i < bogusSize; i++) {
+            if (reg_req->challenge_param[i] != bogusChallengeParamValue ||
+                reg_req->application_param[i] != bogusAppParamValue) {
+                fake_register = false;
+                break;
+            }
+        }
+        if (fake_register) {
+            return io_send_sw(SW_USER_REFUSED);
+        }
+    }
+
     // Backup ins, challenge and application parameters to be used if user accept the request
-    globals_get_u2f_data()->ins = FIDO_INS_ENROLL;
+    globals_get_u2f_data()->ins = FIDO_INS_REGISTER;
     memmove(globals_get_u2f_data()->challenge_param,
             reg_req->challenge_param,
             sizeof(reg_req->challenge_param));
@@ -356,7 +380,7 @@ int u2f_handle_apdu(uint8_t *rx, int rx_length) {
 
     if (rx[OFFSET_CLA] == FIDO_CLA) {
         switch (rx[OFFSET_INS]) {
-            case FIDO_INS_ENROLL:
+            case FIDO_INS_REGISTER:
                 PRINTF("enroll\n");
                 return u2f_handle_apdu_enroll(rx, data_length, data);
 

@@ -24,4 +24,5 @@
 #define SW_INCORRECT_P1P2           0x6A86
 #define SW_INS_NOT_SUPPORTED        0x6D00
 #define SW_CLA_NOT_SUPPORTED        0x6E00
+#define SW_USER_REFUSED             0x6F01
 #define SW_PROPRIETARY_INTERNAL     0x6FFF

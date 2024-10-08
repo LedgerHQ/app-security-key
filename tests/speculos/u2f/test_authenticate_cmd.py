@@ -108,7 +108,7 @@ def test_authenticate_user_refused(client, test_name):
                                   check_screens="full",
                                   compare_args=compare_args)
 
-    assert e.value.code == APDU.SW_PROPRIETARY_INTERNAL
+    assert e.value.code == APDU.SW_USER_REFUSED
 
 
 def test_authenticate_with_reboot_ok(client):

@@ -64,7 +64,15 @@ def test_register_user_refused(client, test_name):
                               check_screens="full",
                               compare_args=compare_args)
 
-    assert e.value.code == APDU.SW_PROPRIETARY_INTERNAL
+    assert e.value.code == APDU.SW_USER_REFUSED
+
+
+def test_register_fake_refused(client):
+    # challenge parameter + application parameter
+    data = b'\x42' * 32 + b'\x41' * 32
+    with pytest.raises(ApduError) as e:
+        client.ctap1.send_apdu(ins=Ctap1.INS.REGISTER, data=data)
+    assert e.value.code == APDU.SW_USER_REFUSED
 
 
 def test_register_duplicate(client):
