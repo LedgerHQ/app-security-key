@@ -310,7 +310,8 @@ void app_nbgl_status(const char *message, bool is_success, nbgl_callback_t on_qu
         .centeredInfo.style = LARGE_CASE_INFO,
         .centeredInfo.text1 = message,
         .centeredInfo.text2 = NULL,
-        .centeredInfo.text3 = g.display_status[0] == 0 ? NULL : &g.display_status[0],
+        .centeredInfo.text3 = NULL,
+        /* .centeredInfo.text3 = g.display_status[0] == 0 ? NULL : &g.display_status[0], */
         .tapActionText = NULL,
         .tapActionToken = QUIT_TOKEN,
         .topRightStyle = NO_BUTTON_STYLE,
