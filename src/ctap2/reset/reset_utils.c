@@ -1,7 +1,7 @@
 /*
 *******************************************************************************
 *   Ledger App Security Key
-*   (c) 2022 Ledger
+*   (c) 2024 Ledger
 *
 *  Licensed under the Apache License, Version 2.0 (the "License");
 *  you may not use this file except in compliance with the License.
@@ -16,27 +16,8 @@
 *   limitations under the License.
 ********************************************************************************/
 
-#include "os.h"
-
-#include "ctap2.h"
 #include "config.h"
-#include "ui_shared.h"
 #include "globals.h"
-
-void ctap2_reset_handle(u2f_service_t *service, uint8_t *buffer, uint16_t length) {
-    UNUSED(service);
-    UNUSED(buffer);
-    UNUSED(length);
-
-    if (CMD_IS_OVER_U2F_NFC) {
-        // Denied authenticatorReset over NFC as it can't be approved by the user.
-        // Note, this is a behavior allowed by the FIDO spec.
-        send_cbor_error(&G_io_u2f, ERROR_OPERATION_DENIED);
-    }
-
-    PRINTF("ctap2_reset_handle\n");
-    ctap2_reset_ux();
-}
 
 void ctap2_reset_confirm() {
     config_process_ctap2_reset();

@@ -16,7 +16,7 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Lint C code
-        run: clang-format --dry-run --Werror include/* src/* src-cbor/*
+        run: clang-format --dry-run --Werror include/* src/* cbor-src/*
 
   job_lint_python:
     name: Lint Python code
@@ -32,4 +32,4 @@ jobs:
           sudo apt install -y flake8
 
       - name: Lint Python code
-        run: cd tests/speculos && flake8
+        run: cd tests/functional && flake8

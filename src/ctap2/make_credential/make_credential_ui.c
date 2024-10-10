@@ -21,9 +21,11 @@
 #include "os.h"
 #include "ux.h"
 
-#include "ctap2.h"
 #include "globals.h"
 #include "ui_shared.h"
+
+#include "make_credential_ui.h"
+#include "make_credential_utils.h"
 
 static void ctap_ux_on_user_choice(bool confirm) {
     ctap2UxState = CTAP2_UX_STATE_NONE;

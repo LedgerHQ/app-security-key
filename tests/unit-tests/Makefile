@@ -4,7 +4,7 @@ RM ?= rm -f
 CFLAGS ?= -O2 -Wall -Wextra -Wformat=2 -Wp,-MT,$@ -Wp,-MD,$(dir $@).$(notdir $@).d -fstack-protector
 CFLAGS += -DPRINTF=printf
 CFLAGS += -DUNIT_TESTS
-CFLAGS += -I. -I../../include -I../../src-cbor
+CFLAGS += -I. -I../../include -I../../cbor-src
 
 LDFLAGS ?= -Wl,-O1,-as-needed,-no-undefined,-z,relro,-z,now,--fatal-warnings -fstack-protector
 
@@ -31,16 +31,16 @@ test_cbip_decode: test_cbip_decode.o cbip_decode.o
 test_cbip_encode: test_cbip_encode.o cbip_encode.o
 	$(CC) $(LDFLAGS) -o $@ $^
 
-fuzz_cbip_decode: fuzz_cbip_decode.cpp ../../src-cbor/cbip_decode.c
-	clang -g -O1 -fsanitize=fuzzer,address $(CFLAGS) -UPRINTF -DPRINTF= -Wno-unused-value -o $@ fuzz_cbip_decode.cpp ../../src-cbor/cbip_decode.c
+fuzz_cbip_decode: fuzz_cbip_decode.cpp ../../cbor-src/cbip_decode.c
+	clang -g -O1 -fsanitize=fuzzer,address $(CFLAGS) -UPRINTF -DPRINTF= -Wno-unused-value -o $@ fuzz_cbip_decode.cpp ../../cbor-src/cbip_decode.c
 
-fuzz_cbip_helper: fuzz_cbip_helper.cpp ../../src/cbip_helper.c ../../src-cbor/cbip_decode.c
-	clang -g -O1 -fsanitize=fuzzer,address $(CFLAGS) -UPRINTF -DPRINTF= -DHAVE_CBOR_DEBUG -DFUZZ -Wno-unused-value -o $@ fuzz_cbip_helper.cpp ../../src/cbip_helper.c ../../src-cbor/cbip_decode.c
+fuzz_cbip_helper: fuzz_cbip_helper.cpp ../../src/cbip_helper.c ../../cbor-src/cbip_decode.c
+	clang -g -O1 -fsanitize=fuzzer,address $(CFLAGS) -UPRINTF -DPRINTF= -DHAVE_CBOR_DEBUG -DFUZZ -Wno-unused-value -o $@ fuzz_cbip_helper.cpp ../../src/cbip_helper.c ../../cbor-src/cbip_decode.c
 
-cbip_decode.o: ../../src-cbor/cbip_decode.c
+cbip_decode.o: ../../cbor-src/cbip_decode.c
 	$(CC) $(CFLAGS) -c -o $@ $<
 
-cbip_encode.o: ../../src-cbor/cbip_encode.c
+cbip_encode.o: ../../cbor-src/cbip_encode.c
 	$(CC) $(CFLAGS) -c -o $@ $<
 
 test_cbip_decode.o: test_cbip_decode.c

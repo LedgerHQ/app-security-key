@@ -1,0 +1,367 @@
+/*
+*******************************************************************************
+*   Ledger App Security Key
+*   (c) 2022 Ledger
+*
+*  Licensed under the Apache License, Version 2.0 (the "License");
+*  you may not use this file except in compliance with the License.
+*  You may obtain a copy of the License at
+*
+*      http://www.apache.org/licenses/LICENSE-2.0
+*
+*   Unless required by applicable law or agreed to in writing, software
+*   distributed under the License is distributed on an "AS IS" BASIS,
+*   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+*  See the License for the specific language governing permissions and
+*   limitations under the License.
+********************************************************************************/
+
+#include <string.h>
+
+#include "ctap2.h"
+#include "config.h"
+#include "ui_shared.h"
+#include "globals.h"
+#include "rk_storage.h"
+
+#include "get_assertion_ui.h"
+#include "get_assertion_utils.h"
+
+static int parse_getAssert_authnr_rpid(cbipDecoder_t *decoder, cbipItem_t *mapItem) {
+    ctap2_assert_data_t *ctap2AssertData = globals_get_ctap2_assert_data();
+
+    if (cbiph_get_map_key_text(decoder,
+                               mapItem,
+                               TAG_RP_ID,
+                               &ctap2AssertData->rpId,
+                               &ctap2AssertData->rpIdLen) != CBIPH_STATUS_FOUND) {
+        return ERROR_MISSING_PARAMETER;
+    }
+
+#ifdef HAVE_FIDO2_RPID_FILTER
+    if (CMD_IS_OVER_U2F_CMD && !CMD_IS_OVER_U2F_NFC) {
+        if (ctap2_check_rpid_filter(ctap2AssertData->rpId, ctap2AssertData->rpIdLen)) {
+            PRINTF("rpId denied by filter\n");
+            return ERROR_PROP_RPID_MEDIA_DENIED;
+        }
+    }
+#endif
+
+    // Compute RP ID hash
+    cx_hash_sha256((uint8_t *) ctap2AssertData->rpId,
+                   ctap2AssertData->rpIdLen,
+                   ctap2AssertData->rpIdHash,
+                   CX_SHA256_SIZE);
+
+    // TODO: UTF-8 characters that are not ASCII will be dropped when displaying
+
+    return 0;
+}
+
+static int parse_getAssert_authnr_clientDataHash(cbipDecoder_t *decoder, cbipItem_t *mapItem) {
+    ctap2_assert_data_t *ctap2AssertData = globals_get_ctap2_assert_data();
+    uint32_t itemLength;
+    int status;
+
+    status = cbiph_get_map_key_bytes(decoder,
+                                     mapItem,
+                                     TAG_CLIENT_DATA_HASH,
+                                     &ctap2AssertData->clientDataHash,
+                                     &itemLength);
+    if (status != CBIPH_STATUS_FOUND) {
+        PRINTF("Error fetching clientDataHash\n");
+        return cbiph_map_cbor_error(status);
+    }
+    if (itemLength != CX_SHA256_SIZE) {
+        PRINTF("Invalid clientDataHash length\n");
+        return ERROR_INVALID_CBOR;
+    }
+    return 0;
+}
+
+static int process_getAssert_authnr_allowList(cbipDecoder_t *decoder, cbipItem_t *mapItem) {
+    ctap2_assert_data_t *ctap2AssertData = globals_get_ctap2_assert_data();
+    cbipItem_t tmpItem;
+    int arrayLen;
+    int status = CBIPH_STATUS_NOT_FOUND;
+    uint8_t *prevCredId = NULL;
+    uint32_t prevCredIdLen = 0;
+
+    ctap2AssertData->allowListPresent = 0;
+    ctap2AssertData->availableCredentials = 0;
+
+    CHECK_MAP_KEY_ITEM_IS_VALID(decoder, mapItem, TAG_ALLOWLIST, tmpItem, cbipArray);
+    arrayLen = tmpItem.value;
+    if ((status == CBIPH_STATUS_FOUND) && (arrayLen > 0)) {
+        ctap2AssertData->allowListPresent = 1;
+
+        for (int i = 0; i < arrayLen; i++) {
+            if (i == 0) {
+                cbip_next(decoder, &tmpItem);
+            } else {
+                cbiph_next_deep(decoder, &tmpItem);
+            }
+
+            status = handle_getAssert_allowList_item(decoder, &tmpItem, true);
+            if (status == ERROR_INVALID_CREDENTIAL) {
+                // Just ignore this credential
+                continue;
+            } else if (status != ERROR_NONE) {
+                return status;
+            }
+
+            /* Weird behavior seen on Safari on MacOs, allowList entries are duplicated.
+             * seen order is: 1, 2, ..., n, 1', 2', ..., n'.
+             * In order to improve user experience while this might be fix in Safari side,
+             * we decided to filter out the duplicate in a specific scenario:
+             * - they are only 2 credentials in the allowList
+             * - the first and second credentials are valid and are exactly the same.
+             */
+            if (arrayLen == 2) {
+                if (i == 0) {
+                    // Backup credId and credIdLen before parsing next credential
+                    prevCredId = ctap2AssertData->credId;
+                    prevCredIdLen = ctap2AssertData->credIdLen;
+                } else {
+                    if ((ctap2AssertData->availableCredentials == 1) &&
+                        (ctap2AssertData->credIdLen == prevCredIdLen) &&
+                        (memcmp(ctap2AssertData->credId, prevCredId, prevCredIdLen) == 0)) {
+                        // Just ignore this duplicate credential
+                        continue;
+                    }
+                }
+            }
+
+            PRINTF("Valid candidate %d\n", i);
+            ctap2AssertData->availableCredentials += 1;
+        }
+    }
+
+    PRINTF("allowListPresent %d entries %d\n",
+           ctap2AssertData->allowListPresent,
+           ctap2AssertData->availableCredentials);
+
+    return 0;
+}
+
+static int process_getAssert_authnr_extensions(cbipDecoder_t *decoder, cbipItem_t *mapItem) {
+    ctap2_assert_data_t *ctap2AssertData = globals_get_ctap2_assert_data();
+    cbipItem_t extensionsItem, hmacSecretItem;
+    int status = CBIPH_STATUS_NOT_FOUND;
+
+    CHECK_MAP_KEY_ITEM_IS_VALID(decoder, mapItem, TAG_EXTENSIONS, extensionsItem, cbipMap);
+    if (status == CBIPH_STATUS_FOUND) {
+        // Check hmacSecret extension
+        CHECK_MAP_STR_KEY_ITEM_IS_VALID(decoder,
+                                        &extensionsItem,
+                                        EXTENSION_HMAC_SECRET,
+                                        hmacSecretItem,
+                                        cbipMap);
+        if (status == CBIPH_STATUS_FOUND) {
+            // All processing and check is done in ctap2_compute_hmacSecret_output()
+            // when building the response
+            ctap2AssertData->extensions |= FLAG_EXTENSION_HMAC_SECRET;
+        }
+    }
+    return 0;
+}
+
+static int process_getAssert_authnr_options(cbipDecoder_t *decoder, cbipItem_t *mapItem) {
+    ctap2_assert_data_t *ctap2AssertData = globals_get_ctap2_assert_data();
+    cbipItem_t optionsItem;
+    int status = CBIPH_STATUS_NOT_FOUND;
+    bool boolValue;
+
+    ctap2AssertData->userPresenceRequired = true;
+    CHECK_MAP_KEY_ITEM_IS_VALID(decoder, mapItem, TAG_OPTIONS, optionsItem, cbipMap);
+    if (status == CBIPH_STATUS_FOUND) {
+        // Forbidden option
+        status = cbiph_get_map_key_str_bool(decoder, &optionsItem, OPTION_RESIDENT_KEY, &boolValue);
+        if ((status == CBIPH_STATUS_FOUND) && boolValue) {
+            PRINTF("Forbidden resident key option\n");
+            return ERROR_INVALID_OPTION;
+        }
+
+        status =
+            cbiph_get_map_key_str_bool(decoder, &optionsItem, OPTION_USER_VERIFICATION, &boolValue);
+        if (status == CBIPH_STATUS_FOUND) {
+            ctap2AssertData->pinRequired = boolValue;
+        }
+
+        status =
+            cbiph_get_map_key_str_bool(decoder, &optionsItem, OPTION_USER_PRESENCE, &boolValue);
+        if (status == CBIPH_STATUS_FOUND) {
+            ctap2AssertData->userPresenceRequired = boolValue;
+        }
+    }
+
+    PRINTF("up %d uv %d\n", ctap2AssertData->userPresenceRequired, ctap2AssertData->pinRequired);
+
+    return 0;
+}
+
+static int process_getAssert_authnr_pin(cbipDecoder_t *decoder, cbipItem_t *mapItem) {
+    ctap2_assert_data_t *ctap2AssertData = globals_get_ctap2_assert_data();
+    int status;
+    int pinProtocolVersion = 0;
+    uint8_t *pinAuth;
+    uint32_t pinAuthLen;
+
+    status = cbiph_get_map_key_int(decoder, mapItem, TAG_PIN_PROTOCOL, &pinProtocolVersion);
+    if (status == CBIPH_STATUS_FOUND) {
+        if (pinProtocolVersion != PIN_PROTOCOL_VERSION_V1) {
+            PRINTF("Unsupported PIN protocol version\n");
+            return ERROR_PIN_AUTH_INVALID;
+        }
+    }
+
+    status = cbiph_get_map_key_bytes(decoder, mapItem, TAG_PIN_AUTH, &pinAuth, &pinAuthLen);
+    if (status > 0) {
+        if (!N_u2f.pinSet) {
+            PRINTF("PIN not set\n");
+            return ERROR_PIN_NOT_SET;
+        }
+
+        if (pinAuthLen == 0) {
+            // DEVIATION from FIDO2.0 spec: "If platform sends zero length pinAuth,
+            // authenticator needs to wait for user touch and then returns [...]"
+            // Impact is minor because user as still manually unlocked it's device.
+            // therefore user presence is somehow guarantee.
+            return ERROR_PIN_INVALID;
+        }
+
+        status = ctap2_client_pin_verify_auth_token(pinProtocolVersion,
+                                                    ctap2AssertData->clientDataHash,
+                                                    CX_SHA256_SIZE,
+                                                    pinAuth,
+                                                    pinAuthLen);
+        if (status != ERROR_NONE) {
+            return ERROR_PIN_AUTH_INVALID;
+        }
+
+        ctap2AssertData->clientPinAuthenticated = 1;
+        PRINTF("Client PIN authenticated\n");
+    }
+
+    return 0;
+}
+
+void ctap2_get_assertion_handle(u2f_service_t *service, uint8_t *buffer, uint16_t length) {
+    ctap2_assert_data_t *ctap2AssertData = globals_get_ctap2_assert_data();
+    cbipDecoder_t decoder;
+    cbipItem_t mapItem;
+    int status;
+
+    PRINTF("CTAP2 get_assertion_handle\n");
+
+    memset(ctap2AssertData, 0, sizeof(ctap2_assert_data_t));
+    ctap2AssertData->buffer = buffer;
+
+    // Init CBIP decoder
+    cbip_decoder_init(&decoder, buffer, length);
+    cbip_first(&decoder, &mapItem);
+    if (mapItem.type != cbipMap) {
+        PRINTF("Invalid top item\n");
+        status = ERROR_INVALID_CBOR;
+        goto exit;
+    }
+
+    ctap2_send_keepalive_processing();
+
+    // Check rpid
+    status = parse_getAssert_authnr_rpid(&decoder, &mapItem);
+    if (status != 0) {
+        goto exit;
+    }
+
+    // Check clientDataHash
+    status = parse_getAssert_authnr_clientDataHash(&decoder, &mapItem);
+    if (status != 0) {
+        goto exit;
+    }
+
+    // Check allowlist
+    status = process_getAssert_authnr_allowList(&decoder, &mapItem);
+    if (status != 0) {
+        goto exit;
+    }
+
+    // Check extensions
+    status = process_getAssert_authnr_extensions(&decoder, &mapItem);
+    if (status != 0) {
+        goto exit;
+    }
+
+    // Check options
+    status = process_getAssert_authnr_options(&decoder, &mapItem);
+    if (status != 0) {
+        goto exit;
+    }
+
+    if (((ctap2AssertData->extensions & FLAG_EXTENSION_HMAC_SECRET) != 0) &&
+        !ctap2AssertData->userPresenceRequired) {
+        PRINTF("hmac-secret not allowed without up\n");
+        status = ERROR_INVALID_OPTION;
+        goto exit;
+    }
+
+    // Check PIN
+    status = process_getAssert_authnr_pin(&decoder, &mapItem);
+    if (status != 0) {
+        goto exit;
+    }
+
+    if (CMD_IS_OVER_U2F_NFC) {
+        // No up nor uv requested, skip UX and reply immediately
+        ctap2_copy_info_on_buffers();
+        // TODO: is this what we want?
+        // TODO: Handle cases where availableCredentials is != 1
+        //  -> which credentials should be chosen?
+        //  -> when credentials comes from allowListPresent, I think the spec allow to choose for
+        //  the user
+        //  -> when credentials comes from rk, the spec ask to use authenticatorGetNextAssertion
+        //  features
+        get_assertion_confirm(1);
+    } else if (!ctap2AssertData->userPresenceRequired && !ctap2AssertData->pinRequired) {
+        // No up nor uv required, skip UX and reply immediately
+        get_assertion_confirm(1);
+    } else {
+        // Look for a potential rk entry if no allow list was provided
+        if (!ctap2AssertData->allowListPresent) {
+            ctap2AssertData->availableCredentials = rk_storage_count(ctap2AssertData->rpIdHash);
+            if (ctap2AssertData->availableCredentials == 1) {
+                // Single resident credential load it to go through the usual flow
+                PRINTF("Single resident credential\n");
+                status = rk_storage_find_youngest(ctap2AssertData->rpIdHash,
+                                                  NULL,
+                                                  &ctap2AssertData->nonce,
+                                                  &ctap2AssertData->credential,
+                                                  &ctap2AssertData->credentialLen);
+                if (status == RK_NOT_FOUND) {
+                    // This can theoretically never happen.
+                    // But still, if it does, fall back to the "No resident credentials" case
+                    ctap2AssertData->availableCredentials = 0;
+                }
+            }
+        }
+
+        if (ctap2AssertData->availableCredentials == 0) {
+            get_assertion_ux(CTAP2_UX_STATE_NO_ASSERTION);
+        } else if (ctap2AssertData->availableCredentials > 1) {
+            // DEVIATION from FIDO2.0 spec in case of allowList presence:
+            // "select any applicable credential and proceed".
+            // We always ask the user to choose.
+            get_assertion_ux(CTAP2_UX_STATE_MULTIPLE_ASSERTION);
+        } else {
+            get_assertion_ux(CTAP2_UX_STATE_GET_ASSERTION);
+        }
+    }
+    status = 0;
+
+exit:
+    if (status != 0) {
+        PRINTF("Get_assertion request parsing error %x\n", status);
+        send_cbor_error(service, status);
+    }
+    return;
+}

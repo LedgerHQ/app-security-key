@@ -31,4 +31,4 @@ doc/latex
 attestations/data/prod/*/*priv-key.*
 attestations/data/prod/*priv-key.*
 
-tests/speculos/snapshots-tmp/
+tests/functional/snapshots-tmp/

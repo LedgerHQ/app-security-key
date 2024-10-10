@@ -21,6 +21,7 @@
 
 #ifndef UNIT_TESTS
 #include "cx.h"
+#include "os_io_seproxyhal.h"
 
 #include "u2f_service.h"
 #include "u2f_transport.h"
@@ -192,19 +193,6 @@ void ctap2_get_next_assertion_handle(u2f_service_t *service, uint8_t *buffer, ui
 void ctap2_get_info_handle(u2f_service_t *service, uint8_t *buffer, uint16_t length);
 void ctap2_client_pin_handle(u2f_service_t *service, uint8_t *buffer, uint16_t length);
 void ctap2_reset_handle(u2f_service_t *service, uint8_t *buffer, uint16_t length);
-
-void ctap2_make_credential_ux(void);
-void ctap2_make_credential_confirm(void);
-void ctap2_make_credential_user_cancel(void);
-
-void ctap2_get_assertion_ux(ctap2_ux_state_t state);
-void ctap2_get_assertion_credential_idx(uint16_t idx);
-void ctap2_get_assertion_confirm(uint16_t idx);
-void ctap2_get_assertion_user_cancel(void);
-
-void ctap2_reset_ux(void);
-void ctap2_reset_confirm(void);
-void ctap2_reset_cancel(void);
 
 void ctap2_client_pin_reset_ctx(void);
 

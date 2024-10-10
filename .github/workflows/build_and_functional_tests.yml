@@ -64,9 +64,9 @@ jobs:
 
       - name: Install tests dependencies
         run: |
-          pip install --extra-index-url https://test.pypi.org/simple/ -r tests/speculos/requirements.txt
+          pip install --extra-index-url https://test.pypi.org/simple/ -r tests/functional/requirements.txt
 
       - name: Run test
         env:
           CTEST_OUTPUT_ON_FAILURE: 1
-        run: pytest tests/speculos/ --tb=short -v --device ${{ matrix.model }} ${{ matrix.args }}
+        run: pytest tests/functional/ --tb=short -v --device ${{ matrix.model }} ${{ matrix.args }}

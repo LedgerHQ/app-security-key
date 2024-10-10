@@ -19,9 +19,11 @@
 #include "os.h"
 #include "ux.h"
 
-#include "ctap2.h"
 #include "globals.h"
 #include "ui_shared.h"
+
+#include "reset_utils.h"
+#include "reset_ui.h"
 
 static void ctap_ux_on_user_action(bool confirm) {
     ctap2UxState = CTAP2_UX_STATE_NONE;

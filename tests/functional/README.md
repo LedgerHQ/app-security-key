@@ -37,11 +37,11 @@ Or you can refer to the section `Available pytest options` to configure the opti
 Given the requirements are installed and the app has been built, just run one of the following commands:
 
 ```
-pytest tests/speculos/ --device nanosp
-pytest tests/speculos/ --device nanosp --transport HID
-pytest tests/speculos/ --device nanox
-pytest tests/speculos/ --device nanosp --display
-pytest tests/speculos/ --device nanosp --ctap2_u2f_proxy
+pytest tests/functional/ --device nanosp
+pytest tests/functional/ --device nanosp --transport HID
+pytest tests/functional/ --device nanox
+pytest tests/functional/ --device nanosp --display
+pytest tests/functional/ --device nanosp --ctap2_u2f_proxy
 ```
 
 
