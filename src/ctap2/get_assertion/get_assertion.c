@@ -112,7 +112,7 @@ static int process_getAssert_authnr_allowList(cbipDecoder_t *decoder, cbipItem_t
 
             /* Weird behavior seen on Safari on MacOs, allowList entries are duplicated.
              * seen order is: 1, 2, ..., n, 1', 2', ..., n'.
-             * In order to improve user experience while this might be fix in Safari side,
+             * In order to improve user experience until this might be fixed in Safari side,
              * we decided to filter out the duplicate in a specific scenario:
              * - they are only 2 credentials in the allowList
              * - the first and second credentials are valid and are exactly the same.
@@ -280,7 +280,7 @@ void ctap2_get_assertion_handle(u2f_service_t *service, uint8_t *buffer, uint16_
         goto exit;
     }
 
-    // Check allowlist
+    // Check allowList
     status = process_getAssert_authnr_allowList(&decoder, &mapItem);
     if (status != 0) {
         goto exit;
@@ -328,15 +328,14 @@ void ctap2_get_assertion_handle(u2f_service_t *service, uint8_t *buffer, uint16_
     } else {
         // Look for a potential rk entry if no allow list was provided
         if (!ctap2AssertData->allowListPresent) {
-            ctap2AssertData->availableCredentials = rk_storage_count(ctap2AssertData->rpIdHash);
+            ctap2AssertData->availableCredentials = build_RKList_from_rpID(ctap2AssertData->rpIdHash);
             if (ctap2AssertData->availableCredentials == 1) {
                 // Single resident credential load it to go through the usual flow
                 PRINTF("Single resident credential\n");
-                status = rk_storage_find_youngest(ctap2AssertData->rpIdHash,
-                                                  NULL,
-                                                  &ctap2AssertData->nonce,
-                                                  &ctap2AssertData->credential,
-                                                  &ctap2AssertData->credentialLen);
+                status = next_credential_from_RKList(NULL,
+                                                     &ctap2AssertData->nonce,
+                                                     &ctap2AssertData->credential,
+                                                     &ctap2AssertData->credentialLen);
                 if (status == RK_NOT_FOUND) {
                     // This can theoretically never happen.
                     // But still, if it does, fall back to the "No resident credentials" case

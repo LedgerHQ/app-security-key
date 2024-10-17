@@ -69,4 +69,20 @@ int rk_storage_find_account(const uint8_t *rpIdHash,
  */
 int rk_storage_erase_account(const uint8_t *rpIdHash, const uint8_t *userId, uint32_t userIdLen);
 
+/*
+ * Initiates an internal list containing the indexes of the existing RKs matching the given rpID.
+ *
+ * Returns the number of matching RKs (size of the list)
+ */
+uint8_t rk_build_RKList_from_rpID(const uint8_t *rpIdHash);
+
+/*
+ * From the RK list initiated by `build_RKList_from_rpID`, fills the first RK's information
+ * into the given arguments, then removes it from the list.
+ */
+int rk_next_credential_from_RKList(uint16_t *idx,
+                                   uint8_t **nonce,
+                                   uint8_t **credential,
+                                   uint32_t *credentialLen);
+
 #endif
