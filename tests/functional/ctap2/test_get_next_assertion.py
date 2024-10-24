@@ -15,14 +15,15 @@ def test_get_next_assertion_no_context(client):
 
 
 def test_get_next_assertion_no_credentials(client):
-    rp, credential_data1, user1 = generate_get_assertion_params(client)
-    rp, credential_data2, user2 = generate_get_assertion_params(client, rp)
+    t1 = generate_get_assertion_params(client)
+    rp = t1.args.rp
+    t2 = generate_get_assertion_params(client, rp=rp)
 
-    registered_users = [user1, user2]
+    registered_users = [t1.args.user, t1.args.user]
     client_data_hash = generate_random_bytes(32)
     allow_list = [
-        {"id": credential_data1.credential_id, "type": "public-key"},
-        {"id": credential_data2.credential_id, "type": "public-key"},
+        {"id": t1.credential_data.credential_id, "type": "public-key"},
+        {"id": t2.credential_data.credential_id, "type": "public-key"},
     ]
     assertion = client.ctap2.get_assertion(rp["id"], client_data_hash,
                                            allow_list,

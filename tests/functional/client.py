@@ -21,7 +21,7 @@ from ctap2_client import LedgerCtap2
 
 from ragger.firmware import Firmware
 from ragger.backend import BackendInterface
-from ragger.navigator import Navigator
+from ragger.navigator import Navigator, NavInsID, NavIns
 
 
 TESTS_SPECULOS_DIR = Path(__file__).absolute().parent
@@ -35,16 +35,16 @@ PROD_CA_PATH = CA_PATH / "prod" / "ca-cert.pem"
 
 
 class LedgerAttestationVerifier(AttestationVerifier):
-    def __init__(self, device_model):
+    def __init__(self, firmware: Firmware):
         super().__init__()
 
         use_prod_ca = os.environ.get("USE_PROD_CA", False)
 
         if use_prod_ca:
-            self.metadata_path = METADATAS_PATH / "prod-{}.json".format(device_model)
+            self.metadata_path = METADATAS_PATH / "prod-{}.json".format(firmware.name)
             self.ca_path = PROD_CA_PATH
         else:
-            self.metadata_path = METADATAS_PATH / "test-{}.json".format(device_model)
+            self.metadata_path = METADATAS_PATH / "test-{}.json".format(firmware.name)
             self.ca_path = TEST_CA_PATH
 
     def ca_lookup(self, result, auth_data):
@@ -225,7 +225,6 @@ class TestClient:
                  ctap2_u2f_proxy: bool,
                  debug=False):
         self.firmware = firmware
-        self.model = firmware.device
         self.ragger_backend = ragger_backend
         self.navigator = navigator
         self.debug = debug
@@ -257,10 +256,10 @@ class TestClient:
             self.dev = LedgerCtapHidDevice(descriptor, self.hid_dev,
                                            self.USB_transport, self.debug)
 
-            self.ctap1 = LedgerCtap1(self.dev, self.model, self.navigator,
+            self.ctap1 = LedgerCtap1(self.dev, self.firmware, self.navigator,
                                      self.debug)
             try:
-                self.ctap2 = LedgerCtap2(self.dev, self.model, self.navigator,
+                self.ctap2 = LedgerCtap2(self.dev, self.firmware, self.navigator,
                                          self.ctap2_u2f_proxy, self.debug)
                 self.client_pin = ClientPin(self.ctap2)
             except Exception:
@@ -279,3 +278,44 @@ class TestClient:
         self.ragger_backend._client.stop()
         self.ragger_backend._client.start()
         self.start()
+
+    # TODO: clean when the RK will be activated by default
+    def activate_rk_option(self):
+        if self.firmware.is_nano:
+            instructions = [
+                # Enter in the settings
+                NavInsID.RIGHT_CLICK,
+                NavInsID.RIGHT_CLICK,
+                NavInsID.RIGHT_CLICK,
+                NavInsID.BOTH_CLICK,
+                # Enable and skip "Enabling" message
+                NavInsID.BOTH_CLICK
+            ]
+
+            if self.firmware is Firmware.NANOS:
+                # Screen 0 -> 5
+                instructions += [NavInsID.RIGHT_CLICK] * 5
+            else:
+                # Screen 0 -> 13
+                instructions += [NavInsID.RIGHT_CLICK] * 13
+
+            instructions += [
+                NavInsID.BOTH_CLICK,
+                # Leave settings
+                NavInsID.RIGHT_CLICK,
+                NavInsID.BOTH_CLICK
+            ]
+        else:
+            instructions = [
+                # Enter in the settings
+                NavInsID.USE_CASE_HOME_SETTINGS,
+                # Enable and skip "Enabling" message
+                NavIns(NavInsID.CHOICE_CHOOSE, (1,)),
+                NavInsID.USE_CASE_CHOICE_CONFIRM,
+                NavInsID.USE_CASE_STATUS_DISMISS,
+                # Leave settings
+                NavInsID.USE_CASE_SETTINGS_MULTI_PAGE_EXIT,
+            ]
+
+        self.navigator.navigate(instructions,
+                                screen_change_before_first_instruction=False)

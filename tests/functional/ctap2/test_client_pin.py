@@ -47,36 +47,30 @@ def test_client_pin_check_not_set(client):
     assert e.value.code == CtapError.ERR.PIN_AUTH_INVALID
 
     # Check make credential request behavior with zero length pinAuth
-    client_data_hash, rp, user, key_params = generate_make_credentials_params()
-    pin_auth = b""
+    args = generate_make_credentials_params(client, pin_uv_param=b"")
+
     # DEVIATION from FIDO2.0 spec: If platform sends zero length pinAuth,
     # authenticator needs to wait for user touch and then returns [...]"
     # Impact is minor because user as still manually unlocked it's device.
     # therefore user presence is somehow guarantee.
     with pytest.raises(CtapError) as e:
-        client.ctap2.make_credential(client_data_hash,
-                                     rp,
-                                     user,
-                                     key_params,
-                                     pin_uv_param=pin_auth,
-                                     pin_uv_protocol=client.client_pin.protocol.VERSION,
-                                     user_accept=None)
+        client.ctap2.make_credential(args, user_accept=None)
     assert e.value.code == CtapError.ERR.PIN_NOT_SET
 
     # Check get assertion request behavior with zero length pinAuth
-    rp, credential_data, _ = generate_get_assertion_params(client)
+    t = generate_get_assertion_params(client)
 
     client_data_hash = generate_random_bytes(32)
-    allow_list = [{"id": credential_data.credential_id, "type": "public-key"}]
+    allow_list = [{"id": t.credential_data.credential_id, "type": "public-key"}]
 
     # DEVIATION from FIDO2.0 spec: If platform sends zero length pinAuth,
     # authenticator needs to wait for user touch and then returns [...]"
     # Impact is minor because user as still manually unlocked it's device.
     # therefore user presence is somehow guarantee.
     with pytest.raises(CtapError) as e:
-        client.ctap2.get_assertion(rp["id"], client_data_hash,
+        client.ctap2.get_assertion(t.args.rp["id"], client_data_hash,
                                    allow_list,
-                                   pin_uv_param=pin_auth,
+                                   pin_uv_param=b"",
                                    pin_uv_protocol=client.client_pin.protocol.VERSION,
                                    user_accept=None)
     assert e.value.code == CtapError.ERR.PIN_NOT_SET
@@ -109,36 +103,31 @@ def test_client_pin_check_set(client):
     client.client_pin.get_pin_token(PIN_B)
 
     # Check make credential request behavior with zero length pinAuth
-    client_data_hash, rp, user, key_params = generate_make_credentials_params()
-    pin_auth = b""
+    args = generate_make_credentials_params(client, pin_uv_param=b"")
+
     # DEVIATION from FIDO2.0 spec: If platform sends zero length pinAuth,
     # authenticator needs to wait for user touch and then returns [...]"
     # Impact is minor because user as still manually unlocked it's device.
     # therefore user presence is somehow guarantee.
     with pytest.raises(CtapError) as e:
-        client.ctap2.make_credential(client_data_hash,
-                                     rp,
-                                     user,
-                                     key_params,
-                                     pin_uv_param=pin_auth,
-                                     pin_uv_protocol=client.client_pin.protocol.VERSION,
-                                     user_accept=None)
+        client.ctap2.make_credential(args, user_accept=None)
     assert e.value.code == CtapError.ERR.PIN_INVALID
 
     # Check get assertion request behavior with zero length pinAuth
-    rp, credential_data, _ = generate_get_assertion_params(client, pin=PIN_B)
+    t = generate_get_assertion_params(client, pin=PIN_B)
 
     client_data_hash = generate_random_bytes(32)
-    allow_list = [{"id": credential_data.credential_id, "type": "public-key"}]
+    allow_list = [{"id": t.credential_data.credential_id, "type": "public-key"}]
 
     # DEVIATION from FIDO2.0 spec: "If platform sends zero length pinAuth,
     # authenticator needs to wait for user touch and then returns [...]"
     # Impact is minor because user as still manually unlocked it's device.
     # therefore user presence is somehow guarantee.
     with pytest.raises(CtapError) as e:
-        client.ctap2.get_assertion(rp["id"], client_data_hash,
+        client.ctap2.get_assertion(t.args.rp["id"],
+                                   client_data_hash,
                                    allow_list,
-                                   pin_uv_param=pin_auth,
+                                   pin_uv_param=b"",
                                    pin_uv_protocol=client.client_pin.protocol.VERSION,
                                    user_accept=None)
     assert e.value.code == CtapError.ERR.PIN_INVALID
@@ -160,55 +149,40 @@ def test_use_pin(client):
     token = client.client_pin.get_pin_token(PIN_A)
     assert client.client_pin.get_pin_retries() == (8, None)
 
-    client_data_hash, rp, user, key_params = generate_make_credentials_params()
-    pin_auth = client.client_pin.protocol.authenticate(token, client_data_hash)
+    args = generate_make_credentials_params(client)
+    pin_auth = client.client_pin.protocol.authenticate(token, args.client_data_hash)
 
     # Create a bad pin auth using a bad token
     bad_token = bytearray(token)
     bad_token[0] ^= 0x40
     bad_token = bytes(bad_token)
-    bad_pin_auth = client.client_pin.protocol.authenticate(bad_token, client_data_hash)
+    bad_pin_auth = client.client_pin.protocol.authenticate(bad_token, args.client_data_hash)
 
     # Check should use pin
     with pytest.raises(CtapError) as e:
-        client.ctap2.make_credential(client_data_hash,
-                                     rp,
-                                     user,
-                                     key_params,
-                                     user_accept=None)
+        client.ctap2.make_credential(args, user_accept=None)
     assert e.value.code == CtapError.ERR.PUAT_REQUIRED
 
     # Check should use correct token
     with pytest.raises(CtapError) as e:
-        client.ctap2.make_credential(client_data_hash,
-                                     rp,
-                                     user,
-                                     key_params,
-                                     pin_uv_param=bad_pin_auth,
-                                     pin_uv_protocol=client.client_pin.protocol.VERSION,
-                                     user_accept=None)
+        args.pin_uv_param = bad_pin_auth
+        args.pin_uv_protocol = client.client_pin.protocol.VERSION
+        client.ctap2.make_credential(args, user_accept=None)
     assert e.value.code == CtapError.ERR.PIN_AUTH_INVALID
 
     # Check should use correct protocol
     with pytest.raises(CtapError) as e:
-        client.ctap2.make_credential(client_data_hash,
-                                     rp,
-                                     user,
-                                     key_params,
-                                     pin_uv_param=pin_auth,
-                                     pin_uv_protocol=PinProtocolV2.VERSION,
-                                     user_accept=None)
+        args.pin_uv_param = pin_auth
+        args.pin_uv_protocol = PinProtocolV2.VERSION
+        client.ctap2.make_credential(args, user_accept=None)
     assert e.value.code == CtapError.ERR.PIN_AUTH_INVALID
 
     # Using a bad token doesn't affect pin_retries
     assert client.client_pin.get_pin_retries() == (8, None)
 
-    attestation = client.ctap2.make_credential(client_data_hash,
-                                               rp,
-                                               user,
-                                               key_params,
-                                               pin_uv_param=pin_auth,
-                                               pin_uv_protocol=client.client_pin.protocol.VERSION)
+    args.pin_uv_param = pin_auth
+    args.pin_uv_protocol = client.client_pin.protocol.VERSION
+    attestation = client.ctap2.make_credential(args)
     assert attestation.auth_data.flags & AuthenticatorData.FLAG.USER_PRESENT
     assert attestation.auth_data.flags & AuthenticatorData.FLAG.USER_VERIFIED
 
@@ -219,13 +193,13 @@ def test_use_pin(client):
     bad_pin_auth = client.client_pin.protocol.authenticate(bad_token, client_data_hash)
 
     # Check without using pin
-    assertion = client.ctap2.get_assertion(rp["id"], client_data_hash, allow_list)
+    assertion = client.ctap2.get_assertion(args.rp["id"], client_data_hash, allow_list)
     assert assertion.auth_data.flags & AuthenticatorData.FLAG.USER_PRESENT
     assert not assertion.auth_data.flags & AuthenticatorData.FLAG.USER_VERIFIED
 
     # Check should use correct token
     with pytest.raises(CtapError) as e:
-        client.ctap2.get_assertion(rp["id"], client_data_hash, allow_list,
+        client.ctap2.get_assertion(args.rp["id"], client_data_hash, allow_list,
                                    pin_uv_param=bad_pin_auth,
                                    pin_uv_protocol=client.client_pin.protocol.VERSION,
                                    user_accept=None)
@@ -233,14 +207,14 @@ def test_use_pin(client):
 
     # Check should use correct protocol
     with pytest.raises(CtapError) as e:
-        client.ctap2.get_assertion(rp["id"], client_data_hash, allow_list,
+        client.ctap2.get_assertion(args.rp["id"], client_data_hash, allow_list,
                                    pin_uv_param=pin_auth,
                                    pin_uv_protocol=PinProtocolV2.VERSION,
                                    user_accept=None)
     assert e.value.code == CtapError.ERR.PIN_AUTH_INVALID
 
     # Check with pin
-    assertion = client.ctap2.get_assertion(rp["id"], client_data_hash, allow_list,
+    assertion = client.ctap2.get_assertion(args.rp["id"], client_data_hash, allow_list,
                                            pin_uv_param=pin_auth,
                                            pin_uv_protocol=client.client_pin.protocol.VERSION)
     assert assertion.auth_data.flags & AuthenticatorData.FLAG.USER_PRESENT
@@ -259,15 +233,10 @@ def test_client_pin_unique_token(client):
     token_a = client.client_pin.get_pin_token(PIN_A)
 
     # Check that token is working
-    client_data_hash, rp, user, key_params = generate_make_credentials_params()
-    pin_auth = client.client_pin.protocol.authenticate(token_a, client_data_hash)
+    args = generate_make_credentials_params(client, pin_uv_param=b"")
+    args.pin_uv_param = client.client_pin.protocol.authenticate(token_a, args.client_data_hash)
 
-    client.ctap2.make_credential(client_data_hash,
-                                 rp,
-                                 user,
-                                 key_params,
-                                 pin_uv_param=pin_auth,
-                                 pin_uv_protocol=client.client_pin.protocol.VERSION)
+    client.ctap2.make_credential(args)
 
     # Generate a second token
     token_b = client.client_pin.get_pin_token(PIN_A)
@@ -281,26 +250,15 @@ def test_client_pin_unique_token(client):
     # CTAP2_ERR_PIN_TOKEN_EXPIRED and platform can act on the error accordingly."
     # we are considering that this specific error must be answered only when
     # the token expired due to timeout, which don't occurs on our devices.
-    client_data_hash, rp, user, key_params = generate_make_credentials_params()
-    pin_auth = client.client_pin.protocol.authenticate(token_a, client_data_hash)
+    args = generate_make_credentials_params(client, pin_uv_param=b"")
+    args.pin_uv_param = client.client_pin.protocol.authenticate(token_a, args.client_data_hash)
     with pytest.raises(CtapError) as e:
-        client.ctap2.make_credential(client_data_hash,
-                                     rp,
-                                     user,
-                                     key_params,
-                                     pin_uv_param=pin_auth,
-                                     pin_uv_protocol=client.client_pin.protocol.VERSION,
-                                     user_accept=None)
+        client.ctap2.make_credential(args, user_accept=None)
     assert e.value.code == CtapError.ERR.PIN_AUTH_INVALID
 
     # Check that second token can be used to validate the same request
-    pin_auth = client.client_pin.protocol.authenticate(token_b, client_data_hash)
-    client.ctap2.make_credential(client_data_hash,
-                                 rp,
-                                 user,
-                                 key_params,
-                                 pin_uv_param=pin_auth,
-                                 pin_uv_protocol=client.client_pin.protocol.VERSION)
+    args.pin_uv_param = client.client_pin.protocol.authenticate(token_b, args.client_data_hash)
+    client.ctap2.make_credential(args)
 
     # Reset device for next tests
     client.ctap2.reset()

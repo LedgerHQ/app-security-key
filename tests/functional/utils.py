@@ -2,12 +2,16 @@ import random
 import secrets
 import string
 import struct
+from dataclasses import asdict, dataclass
+from typing import Any, Dict, List, Optional
 
 from fido2.cose import ES256
+from fido2.ctap2.base import args, AttestationResponse
 from fido2.utils import sha256
 from fido2.webauthn import AttestedCredentialData
 
-from ragger.navigator import NavIns, NavInsID
+from ragger.firmware import Firmware
+from ragger.navigator import Navigator, NavIns, NavInsID
 
 # Application build configuration
 HAVE_NO_RESET_GENERATION_INCREMENT = True
@@ -19,12 +23,39 @@ FIDO_RP_ID_HASH_1 = bytes.fromhex("000102030405060708090a0b0c0d0e0f"
                                   "101112131415161718191a1b1c1d1e1f")
 
 
+@dataclass
+class MakeCredentialArguments:
+    client_data_hash: str
+    rp: str
+    user: str
+    key_params: List[Dict]
+    exclude_list: Optional[List] = None
+    extensions: Optional[Dict] = None
+    options: Optional[Dict] = None
+    pin_uv_param: Optional[Any] = None
+    pin_uv_protocol: Optional[Any] = None
+    entreprise_attestation: Optional[str] = None
+
+    @property
+    def cbor_args(self):
+        return args(*asdict(self).values())
+
+
+@dataclass
+class MakeCredentialTransaction:
+    args: MakeCredentialArguments
+    attestation: AttestationResponse
+
+    @property
+    def credential_data(self) -> AttestedCredentialData:
+        return AttestedCredentialData(self.attestation.auth_data.credential_data)
+
+
 def prepare_apdu(cla=0, ins=0, p1=0, p2=0, data=b""):
     size = len(data)
     size_h = size >> 16 & 0xFF
     size_l = size & 0xFFFF
     apdu = struct.pack(">BBBBBH", cla, ins, p1, p2, size_h, size_l) + data + b"\0\0"
-
     return apdu
 
 
@@ -36,7 +67,17 @@ def generate_random_string(length):
     return "".join(random.choice(string.ascii_lowercase) for _ in range(length))
 
 
-def generate_make_credentials_params(ref=None):
+def generate_make_credentials_params(client,
+                                     rp=None,
+                                     rk: Optional[bool] = None,
+                                     uv=None,
+                                     key_params=None,
+                                     pin: Optional[bytes] = None,
+                                     pin_uv_param: Optional[bytes] = None,
+                                     ref: int = None,
+                                     exclude_list: Optional[List] = None,
+                                     extensions: Optional[List] = None,
+                                     options: Optional[Dict] = None) -> MakeCredentialArguments:
     if ref is None:
         rp_base = generate_random_string(20)
         rp_id = "webctap.{}.com".format(rp_base)
@@ -55,52 +96,39 @@ def generate_make_credentials_params(ref=None):
             user_name = f"My user {ref} name"
 
     client_data_hash = generate_random_bytes(32)
-    rp = {"id": rp_id}
+    if rp is None:
+        rp = {"id": rp_id}
     user = {"id": user_id}
     if user_name:
         user["name"] = user_name
-    key_params = [{"type": "public-key", "alg": ES256.ALGORITHM}]
-    return client_data_hash, rp, user, key_params
-
-
-def generate_get_assertion_params(client, rp=None, rk=None, uv=None,
-                                  key_params=None, user_accept=True,
-                                  pin=None, ref=None):
-    client_data_hash, _rp, user, _key_params = generate_make_credentials_params(ref=ref)
-    options = None
-
-    if not rp:
-        rp = _rp
-
+    key_params = key_params if key_params is not None else [{"type": "public-key", "alg": ES256.ALGORITHM}]
     if rk is not None or uv is not None:
-        options = {}
+        options = options if options is not None else {}
         if rk is not None:
             options["rk"] = rk
         if uv is not None:
             options["uv"] = uv
 
-    if not key_params:
-        key_params = _key_params
+    params = MakeCredentialArguments(client_data_hash, rp, user, key_params, exclude_list, extensions, options)
 
-    if pin:
-        token = client.client_pin.get_pin_token(pin)
-        pin_uv_param = client.client_pin.protocol.authenticate(token, client_data_hash)
-        pin_uv_protocol = client.client_pin.protocol.VERSION
+    if pin is not None or pin_uv_param is not None:
+        if pin:
+            token = client.client_pin.get_pin_token(pin)
+            params.pin_uv_param = client.client_pin.protocol.authenticate(token, client_data_hash)
+        else:
+            params.pin_uv_param = pin_uv_param
+        params.pin_uv_protocol = client.client_pin.protocol.VERSION
     else:
-        pin_uv_param = None
-        pin_uv_protocol = None
+        params.pin_uv_param = None
+        params.pin_uv_protocol = None
 
-    attestation = client.ctap2.make_credential(client_data_hash,
-                                               rp,
-                                               user,
-                                               key_params,
-                                               options=options,
-                                               user_accept=user_accept,
-                                               pin_uv_param=pin_uv_param,
-                                               pin_uv_protocol=pin_uv_protocol)
-    credential_data = AttestedCredentialData(attestation.auth_data.credential_data)
+    return params
 
-    return rp, credential_data, user
+
+def generate_get_assertion_params(client, user_accept: Optional[bool] = True, **kwargs) -> MakeCredentialTransaction:
+    make_credentials_arguments = generate_make_credentials_params(client, **kwargs)
+    attestation = client.ctap2.make_credential(make_credentials_arguments, user_accept=user_accept)
+    return MakeCredentialTransaction(make_credentials_arguments, attestation)
 
 
 def get_rp_id_hash(rp_id):
@@ -137,40 +165,64 @@ fido_known_app = {
 fido_known_appid = {get_rp_id_hash(x): y for x, y in fido_known_app.items()}
 
 
-def navigate(navigator,
-             user_accept,
-             check_screens,
-             check_cancel,
-             compare_args,
-             text,
-             nav_ins,
-             val_ins):
+class LedgerCTAP:
 
-    if check_screens:
-        assert compare_args
-        root, test_name = compare_args
-    else:
-        root, test_name = None, None
+    def __init__(self, firmware: Firmware, navigator: Navigator, debug: bool = False):
+        self.firmware = firmware
+        self.navigator = navigator
+        self.debug = debug
 
-    if user_accept is not None:
-        # Over U2F endpoint (but not over HID) the device needs the
-        # response to be retrieved before continuing the UX flow.
-
-        if text:
-            navigator.navigate_until_text_and_compare(
-                nav_ins,
-                val_ins,
-                text,
-                root,
-                test_name,
-                screen_change_after_last_instruction=False)
+    def confirm(self):
+        if self.firmware in [Firmware.STAX, Firmware.FLEX]:
+            instructions = [NavInsID.USE_CASE_CHOICE_CONFIRM]
         else:
-            navigator.navigate_and_compare(
-                root,
-                test_name,
-                val_ins,
-                screen_change_after_last_instruction=False)
+            instructions = [NavInsID.BOTH_CLICK]
+        self.navigator.navigate(instructions,
+                                screen_change_after_last_instruction=False)
 
-    elif check_cancel:
-        navigator.navigate([NavIns(NavInsID.WAIT, (0.1,))],
-                           screen_change_after_last_instruction=False)
+    def wait_for_return_on_dashboard(self):
+        if self.firmware in [Firmware.STAX, Firmware.FLEX]:
+            # On Stax tap on the center to dismiss the status message faster
+            # Ignore if there is nothing that happen (probably already on home screen),
+            # which is expected for flow without status (reset)
+            self.navigator.navigate([NavInsID.USE_CASE_STATUS_DISMISS],
+                                    screen_change_after_last_instruction=False)
+        self.navigator._backend.wait_for_home_screen()
+
+    def navigate(self,
+                 user_accept: Optional[bool],
+                 check_screens: bool,
+                 check_cancel: bool,
+                 compare_args,
+                 text: Optional[str],
+                 nav_ins,
+                 val_ins):
+
+        if check_screens:
+            assert compare_args
+            root, test_name = compare_args
+        else:
+            root, test_name = None, None
+
+        if user_accept is not None:
+            # Over U2F endpoint (but not over HID) the device needs the
+            # response to be retrieved before continuing the UX flow.
+
+            if text:
+                self.navigator.navigate_until_text_and_compare(
+                    nav_ins,
+                    val_ins,
+                    text,
+                    root,
+                    test_name,
+                    screen_change_after_last_instruction=False)
+            else:
+                self.navigator.navigate_and_compare(
+                    root,
+                    test_name,
+                    val_ins,
+                    screen_change_after_last_instruction=False)
+
+        elif check_cancel:
+            self.navigator.navigate([NavIns(NavInsID.WAIT, (0.1,))],
+                                    screen_change_after_last_instruction=False)

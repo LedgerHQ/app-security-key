@@ -1,4 +1,4 @@
-from utils import generate_random_bytes
+from utils import generate_random_bytes, MakeCredentialArguments
 from fido2.webauthn import AttestedCredentialData
 from fido2.utils import sha256
 from fido2.cose import ES256
@@ -36,28 +36,22 @@ def test_interop_u2f_reg_then_ctap2_auth(client):
 
 
 def test_interop_ctap2_reg_then_u2f_auth(client):
+
     rp_id = "webctap.example.org"
 
     # Create credential through CTAP2
-    client_data_hash = generate_random_bytes(32)
-    rp = {
-        "id": rp_id
-    }
-    user = {
-        "id": generate_random_bytes(64),
-    }
-    key_params = [{"type": "public-key", "alg": ES256.ALGORITHM}]
+    args = MakeCredentialArguments(generate_random_bytes(32),
+                                   rp = {"id": rp_id},
+                                   user = {"id": generate_random_bytes(64)},
+                                   key_params=[{"type": "public-key", "alg": ES256.ALGORITHM}])
 
-    attestation = client.ctap2.make_credential(client_data_hash,
-                                               rp,
-                                               user,
-                                               key_params)
+    attestation = client.ctap2.make_credential(args)
     credential_data = AttestedCredentialData(attestation.auth_data.credential_data)
 
     # Authenticate with CTAP2 authentication
     client_data_hash = generate_random_bytes(32)
     allow_list = [{"id": credential_data.credential_id, "type": "public-key"}]
-    assertion = client.ctap2.get_assertion(rp["id"], client_data_hash,
+    assertion = client.ctap2.get_assertion(rp_id, client_data_hash,
                                            allow_list)
     assertion.verify(client_data_hash, credential_data.public_key)
 

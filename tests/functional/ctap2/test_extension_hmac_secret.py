@@ -7,21 +7,16 @@ from fido2.webauthn import AttestedCredentialData
 from utils import generate_random_bytes, generate_make_credentials_params
 
 
-def test_extensions_hmac_secret(client):
+def test_extensions_hmac_secret_ok(client):
     info = client.ctap2.info
     assert "hmac-secret" in info.extensions
 
     hmac_ext = HmacSecretExtension(client.ctap2)
 
     # Create a credential
-    client_data_hash, rp, user, key_params = generate_make_credentials_params()
-    extensions = {"hmac-secret": True}
+    args = generate_make_credentials_params(client, extensions={"hmac-secret": True})
 
-    attestation = client.ctap2.make_credential(client_data_hash,
-                                               rp,
-                                               user,
-                                               key_params,
-                                               extensions=extensions)
+    attestation = client.ctap2.make_credential(args)
     assert attestation.auth_data.extensions["hmac-secret"]
 
     # Retrieve a first assertion with one salt
@@ -33,7 +28,8 @@ def test_extensions_hmac_secret(client):
         "hmacGetSecret": {"salt1": salt1}})
     extensions = {"hmac-secret": hmac_ext_data}
 
-    assertion = client.ctap2.get_assertion(rp["id"], client_data_hash,
+    assertion = client.ctap2.get_assertion(args.rp["id"],
+                                           args.client_data_hash,
                                            allow_list,
                                            extensions=extensions)
 
@@ -41,7 +37,8 @@ def test_extensions_hmac_secret(client):
 
     # Retrieve another assertion with same salt but with UV
     options = {"uv": True}
-    assertion = client.ctap2.get_assertion(rp["id"], client_data_hash,
+    assertion = client.ctap2.get_assertion(args.rp["id"],
+                                           args.client_data_hash,
                                            allow_list,
                                            options=options,
                                            extensions=extensions)
@@ -57,7 +54,8 @@ def test_extensions_hmac_secret(client):
         "hmacGetSecret": {"salt1": salt1, "salt2": salt2}})
     extensions = {"hmac-secret": hmac_ext_data}
 
-    assertion = client.ctap2.get_assertion(rp["id"], client_data_hash,
+    assertion = client.ctap2.get_assertion(args.rp["id"],
+                                           args.client_data_hash,
                                            allow_list,
                                            extensions=extensions)
 
@@ -72,14 +70,9 @@ def test_extensions_hmac_secret_error(client):
     hmac_ext = HmacSecretExtension(client.ctap2)
 
     # Create a credential
-    client_data_hash, rp, user, key_params = generate_make_credentials_params()
-    extensions = {"hmac-secret": True}
+    args = generate_make_credentials_params(client, extensions={"hmac-secret": True})
 
-    attestation = client.ctap2.make_credential(client_data_hash,
-                                               rp,
-                                               user,
-                                               key_params,
-                                               extensions=extensions)
+    attestation = client.ctap2.make_credential(args)
     assert attestation.auth_data.extensions["hmac-secret"]
 
     # Check with missing keyAgreement in "hmac-secret"
@@ -93,7 +86,8 @@ def test_extensions_hmac_secret_error(client):
     extensions = {"hmac-secret": hmac_ext_data}
 
     with pytest.raises(CtapError) as e:
-        client.ctap2.get_assertion(rp["id"], client_data_hash,
+        client.ctap2.get_assertion(args.rp["id"],
+                                   args.client_data_hash,
                                    allow_list,
                                    extensions=extensions)
     assert e.value.code == CtapError.ERR.MISSING_PARAMETER

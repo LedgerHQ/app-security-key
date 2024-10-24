@@ -1,5 +1,6 @@
 from hashlib import sha256
 from fido2.ctap2.base import Ctap2, Info
+from ragger.firmware import Firmware
 from utils import ENABLE_RK_CONFIG
 
 
@@ -29,28 +30,20 @@ def test_get_info_extensions(client):
 def test_get_info_aaguid(client):
     info = client.ctap2.info
 
-    if client.model == "nanos":
-        hs = sha256("Ledger FIDO 2 1.0".encode('utf-8')).hexdigest()
-        hs = hs[:32]  # Keep only the 16 first bytes
-        assert hs == info.aaguid.hex()
-    elif client.model == "nanox":
-        hs = sha256("Ledger FIDO 2 1.0 NanoX".encode('utf-8')).hexdigest()
-        hs = hs[:32]  # Keep only the 16 first bytes
-        assert hs == info.aaguid.hex()
-    elif client.model == "nanosp":
-        hs = sha256("Ledger FIDO 2 1.0 NanoS+".encode('utf-8')).hexdigest()
-        hs = hs[:32]  # Keep only the 16 first bytes
-        assert hs == info.aaguid.hex()
-    elif client.model == "stax":
-        hs = sha256("Ledger FIDO 2 1.0 Stax".encode('utf-8')).hexdigest()
-        hs = hs[:32]  # Keep only the 16 first bytes
-        assert hs == info.aaguid.hex()
-    elif client.model == "flex":
-        hs = sha256("Ledger FIDO 2 1.0 Flex".encode('utf-8')).hexdigest()
-        hs = hs[:32]  # Keep only the 16 first bytes
-        assert hs == info.aaguid.hex()
-    else:
+    expected_base_string = {
+        Firmware.NANOS: "Ledger FIDO 2 1.0",
+        Firmware.NANOX: "Ledger FIDO 2 1.0 NanoX",
+        Firmware.NANOSP: "Ledger FIDO 2 1.0 NanoS+",
+        Firmware.STAX: "Ledger FIDO 2 1.0 Stax",
+        Firmware.FLEX: "Ledger FIDO 2 1.0 Flex"
+    }
+    if client.firmware not in expected_base_string:
         raise ValueError("Unhandled model")
+
+    base_string = expected_base_string[client.firmware]
+    hs = sha256(base_string.encode('utf-8')).hexdigest()
+    hs = hs[:32]  # Keep only the 16 first bytes
+    assert hs == info.aaguid.hex()
 
 
 def test_get_info_options(client):

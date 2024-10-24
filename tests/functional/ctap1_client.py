@@ -2,12 +2,13 @@ import struct
 
 from enum import IntEnum
 
-from ragger.navigator import NavInsID
+from ragger.firmware import Firmware
+from ragger.navigator import Navigator, NavInsID
 
 from fido2.ctap1 import Ctap1, ApduError, RegistrationData, SignatureData
 from fido2.hid import CTAPHID
 
-from utils import prepare_apdu, navigate
+from utils import prepare_apdu, LedgerCTAP
 
 
 class APDU(IntEnum):
@@ -36,7 +37,7 @@ class U2F_P1(IntEnum):
     OPTIONAL_USER_PRESENCE = 0x08
 
 
-class LedgerCtap1(Ctap1):
+class LedgerCtap1(Ctap1, LedgerCTAP):
     """ Overriding fido2.ctap1.Ctap1
 
     This is mostly to allow to interact with the screen and the buttons
@@ -45,25 +46,9 @@ class LedgerCtap1(Ctap1):
     Then, register() and authenticate() Ctap1 functions are overridden
     to add interactions with the screen and the buttons.
     """
-    def __init__(self, device, model, navigator, debug=False):
-        super().__init__(device)
-        self.model = model
-        self.navigator = navigator
-        self.debug = debug
-
-    def confirm(self):
-        if self.model in ["stax", "flex"]:
-            instructions = [NavInsID.USE_CASE_CHOICE_CONFIRM]
-        else:
-            instructions = [NavInsID.BOTH_CLICK]
-        self.navigator.navigate(instructions,
-                                screen_change_after_last_instruction=False)
-
-    def wait_for_return_on_dashboard(self):
-        if self.model in ["stax", "flex"]:
-            # On Stax tap on the center to dismiss the status message faster
-            self.navigator.navigate([NavInsID.USE_CASE_STATUS_DISMISS])
-        self.navigator._backend.wait_for_home_screen()
+    def __init__(self, device, firmware: Firmware, navigator: Navigator, debug: bool = False):
+        Ctap1.__init__(self, device)
+        LedgerCTAP.__init__(self, firmware, navigator, debug)
 
     def parse_response(self, response):
         status = struct.unpack(">H", response[-2:])[0]
@@ -101,7 +86,7 @@ class LedgerCtap1(Ctap1):
         nav_ins = None
         val_ins = None
 
-        if self.model.startswith("nano"):
+        if self.firmware.is_nano:
             nav_ins = NavInsID.RIGHT_CLICK
             val_ins = [NavInsID.BOTH_CLICK]
             if user_accept is not None:
@@ -109,21 +94,20 @@ class LedgerCtap1(Ctap1):
                     text = "Register"
                 else:
                     text = "Abort"
-        elif self.model in ["stax", "flex"]:
+        elif self.firmware in [Firmware.STAX, Firmware.FLEX]:
             if user_accept is not None:
                 if not user_accept:
                     val_ins = [NavInsID.USE_CASE_CHOICE_REJECT]
                 else:
                     val_ins = [NavInsID.USE_CASE_CHOICE_CONFIRM]
 
-        navigate(self.navigator,
-                 user_accept,
-                 check_screens,
-                 False,  # Never check cancel
-                 compare_args,
-                 text,
-                 nav_ins,
-                 val_ins)
+        self.navigate(user_accept,
+                      check_screens,
+                      False,  # Never check cancel
+                      compare_args,
+                      text,
+                      nav_ins,
+                      val_ins)
 
         response = self.device.recv(CTAPHID.MSG)
         try:
@@ -163,7 +147,7 @@ class LedgerCtap1(Ctap1):
         nav_ins = None
         val_ins = None
 
-        if self.model.startswith("nano"):
+        if self.firmware.is_nano:
             nav_ins = NavInsID.RIGHT_CLICK
             val_ins = [NavInsID.BOTH_CLICK]
             if user_accept is not None:
@@ -171,21 +155,20 @@ class LedgerCtap1(Ctap1):
                     text = "Login"
                 else:
                     text = "Abort"
-        elif self.model in ["stax", "flex"]:
+        elif self.firmware in [Firmware.STAX, Firmware.FLEX]:
             if user_accept is not None:
                 if not user_accept:
                     val_ins = [NavInsID.USE_CASE_CHOICE_REJECT]
                 else:
                     val_ins = [NavInsID.USE_CASE_CHOICE_CONFIRM]
 
-        navigate(self.navigator,
-                 user_accept,
-                 check_screens,
-                 False,  # Never check cancel
-                 compare_args,
-                 text,
-                 nav_ins,
-                 val_ins)
+        self.navigate(user_accept,
+                      check_screens,
+                      False,  # Never check cancel
+                      compare_args,
+                      text,
+                      nav_ins,
+                      val_ins)
 
         response = self.device.recv(CTAPHID.MSG)
         try:
