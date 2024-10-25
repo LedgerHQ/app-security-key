@@ -28,8 +28,24 @@
 #define TAG_PIN_AUTH         0x06
 #define TAG_PIN_PROTOCOL     0x07
 
-void get_assertion_confirm(uint16_t idx);
+/*
+ * Selects a relevant credential given `idx` and global data (RP, AllowList, ...) and fill its
+ * content into global data for further usage.
+ */
 void get_assertion_credential_idx(uint16_t idx);
+
+/*
+ * Selects a relevant credential given `idx` and global data (RP, AllowList, ...) then builds, signs
+ * and returns a getAssertion (or getNextAssertion, which is the same structure) response.
+ */
+void get_assertion_confirm(uint16_t idx);
+
+/*
+ * Builds, signs and returns a getAssertion (or getNextAssertion, which is the same structure)
+ * response from a credential stored in the `globals_get_ctap2_assert_data()` global variable.
+ */
+void get_assertion_send(void);
+
 void get_assertion_user_cancel();
 
-int handle_getAssert_allowList_item(cbipDecoder_t *decoder, cbipItem_t *item, bool unwrap);
+int handle_allowList_item(cbipDecoder_t *decoder, cbipItem_t *item, bool unwrap);

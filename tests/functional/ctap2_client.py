@@ -199,7 +199,6 @@ class LedgerCtap2(Ctap2, LedgerCTAP):
                                    NavInsID.USE_CASE_CHOICE_CONFIRM]
                     else:
                         val_ins = [NavInsID.USE_CASE_CHOICE_CONFIRM]
-
         if not no_check:
             self.navigate(user_accept,
                           check_screens and not no_check,
@@ -208,18 +207,20 @@ class LedgerCtap2(Ctap2, LedgerCTAP):
                           text,
                           nav_ins,
                           val_ins)
-
             if check_cancel:
                 # Send a cancel command
                 self.device.send(CTAPHID.CANCEL, b"")
-
-        response = self.device.recv(ctap_hid_cmd)
-
         if not no_check and user_accept is not None:
             self.wait_for_return_on_dashboard()
-
+        response = self.device.recv(ctap_hid_cmd)
         response = self.parse_response(response)
+        return AssertionResponse.from_dict(response)
 
+    def get_next_assertion(self):
+        cmd = Ctap2.CMD.GET_NEXT_ASSERTION
+        ctap_hid_cmd = self.send_cbor_nowait(cmd)
+        response = self.device.recv(ctap_hid_cmd)
+        response = self.parse_response(response)
         return AssertionResponse.from_dict(response)
 
     def reset(self, *, event=None, on_keepalive=None, user_accept=True,

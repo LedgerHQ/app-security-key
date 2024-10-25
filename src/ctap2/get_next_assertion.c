@@ -16,14 +16,35 @@
 *   limitations under the License.
 ********************************************************************************/
 
-#include "os.h"
+#include <os.h>
 
 #include "ctap2.h"
+#include "get_assertion_utils.h"
+#include "globals.h"
+#include "rk_storage.h"
 
 void ctap2_get_next_assertion_handle(u2f_service_t *service, uint8_t *buffer, uint16_t length) {
     UNUSED(buffer);
     UNUSED(length);
+    ctap2_assert_data_t *ctap2AssertData = globals_get_ctap2_assert_data();
 
-    // credential selection is always done on device
-    send_cbor_error(service, ERROR_NOT_ALLOWED);
+    if (ctap2AssertData->allowListPresent) {
+        PRINTF("GET_NEXT_ASSERTION not implemented for non-RK credentials.\n");
+        send_cbor_error(service, ERROR_NOT_ALLOWED);
+        return;
+    } else {
+        // No allow list -> RK credentials
+        PRINTF("GET_NEXT_ASSERTION: looking for the next RK credential.\n");
+        ctap2AssertData->availableCredentials = 1;
+        int status = rk_next_credential_from_RKList(NULL,
+                                                    &ctap2AssertData->nonce,
+                                                    &ctap2AssertData->credential,
+                                                    &ctap2AssertData->credentialLen);
+        if (status == RK_NOT_FOUND) {
+            PRINTF("GET_NEXT_ASSERTION: no remaining RK credential.\n");
+            send_cbor_error(service, ERROR_NOT_ALLOWED);
+            return;
+        }
+        get_assertion_send();
+    }
 }

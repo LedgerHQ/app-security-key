@@ -27,7 +27,7 @@
 #include "get_assertion_ui.h"
 #include "get_assertion_utils.h"
 
-static int parse_getAssert_authnr_rpid(cbipDecoder_t *decoder, cbipItem_t *mapItem) {
+static int decode_rpid(cbipDecoder_t *decoder, cbipItem_t *mapItem) {
     ctap2_assert_data_t *ctap2AssertData = globals_get_ctap2_assert_data();
 
     if (cbiph_get_map_key_text(decoder,
@@ -58,7 +58,7 @@ static int parse_getAssert_authnr_rpid(cbipDecoder_t *decoder, cbipItem_t *mapIt
     return 0;
 }
 
-static int parse_getAssert_authnr_clientDataHash(cbipDecoder_t *decoder, cbipItem_t *mapItem) {
+static int decode_clientDataHash(cbipDecoder_t *decoder, cbipItem_t *mapItem) {
     ctap2_assert_data_t *ctap2AssertData = globals_get_ctap2_assert_data();
     uint32_t itemLength;
     int status;
@@ -79,7 +79,7 @@ static int parse_getAssert_authnr_clientDataHash(cbipDecoder_t *decoder, cbipIte
     return 0;
 }
 
-static int process_getAssert_authnr_allowList(cbipDecoder_t *decoder, cbipItem_t *mapItem) {
+static int decode_allowList(cbipDecoder_t *decoder, cbipItem_t *mapItem) {
     ctap2_assert_data_t *ctap2AssertData = globals_get_ctap2_assert_data();
     cbipItem_t tmpItem;
     int arrayLen;
@@ -102,7 +102,7 @@ static int process_getAssert_authnr_allowList(cbipDecoder_t *decoder, cbipItem_t
                 cbiph_next_deep(decoder, &tmpItem);
             }
 
-            status = handle_getAssert_allowList_item(decoder, &tmpItem, true);
+            status = handle_allowList_item(decoder, &tmpItem, true);
             if (status == ERROR_INVALID_CREDENTIAL) {
                 // Just ignore this credential
                 continue;
@@ -111,9 +111,9 @@ static int process_getAssert_authnr_allowList(cbipDecoder_t *decoder, cbipItem_t
             }
 
             /* Weird behavior seen on Safari on MacOs, allowList entries are duplicated.
-             * seen order is: 1, 2, ..., n, 1', 2', ..., n'.
-             * In order to improve user experience until this might be fixed in Safari side,
-             * we decided to filter out the duplicate in a specific scenario:
+             * Observed order is: 1, 2, ..., n, 1', 2', ..., n'.
+             * In order to improve the user experience until this might be fixed in Safari side,
+             * we decided to filter out the duplicates in a specific scenario:
              * - they are only 2 credentials in the allowList
              * - the first and second credentials are valid and are exactly the same.
              */
@@ -144,7 +144,7 @@ static int process_getAssert_authnr_allowList(cbipDecoder_t *decoder, cbipItem_t
     return 0;
 }
 
-static int process_getAssert_authnr_extensions(cbipDecoder_t *decoder, cbipItem_t *mapItem) {
+static int decode_extensions(cbipDecoder_t *decoder, cbipItem_t *mapItem) {
     ctap2_assert_data_t *ctap2AssertData = globals_get_ctap2_assert_data();
     cbipItem_t extensionsItem, hmacSecretItem;
     int status = CBIPH_STATUS_NOT_FOUND;
@@ -166,7 +166,7 @@ static int process_getAssert_authnr_extensions(cbipDecoder_t *decoder, cbipItem_
     return 0;
 }
 
-static int process_getAssert_authnr_options(cbipDecoder_t *decoder, cbipItem_t *mapItem) {
+static int decode_options(cbipDecoder_t *decoder, cbipItem_t *mapItem) {
     ctap2_assert_data_t *ctap2AssertData = globals_get_ctap2_assert_data();
     cbipItem_t optionsItem;
     int status = CBIPH_STATUS_NOT_FOUND;
@@ -200,7 +200,7 @@ static int process_getAssert_authnr_options(cbipDecoder_t *decoder, cbipItem_t *
     return 0;
 }
 
-static int process_getAssert_authnr_pin(cbipDecoder_t *decoder, cbipItem_t *mapItem) {
+static int decode_pin(cbipDecoder_t *decoder, cbipItem_t *mapItem) {
     ctap2_assert_data_t *ctap2AssertData = globals_get_ctap2_assert_data();
     int status;
     int pinProtocolVersion = 0;
@@ -269,31 +269,31 @@ void ctap2_get_assertion_handle(u2f_service_t *service, uint8_t *buffer, uint16_
     ctap2_send_keepalive_processing();
 
     // Check rpid
-    status = parse_getAssert_authnr_rpid(&decoder, &mapItem);
+    status = decode_rpid(&decoder, &mapItem);
     if (status != 0) {
         goto exit;
     }
 
     // Check clientDataHash
-    status = parse_getAssert_authnr_clientDataHash(&decoder, &mapItem);
+    status = decode_clientDataHash(&decoder, &mapItem);
     if (status != 0) {
         goto exit;
     }
 
     // Check allowList
-    status = process_getAssert_authnr_allowList(&decoder, &mapItem);
+    status = decode_allowList(&decoder, &mapItem);
     if (status != 0) {
         goto exit;
     }
 
     // Check extensions
-    status = process_getAssert_authnr_extensions(&decoder, &mapItem);
+    status = decode_extensions(&decoder, &mapItem);
     if (status != 0) {
         goto exit;
     }
 
     // Check options
-    status = process_getAssert_authnr_options(&decoder, &mapItem);
+    status = decode_options(&decoder, &mapItem);
     if (status != 0) {
         goto exit;
     }
@@ -306,7 +306,7 @@ void ctap2_get_assertion_handle(u2f_service_t *service, uint8_t *buffer, uint16_
     }
 
     // Check PIN
-    status = process_getAssert_authnr_pin(&decoder, &mapItem);
+    status = decode_pin(&decoder, &mapItem);
     if (status != 0) {
         goto exit;
     }
@@ -314,28 +314,35 @@ void ctap2_get_assertion_handle(u2f_service_t *service, uint8_t *buffer, uint16_
     if (CMD_IS_OVER_U2F_NFC) {
         // No up nor uv requested, skip UX and reply immediately
         ctap2_copy_info_on_buffers();
-        // TODO: is this what we want?
-        // TODO: Handle cases where availableCredentials is != 1
-        //  -> which credentials should be chosen?
-        //  -> when credentials comes from allowListPresent, I think the spec allow to choose for
-        //  the user
-        //  -> when credentials comes from rk, the spec ask to use authenticatorGetNextAssertion
-        //  features
-        get_assertion_confirm(1);
+
+        if (ctap2AssertData->allowListPresent) {
+            // Allow list -> non-RK credentials
+            get_assertion_confirm(1);
+        } else {
+            // No allow list -> RK credentials
+            ctap2AssertData->availableCredentials = rk_build_RKList_from_rpID(ctap2AssertData->rpIdHash);
+            PRINTF("# of matching credentials: %d\n", ctap2AssertData->availableCredentials);
+            rk_next_credential_from_RKList(NULL,
+                                           &ctap2AssertData->nonce,
+                                           &ctap2AssertData->credential,
+                                           &ctap2AssertData->credentialLen);
+            get_assertion_send();
+        }
+
     } else if (!ctap2AssertData->userPresenceRequired && !ctap2AssertData->pinRequired) {
         // No up nor uv required, skip UX and reply immediately
         get_assertion_confirm(1);
     } else {
         // Look for a potential rk entry if no allow list was provided
         if (!ctap2AssertData->allowListPresent) {
-            ctap2AssertData->availableCredentials = build_RKList_from_rpID(ctap2AssertData->rpIdHash);
+            ctap2AssertData->availableCredentials = rk_build_RKList_from_rpID(ctap2AssertData->rpIdHash);
             if (ctap2AssertData->availableCredentials == 1) {
                 // Single resident credential load it to go through the usual flow
                 PRINTF("Single resident credential\n");
-                status = next_credential_from_RKList(NULL,
-                                                     &ctap2AssertData->nonce,
-                                                     &ctap2AssertData->credential,
-                                                     &ctap2AssertData->credentialLen);
+                status = rk_next_credential_from_RKList(NULL,
+                                                        &ctap2AssertData->nonce,
+                                                        &ctap2AssertData->credential,
+                                                        &ctap2AssertData->credentialLen);
                 if (status == RK_NOT_FOUND) {
                     // This can theoretically never happen.
                     // But still, if it does, fall back to the "No resident credentials" case

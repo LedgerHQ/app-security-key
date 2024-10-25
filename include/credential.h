@@ -31,7 +31,7 @@
  * This API expose credentials in 3 different forms:
  * - credId form (bytes):
  *   This is the form that is exchanged with the platform.
- *   It structure is:
+ *   Its structure is:
  *   +---------+----------+------------------------------+
  *   | VERSION | AES Tag  | AES-SIV encrypted credential |
  *   |         |          |------------------------------+
@@ -39,10 +39,9 @@
  *   +---------+----------+------------------------------+
  *   | 1 byte  | 16 bytes | 16 bytes |encodedLength bytes|
  *   +---------+----------+------------------------------+
-
  *
  * - encodedCredential form (bytes):
- *   This is a list of byte containing information encoded in CBOR.
+ *   This is a list of bytes containing information encoded in CBOR.
  *   It always contains:
  *   - A version
  *   - A flag (currently only storing if the resident key option is used)

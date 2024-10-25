@@ -292,8 +292,8 @@ static const char *const bar_texts[SELECT_MAX_ID_NB] = {
 #endif  // TARGET_STAX
 };
 static uint8_t token_list[SELECT_MAX_ID_NB];
-uint8_t available_credentials;
-uint8_t selected_credential;
+uint16_t available_credentials;
+uint16_t selected_credential;
 
 static void on_user_choice(bool confirm) {
     ctap_ux_on_user_choice(confirm, selected_credential);

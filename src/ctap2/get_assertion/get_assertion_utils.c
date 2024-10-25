@@ -30,15 +30,16 @@
 
 #include "get_assertion_utils.h"
 
-#define TAG_RESP_CREDENTIAL 0x01
-#define TAG_RESP_AUTH_DATA  0x02
-#define TAG_RESP_SIGNATURE  0x03
-#define TAG_RESP_USER       0x04
+#define TAG_RESP_CREDENTIAL  0x01
+#define TAG_RESP_AUTH_DATA   0x02
+#define TAG_RESP_SIGNATURE   0x03
+#define TAG_RESP_USER        0x04
+#define TAG_RESP_NB_OF_CREDS 0x05
 
 
-static int compute_getAssert_hmacSecret_output(uint8_t **output,
-                                               uint32_t *outputLen,
-                                               uint8_t *credRandom) {
+static int compute_hmacSecret_output(uint8_t **output,
+                                     uint32_t *outputLen,
+                                     uint8_t *credRandom) {
     ctap2_assert_data_t *ctap2AssertData = globals_get_ctap2_assert_data();
     cbipDecoder_t decoder;
     cbipItem_t mapItem, tmpItem;
@@ -155,7 +156,7 @@ static int compute_getAssert_hmacSecret_output(uint8_t **output,
     return ERROR_NONE;
 }
 
-static int build_getAssert_authData(uint8_t *buffer, uint32_t bufferLength, uint32_t *authDataLen) {
+static int build_authData(uint8_t *buffer, uint32_t bufferLength, uint32_t *authDataLen) {
     ctap2_assert_data_t *ctap2AssertData = globals_get_ctap2_assert_data();
     uint16_t offset = 0;
     cbipEncoder_t encoder;
@@ -194,7 +195,7 @@ static int build_getAssert_authData(uint8_t *buffer, uint32_t bufferLength, uint
                                            credRandom,
                                            ctap2AssertData->pinRequired);
 
-            status = compute_getAssert_hmacSecret_output(&salt, &saltLength, credRandom);
+            status = compute_hmacSecret_output(&salt, &saltLength, credRandom);
             if (status != ERROR_NONE) {
                 return status;
             }
@@ -214,11 +215,11 @@ static int build_getAssert_authData(uint8_t *buffer, uint32_t bufferLength, uint
 
 #define WRAPPED_CREDENTIAL_OFFSET 200
 
-static int sign_and_build_getAssert_authData(uint8_t *authData,
-                                             uint32_t authDataLen,
-                                             uint8_t *buffer,
-                                             uint32_t bufferLen,
-                                             credential_data_t *credData) {
+static int sign_and_build_authData(uint8_t *authData,
+                                   uint32_t authDataLen,
+                                   uint8_t *buffer,
+                                   uint32_t bufferLen,
+                                   credential_data_t *credData) {
     ctap2_assert_data_t *ctap2AssertData = globals_get_ctap2_assert_data();
     uint8_t attestationSignature[72];
     uint32_t signatureLength;
@@ -270,6 +271,9 @@ static int sign_and_build_getAssert_authData(uint8_t *authData,
     if (credData->residentKey) {
         mapSize++;
     }
+    if (ctap2AssertData->availableCredentials >= 2) {
+        mapSize++;
+    }
 
     cbip_encoder_init(&encoder, buffer, bufferLen);
 
@@ -283,7 +287,6 @@ static int sign_and_build_getAssert_authData(uint8_t *authData,
         // and can be <0xFF or >0xFF which change the CBOR header size...
         uint8_t *credential;
         uint32_t credentialLength;
-
         if (ctap2AssertData->credId != NULL) {
             credential = ctap2AssertData->credId;
             credentialLength = ctap2AssertData->credIdLen;
@@ -344,6 +347,7 @@ static int sign_and_build_getAssert_authData(uint8_t *authData,
     cbip_add_int(&encoder, TAG_RESP_SIGNATURE);
     cbip_add_byte_string(&encoder, attestationSignature, signatureLength);
 
+    // if RK: encoding credential info
     if (credData->residentKey) {
         cbip_add_int(&encoder, TAG_RESP_USER);
         cbip_add_map_header(&encoder, 1);
@@ -356,10 +360,17 @@ static int sign_and_build_getAssert_authData(uint8_t *authData,
         PRINTF("Adding user %.*H\n", credData->userIdLen, credData->userId);
     }
 
+    // if several possible credentials, encoding the number
+    if (ctap2AssertData->availableCredentials >= 2) {
+        cbip_add_int(&encoder, TAG_RESP_NB_OF_CREDS);
+        cbip_add_int(&encoder, ctap2AssertData->availableCredentials);
+
+    }
+
     return encoder.offset;
 }
 
-int handle_getAssert_allowList_item(cbipDecoder_t *decoder, cbipItem_t *item, bool unwrap) {
+int handle_allowList_item(cbipDecoder_t *decoder, cbipItem_t *item, bool unwrap) {
     ctap2_assert_data_t *ctap2AssertData = globals_get_ctap2_assert_data();
     int status;
 
@@ -409,13 +420,13 @@ int handle_getAssert_allowList_item(cbipDecoder_t *decoder, cbipItem_t *item, bo
 void get_assertion_credential_idx(uint16_t idx) {
     ctap2_assert_data_t *ctap2AssertData = globals_get_ctap2_assert_data();
     int status;
-
     while (1) {
         if (ctap2AssertData->currentCredentialIndex == idx) {
             return;
         }
 
         if (!ctap2AssertData->allowListPresent) {
+            // No allow list -> RK credentials
             if (ctap2AssertData->currentCredentialIndex > idx) {
                 ctap2AssertData->currentCredentialIndex = 0;
                 ctap2AssertData->multipleFlowData.rk.minAge = 0;
@@ -431,13 +442,10 @@ void get_assertion_credential_idx(uint16_t idx) {
                 // Should not happen, just continue a credential will be picked eventually
                 PRINTF("Unexpected failure rk\n");
             }
-
-            ctap2AssertData->currentCredentialIndex++;
-            continue;
         } else {
+            // Allow list -> non-RK credentials
             cbipDecoder_t decoder;
             cbip_decoder_init(&decoder, ctap2AssertData->buffer, CUSTOM_IO_APDU_BUFFER_SIZE);
-
             if (ctap2AssertData->multipleFlowData.allowList.currentCredential == 0 ||
                 ctap2AssertData->currentCredentialIndex > idx) {
                 cbipItem_t mapItem;
@@ -465,7 +473,7 @@ void get_assertion_credential_idx(uint16_t idx) {
             }
             ctap2AssertData->multipleFlowData.allowList.currentCredential++;
 
-            status = handle_getAssert_allowList_item(
+            status = handle_allowList_item(
                 &decoder,
                 &ctap2AssertData->multipleFlowData.allowList.credentialItem,
                 false);
@@ -476,20 +484,15 @@ void get_assertion_credential_idx(uint16_t idx) {
                 // Should not occurs, but anyway, ignore this one
                 continue;
             }
-
-            ctap2AssertData->currentCredentialIndex++;
-            continue;
         }
+        ctap2AssertData->currentCredentialIndex++;
     }
 }
 
 void get_assertion_confirm(uint16_t idx) {
     ctap2_assert_data_t *ctap2AssertData = globals_get_ctap2_assert_data();
-    int status;
-    uint32_t dataLen;
-    credential_data_t credData;
 
-    PRINTF("CTAP2 get_assertion_confirm %d\n", idx);
+    PRINTF("CTAP2 get_assertion_confirm, slot %d\n", idx);
 
     ctap2_send_keepalive_processing();
 
@@ -508,10 +511,20 @@ void get_assertion_confirm(uint16_t idx) {
 
     // Retrieve needed data from credential
     get_assertion_credential_idx(idx);
-    status = credential_decode(&credData,
-                               ctap2AssertData->credential,
-                               ctap2AssertData->credentialLen,
-                               true);
+
+    get_assertion_send();
+}
+
+void get_assertion_send(void) {
+    ctap2_send_keepalive_processing();
+
+    ctap2_assert_data_t *ctap2AssertData = globals_get_ctap2_assert_data();
+    credential_data_t credData;
+    uint32_t dataLen;
+    int status = credential_decode(&credData,
+                                   ctap2AssertData->credential,
+                                   ctap2AssertData->credentialLen,
+                                   true);
 
     if (status != 0) {
         PRINTF("Unexpected modification of CBOR credential data\n");
@@ -520,16 +533,16 @@ void get_assertion_confirm(uint16_t idx) {
     }
 
     // Build authenticator data
-    status = build_getAssert_authData(shared_ctx.sharedBuffer,
-                                      sizeof(shared_ctx.sharedBuffer),
-                                      &dataLen);
+    status = build_authData(shared_ctx.sharedBuffer,
+                            sizeof(shared_ctx.sharedBuffer),
+                            &dataLen);
     if (status != ERROR_NONE) {
         goto exit;
     }
 
     ctap2_send_keepalive_processing();
 
-    // Check that sign_and_build_getAssert_authData() can add clientDataHash
+    // Check that sign_and_build_authData() can add clientDataHash
     // (CX_SHA256_SIZE bytes) at the end of authData for hash computing.
     if (dataLen + CX_SHA256_SIZE > sizeof(shared_ctx.sharedBuffer)) {
         PRINTF("Shared buffer size issue!\n");
@@ -538,11 +551,11 @@ void get_assertion_confirm(uint16_t idx) {
     }
 
     // Build the response
-    status = sign_and_build_getAssert_authData(shared_ctx.sharedBuffer,
-                                               dataLen,
-                                               responseBuffer + 1,
-                                               CUSTOM_IO_APDU_BUFFER_SIZE - 1,
-                                               &credData);
+    status = sign_and_build_authData(shared_ctx.sharedBuffer,
+                                     dataLen,
+                                     responseBuffer + 1,
+                                     CUSTOM_IO_APDU_BUFFER_SIZE - 1,
+                                     &credData);
     if (status < 0) {
         goto exit;
     }
