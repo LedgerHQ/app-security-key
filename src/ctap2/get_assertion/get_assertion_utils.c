@@ -209,25 +209,30 @@ static int build_authData(uint8_t *buffer, uint32_t bufferLength, uint32_t *auth
         offset += encoder.offset;
     }
 
+    // Check that sign_and_build_authData() can add clientDataHash
+    // (CX_SHA256_SIZE bytes) at the end of authData for hash computing.
+    if (offset + CX_SHA256_SIZE > bufferLength) {
+        PRINTF("Shared buffer size issue!\n");
+        return ERROR_OTHER;
+    }
     *authDataLen = offset;
     return ERROR_NONE;
 }
 
 #define WRAPPED_CREDENTIAL_OFFSET 200
 
-static int sign_and_build_authData(uint8_t *authData,
-                                   uint32_t authDataLen,
-                                   uint8_t *buffer,
-                                   uint32_t bufferLen,
-                                   credential_data_t *credData) {
+static int sign_and_encode_authData(cbipEncoder_t *encoder,
+                                    uint8_t *authData,
+                                    uint32_t authDataLen,
+                                    uint8_t *buffer,
+                                    uint32_t bufferLen,
+                                    credential_data_t *credData) {
     ctap2_assert_data_t *ctap2AssertData = globals_get_ctap2_assert_data();
     uint8_t attestationSignature[72];
     uint32_t signatureLength;
-    cbipEncoder_t encoder;
-    uint8_t mapSize;
     int status;
 
-    PRINTF("Data to sign %.*H\n", authDataLen, authData);
+    PRINTF("Data to sign (szie %d) %.*H\n", authDataLen, authDataLen, authData);
 
     // Add client data hash for the attestation.
     // We consider we can add it after authData.
@@ -263,22 +268,9 @@ static int sign_and_build_authData(uint8_t *authData,
         signatureLength = status;
     }
 
-    PRINTF("Signature %.*H\n", signatureLength, attestationSignature);
+    PRINTF("Signature (size %d) %.*H\n", signatureLength, signatureLength, attestationSignature);
 
     ctap2_send_keepalive_processing();
-
-    mapSize = 3;
-    if (credData->residentKey) {
-        mapSize++;
-    }
-    if (ctap2AssertData->availableCredentials >= 2) {
-        mapSize++;
-    }
-
-    cbip_encoder_init(&encoder, buffer, bufferLen);
-
-    cbip_add_map_header(&encoder, mapSize);
-
     {
         // Rewrap credentials then encoded in the CBOR response
         // This could be optimized but this would means bypassing the
@@ -306,7 +298,7 @@ static int sign_and_build_authData(uint8_t *authData,
                                        ctap2AssertData->credentialLen,
                                        false);
             if (status < 0) {
-                PRINTF("fail to decode\n");
+                PRINTF("Fail to decode\n");
                 return -1;
             }
 
@@ -329,46 +321,93 @@ static int sign_and_build_authData(uint8_t *authData,
         ctap2_send_keepalive_processing();
 
         PRINTF("Adding credential %.*H\n", credentialLength, credential);
-        cbip_add_int(&encoder, TAG_RESP_CREDENTIAL);
-        cbip_add_map_header(&encoder, 2);
-        cbip_add_string(&encoder, CREDENTIAL_DESCRIPTOR_ID, sizeof(CREDENTIAL_DESCRIPTOR_ID) - 1);
-        cbip_add_byte_string(&encoder, credential, credentialLength);
-        cbip_add_string(&encoder,
+        cbip_add_int(encoder, TAG_RESP_CREDENTIAL);
+        cbip_add_map_header(encoder, 2);
+        cbip_add_string(encoder, CREDENTIAL_DESCRIPTOR_ID, sizeof(CREDENTIAL_DESCRIPTOR_ID) - 1);
+        cbip_add_byte_string(encoder, credential, credentialLength);
+        cbip_add_string(encoder,
                         CREDENTIAL_DESCRIPTOR_TYPE,
                         sizeof(CREDENTIAL_DESCRIPTOR_TYPE) - 1);
-        cbip_add_string(&encoder,
+        cbip_add_string(encoder,
                         CREDENTIAL_TYPE_PUBLIC_KEY,
                         sizeof(CREDENTIAL_TYPE_PUBLIC_KEY) - 1);
     }
 
-    cbip_add_int(&encoder, TAG_RESP_AUTH_DATA);
-    cbip_add_byte_string(&encoder, authData, authDataLen);
+    cbip_add_int(encoder, TAG_RESP_AUTH_DATA);
+    cbip_add_byte_string(encoder, authData, authDataLen);
 
-    cbip_add_int(&encoder, TAG_RESP_SIGNATURE);
-    cbip_add_byte_string(&encoder, attestationSignature, signatureLength);
+    cbip_add_int(encoder, TAG_RESP_SIGNATURE);
+    cbip_add_byte_string(encoder, attestationSignature, signatureLength);
 
-    // if RK: encoding credential info
+    return encoder->offset;
+}
+
+static int build_and_encode_getAssertion_response(uint8_t *buffer,
+                                                  uint32_t bufferLen,
+                                                  credential_data_t *credData) {
+    ctap2_assert_data_t *ctap2AssertData = globals_get_ctap2_assert_data();
+    cbipEncoder_t encoder;
+    uint8_t mapSize = 3;
+    uint32_t dataLen;
+    // Build authenticator data
+    int status = build_authData(shared_ctx.sharedBuffer, sizeof(shared_ctx.sharedBuffer), &dataLen);
+
+    if (status != ERROR_NONE) {
+        return status;
+    }
+
+    // Calculate the number of fields to encode
+    if (credData->residentKey) {
+        mapSize++;
+    }
+    if (ctap2AssertData->availableCredentials >= 2) {
+        mapSize++;
+    }
+
+    // Initialize encoder
+    cbip_encoder_init(&encoder, buffer, bufferLen);
+    cbip_add_map_header(&encoder, mapSize);
+
+    ctap2_send_keepalive_processing();
+
+    // Encoding authData and its signature
+    status = sign_and_encode_authData(&encoder,
+                                      shared_ctx.sharedBuffer,
+                                      dataLen,
+                                      buffer,
+                                      bufferLen,
+                                      credData);
+    if (status < 0) {
+        return status;
+    }
+    // If RK: encoding credential info
     if (credData->residentKey) {
         cbip_add_int(&encoder, TAG_RESP_USER);
-        cbip_add_map_header(&encoder, 1);
+        cbip_add_map_header(&encoder, credData->userStr == NULL ? 1 : 3);
         cbip_add_string(&encoder, KEY_USER_ID, sizeof(KEY_USER_ID) - 1);
         // credData->userId can still be used even after ctap2_rewrap_credential as
         // the credential is resident, and therefore userId is pointing to an area in nvm and
         // not in ctap2AssertData->credId
         cbip_add_byte_string(&encoder, credData->userId, credData->userIdLen);
 
-        PRINTF("Adding user %.*H\n", credData->userIdLen, credData->userId);
+        if (credData->userStr != NULL) {
+            cbip_add_string(&encoder, KEY_USER_NAME, sizeof(KEY_USER_NAME) - 1);
+            cbip_add_string(&encoder, credData->userStr, credData->userStrLen);
+            cbip_add_string(&encoder, KEY_USER_DISPLAYNAME, sizeof(KEY_USER_DISPLAYNAME) - 1);
+            cbip_add_string(&encoder, credData->userStr, credData->userStrLen);
+        }
+
+        PRINTF("Adding user to response %.*H\n", credData->userIdLen, credData->userId);
     }
 
-    // if several possible credentials, encoding the number
+    // If several possible credentials, encoding the number
     if (ctap2AssertData->availableCredentials >= 2) {
         cbip_add_int(&encoder, TAG_RESP_NB_OF_CREDS);
         cbip_add_int(&encoder, ctap2AssertData->availableCredentials);
-
     }
-
     return encoder.offset;
 }
+
 
 int handle_allowList_item(cbipDecoder_t *decoder, cbipItem_t *item, bool unwrap) {
     ctap2_assert_data_t *ctap2AssertData = globals_get_ctap2_assert_data();
@@ -517,10 +556,8 @@ void get_assertion_confirm(uint16_t idx) {
 
 void get_assertion_send(void) {
     ctap2_send_keepalive_processing();
-
     ctap2_assert_data_t *ctap2AssertData = globals_get_ctap2_assert_data();
     credential_data_t credData;
-    uint32_t dataLen;
     int status = credential_decode(&credData,
                                    ctap2AssertData->credential,
                                    ctap2AssertData->credentialLen,
@@ -532,34 +569,14 @@ void get_assertion_send(void) {
         goto exit;
     }
 
-    // Build authenticator data
-    status = build_authData(shared_ctx.sharedBuffer,
-                            sizeof(shared_ctx.sharedBuffer),
-                            &dataLen);
-    if (status != ERROR_NONE) {
-        goto exit;
-    }
-
-    ctap2_send_keepalive_processing();
-
-    // Check that sign_and_build_authData() can add clientDataHash
-    // (CX_SHA256_SIZE bytes) at the end of authData for hash computing.
-    if (dataLen + CX_SHA256_SIZE > sizeof(shared_ctx.sharedBuffer)) {
-        PRINTF("Shared buffer size issue!\n");
-        status = ERROR_OTHER;
-        goto exit;
-    }
-
-    // Build the response
-    status = sign_and_build_authData(shared_ctx.sharedBuffer,
-                                     dataLen,
-                                     responseBuffer + 1,
-                                     CUSTOM_IO_APDU_BUFFER_SIZE - 1,
-                                     &credData);
+    status = build_and_encode_getAssertion_response(responseBuffer + 1,
+                                                    CUSTOM_IO_APDU_BUFFER_SIZE - 1,
+                                                    &credData);
     if (status < 0) {
         goto exit;
     }
-    dataLen = status;
+
+    uint32_t dataLen = status;
     status = 0;
 
     responseBuffer[0] = ERROR_NONE;

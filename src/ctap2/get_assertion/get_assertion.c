@@ -246,6 +246,29 @@ static int decode_pin(cbipDecoder_t *decoder, cbipItem_t *mapItem) {
     return 0;
 }
 
+static void nfc_handle_get_assertion() {
+    ctap2_assert_data_t *ctap2AssertData = globals_get_ctap2_assert_data();
+    if (ctap2AssertData->allowListPresent) {
+        // Allow list -> non-RK credentials.
+        // Falling back to previous behavior: login with the first compatible credential
+        get_assertion_confirm(1);
+    } else {
+        // No allow list -> RK credentials
+        // Spec getnextAssertion behavior: creating a list of compatible credentials, returning
+        // the first one & the number of compatible credentials, so that the client is able then to
+        // call getNextAssertion to fetch other possible credentials.
+        uint16_t slotIdx;
+        ctap2AssertData->availableCredentials = rk_build_RKList_from_rpID(ctap2AssertData->rpIdHash);
+        PRINTF("Matching credentials: %d\n", ctap2AssertData->availableCredentials);
+        rk_next_credential_from_RKList(&slotIdx,
+                                       &ctap2AssertData->nonce,
+                                       &ctap2AssertData->credential,
+                                       &ctap2AssertData->credentialLen);
+        PRINTF("Go for index %d - %.*H\n", slotIdx, ctap2AssertData->credentialLen, ctap2AssertData->credential);
+        get_assertion_send();
+    }
+}
+
 void ctap2_get_assertion_handle(u2f_service_t *service, uint8_t *buffer, uint16_t length) {
     ctap2_assert_data_t *ctap2AssertData = globals_get_ctap2_assert_data();
     cbipDecoder_t decoder;
@@ -315,19 +338,7 @@ void ctap2_get_assertion_handle(u2f_service_t *service, uint8_t *buffer, uint16_
         // No up nor uv requested, skip UX and reply immediately
         ctap2_copy_info_on_buffers();
 
-        if (ctap2AssertData->allowListPresent) {
-            // Allow list -> non-RK credentials
-            get_assertion_confirm(1);
-        } else {
-            // No allow list -> RK credentials
-            ctap2AssertData->availableCredentials = rk_build_RKList_from_rpID(ctap2AssertData->rpIdHash);
-            PRINTF("# of matching credentials: %d\n", ctap2AssertData->availableCredentials);
-            rk_next_credential_from_RKList(NULL,
-                                           &ctap2AssertData->nonce,
-                                           &ctap2AssertData->credential,
-                                           &ctap2AssertData->credentialLen);
-            get_assertion_send();
-        }
+        nfc_handle_get_assertion();
 
     } else if (!ctap2AssertData->userPresenceRequired && !ctap2AssertData->pinRequired) {
         // No up nor uv required, skip UX and reply immediately
