@@ -85,7 +85,9 @@ int nfc_io_send_prepared_response(bool display_infos) {
         if (display_infos) {
             ctap2_copy_info_on_buffers();
         }
-        app_nbgl_status(nfc_status, true, ui_idle);
+        if (!g.is_getNextAssertion) {
+            app_nbgl_status(nfc_status, true, ui_idle);
+        }
     }
 
     return ret;

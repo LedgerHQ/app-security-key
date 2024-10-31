@@ -382,20 +382,24 @@ static int build_and_encode_getAssertion_response(uint8_t *buffer,
     }
     // If RK: encoding credential info
     if (credData->residentKey) {
+        const bool encode_username = (g.is_getNextAssertion && credData->userStr != NULL);
         cbip_add_int(&encoder, TAG_RESP_USER);
-        cbip_add_map_header(&encoder, credData->userStr == NULL ? 1 : 3);
+        cbip_add_map_header(&encoder, encode_username ? 3 : 1);
         cbip_add_string(&encoder, KEY_USER_ID, sizeof(KEY_USER_ID) - 1);
         // credData->userId can still be used even after ctap2_rewrap_credential as
         // the credential is resident, and therefore userId is pointing to an area in nvm and
         // not in ctap2AssertData->credId
         cbip_add_byte_string(&encoder, credData->userId, credData->userIdLen);
 
-        if (credData->userStr != NULL) {
+        if (encode_username) {
             cbip_add_string(&encoder, KEY_USER_NAME, sizeof(KEY_USER_NAME) - 1);
             cbip_add_string(&encoder, credData->userStr, credData->userStrLen);
             cbip_add_string(&encoder, KEY_USER_DISPLAYNAME, sizeof(KEY_USER_DISPLAYNAME) - 1);
             cbip_add_string(&encoder, credData->userStr, credData->userStrLen);
         }
+
+        // While we're at it, copying user name on display buffer
+        ctap2_display_copy_username(credData->userStr, credData->userStrLen);
 
         PRINTF("Adding user to response %.*H\n", credData->userIdLen, credData->userId);
     }

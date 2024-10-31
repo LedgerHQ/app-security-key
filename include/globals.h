@@ -73,6 +73,7 @@ typedef struct global_s {
     char buffer2_65[65];
     char display_status[131];
     bool is_nfc;
+    bool is_getNextAssertion;
 } global_t;
 
 extern global_t g;
