@@ -398,9 +398,6 @@ static int build_and_encode_getAssertion_response(uint8_t *buffer,
             cbip_add_string(&encoder, credData->userStr, credData->userStrLen);
         }
 
-        // While we're at it, copying user name on display buffer
-        ctap2_display_copy_username(credData->userStr, credData->userStrLen);
-
         PRINTF("Adding user to response %.*H\n", credData->userIdLen, credData->userId);
     }
 

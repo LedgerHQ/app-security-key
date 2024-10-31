@@ -165,6 +165,7 @@ static int parse_makeCred_authnr_user(cbipDecoder_t *decoder, cbipItem_t *mapIte
                ctap2RegisterData->userIdLen,
                ctap2RegisterData->userId);
     }
+
     return 0;
 }
 
@@ -434,6 +435,9 @@ void ctap2_make_credential_handle(u2f_service_t *service, uint8_t *buffer, uint1
     if (status != 0) {
         goto exit;
     }
+
+    // RP & user decoded, we can store them into display buffer for future usage
+    ctap2_copy_info_on_buffers();
 
     // Handle cryptographic algorithms
     status = process_makeCred_authnr_keyCredParams(&decoder, &mapItem);

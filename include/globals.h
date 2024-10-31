@@ -67,10 +67,12 @@ static const uint8_t FIDO_AID[FIDO_AID_SIZE] = {0xA0, 0x00, 0x00, 0x06, 0x47, 0x
     253  // Should be 256, stax-rc4 MCU only support 255, so use 253 + 2 for now here
 #define EXT_ENC_DEFAULT_LE 65536
 
+#define NAME_BUFFER_SIZE 65
+
 typedef struct global_s {
     char buffer_20[20];
-    char buffer1_65[65];
-    char buffer2_65[65];
+    char buffer1_65[NAME_BUFFER_SIZE];
+    char buffer2_65[NAME_BUFFER_SIZE];
     char display_status[131];
     bool is_nfc;
     bool is_getNextAssertion;

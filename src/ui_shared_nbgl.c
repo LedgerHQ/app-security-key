@@ -281,7 +281,7 @@ static void tickerCallback(void) {
 }
 
 void app_nbgl_status(const char *message, bool is_success, nbgl_callback_t on_quit) {
-    if (is_success) {
+    if (g.is_nfc && is_success) {
         // Truncate display buffers for small police (hence `false`) then format them into the
         // display buffer (which is then used in `centeredInfo.text3`)
         truncate_pairs_for_display(false);
@@ -310,8 +310,8 @@ void app_nbgl_status(const char *message, bool is_success, nbgl_callback_t on_qu
         .centeredInfo.style = LARGE_CASE_INFO,
         .centeredInfo.text1 = message,
         .centeredInfo.text2 = NULL,
-        .centeredInfo.text3 = NULL,
-        /* .centeredInfo.text3 = g.display_status[0] == 0 ? NULL : &g.display_status[0], */
+        /* .centeredInfo.text3 = NULL, */
+        .centeredInfo.text3 = g.display_status[0] == 0 ? NULL : &g.display_status[0],
         .tapActionText = NULL,
         .tapActionToken = QUIT_TOKEN,
         .topRightStyle = NO_BUTTON_STYLE,

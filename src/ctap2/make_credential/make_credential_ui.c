@@ -131,8 +131,6 @@ void ctap2_make_credential_ux(void) {
     ctap2_register_data_t *ctap2RegisterData = globals_get_ctap2_register_data();
     ctap2UxState = CTAP2_UX_STATE_MAKE_CRED;
 
-    ctap2_copy_info_on_buffers();
-
     UX_WAKE_UP();
 
 #if defined(HAVE_BAGL)

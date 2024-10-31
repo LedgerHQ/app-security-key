@@ -50,7 +50,7 @@ bool nfc_io_is_response_pending(void) {
     return nfc_data_ready;
 }
 
-int nfc_io_send_prepared_response(bool display_infos) {
+int nfc_io_send_prepared_response() {
     if (!nfc_data_ready) {
         return io_send_sw(SW_WRONG_DATA);
     }
@@ -81,13 +81,8 @@ int nfc_io_send_prepared_response(bool display_infos) {
     }
 
     int ret = io_send_response_pointer(responseBuffer + start, size, sw);
-    if (sw == SW_NO_ERROR && nfc_status != NULL) {
-        if (display_infos) {
-            ctap2_copy_info_on_buffers();
-        }
-        if (!g.is_getNextAssertion) {
-            app_nbgl_status(nfc_status, true, ui_idle);
-        }
+    if (sw == SW_NO_ERROR && nfc_status != NULL && !g.is_getNextAssertion) {
+        app_nbgl_status(nfc_status, true, ui_idle);
     }
 
     return ret;
