@@ -41,8 +41,8 @@ def test_interop_ctap2_reg_then_u2f_auth(client):
 
     # Create credential through CTAP2
     args = MakeCredentialArguments(generate_random_bytes(32),
-                                   rp = {"id": rp_id},
-                                   user = {"id": generate_random_bytes(64)},
+                                   rp={"id": rp_id},
+                                   user={"id": generate_random_bytes(64)},
                                    key_params=[{"type": "public-key", "alg": ES256.ALGORITHM}])
 
     attestation = client.ctap2.make_credential(args)

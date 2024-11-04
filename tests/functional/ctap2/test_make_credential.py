@@ -89,13 +89,18 @@ def test_make_credential_exclude_list_ok(client, test_name):
     compare_args = (TESTS_SPECULOS_DIR, test_name)
     # First check with an absent credential in exclude list
     args1 = generate_make_credentials_params(client, ref=0,
-                                             exclude_list=[{"id": generate_random_bytes(64), "type": "public-key"}])
-    attestation = client.ctap2.make_credential(args1, check_screens="full", compare_args=compare_args)
+                                             exclude_list=[{"id": generate_random_bytes(64),
+                                                            "type": "public-key"}])
+    attestation = client.ctap2.make_credential(args1,
+                                               check_screens="full",
+                                               compare_args=compare_args)
 
     credential_data = AttestedCredentialData(attestation.auth_data.credential_data)
 
     # Then check with the credential we have just created in exclude list
-    args2 = generate_make_credentials_params(client, exclude_list=[{"id": credential_data.credential_id, "type": "public-key"}])
+    args2 = generate_make_credentials_params(client,
+                                             exclude_list=[{"id": credential_data.credential_id,
+                                                            "type": "public-key"}])
     args2.rp = args1.rp
 
     with pytest.raises(CtapError) as e:

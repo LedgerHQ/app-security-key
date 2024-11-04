@@ -36,10 +36,7 @@
 #define TAG_RESP_USER        0x04
 #define TAG_RESP_NB_OF_CREDS 0x05
 
-
-static int compute_hmacSecret_output(uint8_t **output,
-                                     uint32_t *outputLen,
-                                     uint8_t *credRandom) {
+static int compute_hmacSecret_output(uint8_t **output, uint32_t *outputLen, uint8_t *credRandom) {
     ctap2_assert_data_t *ctap2AssertData = globals_get_ctap2_assert_data();
     cbipDecoder_t decoder;
     cbipItem_t mapItem, tmpItem;
@@ -409,7 +406,6 @@ static int build_and_encode_getAssertion_response(uint8_t *buffer,
     return encoder.offset;
 }
 
-
 int handle_allowList_item(cbipDecoder_t *decoder, cbipItem_t *item, bool unwrap) {
     ctap2_assert_data_t *ctap2AssertData = globals_get_ctap2_assert_data();
     int status;
@@ -513,10 +509,10 @@ void get_assertion_credential_idx(uint16_t idx) {
             }
             ctap2AssertData->multipleFlowData.allowList.currentCredential++;
 
-            status = handle_allowList_item(
-                &decoder,
-                &ctap2AssertData->multipleFlowData.allowList.credentialItem,
-                false);
+            status =
+                handle_allowList_item(&decoder,
+                                      &ctap2AssertData->multipleFlowData.allowList.credentialItem,
+                                      false);
             if (status == ERROR_INVALID_CREDENTIAL) {
                 // Just ignore this credential
                 continue;

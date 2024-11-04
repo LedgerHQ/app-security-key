@@ -259,7 +259,8 @@ static void nfc_handle_get_assertion() {
         // the first one & the number of compatible credentials, so that the client is able then to
         // call getNextAssertion to fetch other possible credentials.
         uint16_t slotIdx;
-        ctap2AssertData->availableCredentials = rk_build_RKList_from_rpID(ctap2AssertData->rpIdHash);
+        ctap2AssertData->availableCredentials =
+            rk_build_RKList_from_rpID(ctap2AssertData->rpIdHash);
         if (ctap2AssertData->availableCredentials > 1) {
             // This settings will disable the app_nbgl_status call (nothing displayed on SK)
             // Else, this would lead the app to respond too slowly, and the client to bug out
@@ -270,7 +271,10 @@ static void nfc_handle_get_assertion() {
                                        &ctap2AssertData->nonce,
                                        &ctap2AssertData->credential,
                                        &ctap2AssertData->credentialLen);
-        PRINTF("Go for index %d - %.*H\n", slotIdx, ctap2AssertData->credentialLen, ctap2AssertData->credential);
+        PRINTF("Go for index %d - %.*H\n",
+               slotIdx,
+               ctap2AssertData->credentialLen,
+               ctap2AssertData->credential);
         get_assertion_send();
     }
 }
@@ -352,7 +356,8 @@ void ctap2_get_assertion_handle(u2f_service_t *service, uint8_t *buffer, uint16_
     } else {
         // Look for a potential rk entry if no allow list was provided
         if (!ctap2AssertData->allowListPresent) {
-            ctap2AssertData->availableCredentials = rk_build_RKList_from_rpID(ctap2AssertData->rpIdHash);
+            ctap2AssertData->availableCredentials =
+                rk_build_RKList_from_rpID(ctap2AssertData->rpIdHash);
             if (ctap2AssertData->availableCredentials == 1) {
                 // Single resident credential load it to go through the usual flow
                 PRINTF("Single resident credential\n");

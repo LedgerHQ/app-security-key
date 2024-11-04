@@ -102,16 +102,17 @@ def test_option_rk_make_cred_exclude_refused(client, test_name):
     # CTAP2_ERR_CREDENTIAL_EXCLUDED.
 
     # Create a first credential with rk=True
-    transaction = generate_get_assertion_params(client, rk=True)
+    t = generate_get_assertion_params(client, rk=True)
 
     # Now create a new one with:
     # - Same RP
     # - Previous credential in excludeList
     # leads to a CREDENTIAL_EXCLUDED error.
-    args = generate_make_credentials_params(client, exclude_list=[{"id": transaction.credential_data.credential_id,
-                                                                   "type": "public-key"}])
-    args.rp = transaction.args.rp
-    args.credential_data = transaction.credential_data
+    args = generate_make_credentials_params(client,
+                                            exclude_list=[{"id": t.credential_data.credential_id,
+                                                           "type": "public-key"}])
+    args.rp = t.args.rp
+    args.credential_data = t.credential_data
 
     with pytest.raises(CtapError) as e:
         client.ctap2.make_credential(args, user_accept=None)
@@ -123,7 +124,8 @@ def test_option_rk_make_cred_exclude_refused(client, test_name):
 
     # Check that if the RP didn't match, the request is accepted
     args = generate_make_credentials_params(client, ref=0,
-                                            exclude_list=[{"id": transaction.credential_data.credential_id, "type": "public-key"}])
+                                            exclude_list=[{"id": t.credential_data.credential_id,
+                                                           "type": "public-key"}])
 
     client.ctap2.make_credential(args, check_screens="fast", compare_args=compare_args)
 
@@ -175,7 +177,8 @@ def test_option_rk_get_assertion(client, test_name):
         compare_args = (TESTS_SPECULOS_DIR, test_name + "/" + str(idx) + "/get_allow_list")
         assertion = client.ctap2.get_assertion(user.rp["id"], client_data_hash,
                                                allow_list=allow_list,
-                                               check_users=[u.user for u in users], check_screens="fast",
+                                               check_users=[u.user for u in users],
+                                               check_screens="fast",
                                                login_type=login_type, compare_args=compare_args)
         assertion.verify(client_data_hash, credential_data.public_key)
         assert assertion.user["id"] == users[0].user["id"]  # first of allow_list selected

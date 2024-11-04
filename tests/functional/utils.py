@@ -101,7 +101,8 @@ def generate_make_credentials_params(client,
     user = {"id": user_id}
     if user_name:
         user["name"] = user_name
-    key_params = key_params if key_params is not None else [{"type": "public-key", "alg": ES256.ALGORITHM}]
+    key_params = (key_params if key_params is not None
+                  else [{"type": "public-key", "alg": ES256.ALGORITHM}])
     if rk is not None or uv is not None:
         options = options if options is not None else {}
         if rk is not None:
@@ -109,7 +110,8 @@ def generate_make_credentials_params(client,
         if uv is not None:
             options["uv"] = uv
 
-    params = MakeCredentialArguments(client_data_hash, rp, user, key_params, exclude_list, extensions, options)
+    params = MakeCredentialArguments(client_data_hash, rp, user, key_params,
+                                     exclude_list, extensions, options)
 
     if pin is not None or pin_uv_param is not None:
         if pin:
@@ -125,7 +127,9 @@ def generate_make_credentials_params(client,
     return params
 
 
-def generate_get_assertion_params(client, user_accept: Optional[bool] = True, **kwargs) -> MakeCredentialTransaction:
+def generate_get_assertion_params(client,
+                                  user_accept: Optional[bool] = True,
+                                  **kwargs) -> MakeCredentialTransaction:
     make_credentials_arguments = generate_make_credentials_params(client, **kwargs)
     attestation = client.ctap2.make_credential(make_credentials_arguments, user_accept=user_accept)
     return MakeCredentialTransaction(make_credentials_arguments, attestation)

@@ -28,7 +28,8 @@ class LedgerCtap2(Ctap2, LedgerCTAP):
     - directly in CTAPHID.CBOR command
     - encapsulated in U2F APDU with INS=0x10 in CTAPHID.MSG command
     """
-    def __init__(self, device, firmware: Firmware, navigator: Navigator, ctap2_u2f_proxy, debug: bool = False):
+    def __init__(self, device, firmware: Firmware, navigator: Navigator,
+                 ctap2_u2f_proxy, debug: bool = False):
         self.ctap2_u2f_proxy = ctap2_u2f_proxy
         Ctap2.__init__(self, device)
         LedgerCTAP.__init__(self, firmware, navigator, debug)

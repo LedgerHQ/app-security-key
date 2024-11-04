@@ -34,7 +34,7 @@ typedef struct __attribute__((__packed__)) rk_header_s {
     uint16_t idx;  // used as "age" (increases only)
 } rk_header_t;
 
-#define SLOT_SIZE             256
+#define SLOT_SIZE 256
 // Currently 24 on all devices, except NanoS which only allows 8
 #define CREDENTIAL_MAX_NUMBER (RK_SIZE / SLOT_SIZE)
 #define CREDENTIAL_MAX_SIZE   (SLOT_SIZE - sizeof(rk_header_t))

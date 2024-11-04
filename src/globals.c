@@ -57,7 +57,6 @@ static void ctap2_display_copy_username(const char *name, uint8_t nameLength) {
 
 static void ctap2_display_copy_rp(const char *name, uint8_t nameLength) {
     copy_name_in_buffer65(g.buffer1_65, name, nameLength);
-
 }
 
 void ctap2_copy_info_on_buffers(void) {

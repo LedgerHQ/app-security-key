@@ -419,7 +419,6 @@ void get_assertion_ux(ctap2_ux_state_t state) {
 #endif
 
     switch (state) {
-
         // Only one possible credential
         case CTAP2_UX_STATE_GET_ASSERTION: {
             ux_display_user_assertion(g.buffer2_65);
@@ -447,7 +446,6 @@ void get_assertion_ux(ctap2_ux_state_t state) {
             break;
         }
         default: {
-
             // No credential possible
 #if defined(HAVE_BAGL)
             ux_flow_init(0, ux_ctap2_no_assertion_flow, NULL);
