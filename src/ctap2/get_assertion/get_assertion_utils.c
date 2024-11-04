@@ -63,7 +63,7 @@ static int compute_hmacSecret_output(uint8_t **output, uint32_t *outputLen, uint
                                           TAG_HMAC_SECRET_KEY_AGREEMENT,
                                           sharedSecret);
     if (status != ERROR_NONE) {
-        PRINTF("Fail to decapsulate\n");
+        PRINTF("Fail to decapsulate (error %d)\n", status);
         return status;
     }
 
@@ -229,7 +229,7 @@ static int sign_and_encode_authData(cbipEncoder_t *encoder,
     uint32_t signatureLength;
     int status;
 
-    PRINTF("Data to sign (szie %d) %.*H\n", authDataLen, authDataLen, authData);
+    PRINTF("Data to sign (size %d) %.*H\n", authDataLen, authDataLen, authData);
 
     // Add client data hash for the attestation.
     // We consider we can add it after authData.
@@ -341,7 +341,8 @@ static int sign_and_encode_authData(cbipEncoder_t *encoder,
 
 static int build_and_encode_getAssertion_response(uint8_t *buffer,
                                                   uint32_t bufferLen,
-                                                  credential_data_t *credData) {
+                                                  credential_data_t *credData,
+                                                  uint32_t *resultLen) {
     ctap2_assert_data_t *ctap2AssertData = globals_get_ctap2_assert_data();
     cbipEncoder_t encoder;
     uint8_t mapSize = 3;
@@ -403,7 +404,8 @@ static int build_and_encode_getAssertion_response(uint8_t *buffer,
         cbip_add_int(&encoder, TAG_RESP_NB_OF_CREDS);
         cbip_add_int(&encoder, ctap2AssertData->availableCredentials);
     }
-    return encoder.offset;
+    *resultLen = encoder.offset;
+    return ERROR_NONE;
 }
 
 int handle_allowList_item(cbipDecoder_t *decoder, cbipItem_t *item, bool unwrap) {
@@ -555,6 +557,7 @@ void get_assertion_send(void) {
     ctap2_send_keepalive_processing();
     ctap2_assert_data_t *ctap2AssertData = globals_get_ctap2_assert_data();
     credential_data_t credData;
+    uint32_t dataLen;
     int status = credential_decode(&credData,
                                    ctap2AssertData->credential,
                                    ctap2AssertData->credentialLen,
@@ -568,12 +571,12 @@ void get_assertion_send(void) {
 
     status = build_and_encode_getAssertion_response(responseBuffer + 1,
                                                     CUSTOM_IO_APDU_BUFFER_SIZE - 1,
-                                                    &credData);
-    if (status < 0) {
+                                                    &credData,
+                                                    &dataLen);
+    if (status != ERROR_NONE) {
         goto exit;
     }
 
-    uint32_t dataLen = status;
     status = 0;
 
     responseBuffer[0] = ERROR_NONE;
@@ -582,6 +585,7 @@ exit:
     if (status == 0) {
         send_cbor_response(&G_io_u2f, 1 + dataLen);
     } else {
+        PRINTF("GET_ASSERTION build / encoding failed '%d'\n", status);
         send_cbor_error(&G_io_u2f, status);
     }
 }

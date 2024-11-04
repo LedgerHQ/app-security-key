@@ -35,7 +35,7 @@ BACKENDS = ["speculos"]
 
 
 def pytest_addoption(parser):
-    parser.addoption("--transport", default="U2F")
+    parser.addoption("--transport", default="U2F", choices=("U2F", "HID"))
     parser.addoption("--fast", action="store_true")
     parser.addoption("--ctap2_u2f_proxy", action="store_true")
 

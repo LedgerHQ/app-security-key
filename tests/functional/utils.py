@@ -70,7 +70,7 @@ def generate_random_string(length):
 def generate_make_credentials_params(client,
                                      rp=None,
                                      rk: Optional[bool] = None,
-                                     uv=None,
+                                     uv: Optional[bool] = None,
                                      key_params=None,
                                      pin: Optional[bytes] = None,
                                      pin_uv_param: Optional[bytes] = None,

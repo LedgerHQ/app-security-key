@@ -10,7 +10,7 @@ from utils import generate_random_bytes, generate_get_assertion_params
 from utils import generate_make_credentials_params, fido_known_app
 
 
-def test_get_assertion(client, test_name):
+def test_get_assertion_ok(client, test_name):
     compare_args = (TESTS_SPECULOS_DIR, test_name)
     # This test use the fact that after a reboot of the device
     # the ctap2WrappingKey should stay the same.
@@ -124,7 +124,7 @@ def test_get_assertion_user_refused(client, test_name):
 def test_get_assertion_no_credentials(client, test_name):
     compare_args = (TESTS_SPECULOS_DIR, test_name)
     args = generate_make_credentials_params(client, ref=0)
-
+    rp = args.rp
     # Try without allow_list
     with pytest.raises(CtapError) as e:
         client.ctap2.get_assertion(args.rp["id"], args.client_data_hash,
@@ -137,7 +137,7 @@ def test_get_assertion_no_credentials(client, test_name):
     args = generate_make_credentials_params(client)
     allow_list = [{"id": generate_random_bytes(32), "type": "public-key"}]
     with pytest.raises(CtapError) as e:
-        client.ctap2.get_assertion(args.rp["id"], args.client_data_hash,
+        client.ctap2.get_assertion(rp["id"], args.client_data_hash,
                                    allow_list,
                                    login_type="none",
                                    check_screens="full",
@@ -222,13 +222,12 @@ def test_get_assertion_allow_list_ok(client, test_name):
     users_credential_data = []
 
     # Register a first user with a random RP
-    t = generate_get_assertion_params(client, rp=rp)
+    t = generate_get_assertion_params(client)
     allow_list.append({"id": t.credential_data.credential_id, "type": "public-key"})
 
     # Register 3 users for a known RP
     for idx in range(1, 4):
-        local_args = generate_make_credentials_params(client, ref=idx)
-        local_args.rp = t.args.rp
+        local_args = generate_make_credentials_params(client, ref=idx, rp=rp)
         attestation = client.ctap2.make_credential(local_args)
         credential_data = AttestedCredentialData(attestation.auth_data.credential_data)
         allow_list.append({"id": credential_data.credential_id, "type": "public-key"})
@@ -241,7 +240,7 @@ def test_get_assertion_allow_list_ok(client, test_name):
 
     # Generate get assertion request checking presented users
     client_data_hash = generate_random_bytes(32)
-    assertion = client.ctap2.get_assertion(t.args.rp["id"], client_data_hash, allow_list,
+    assertion = client.ctap2.get_assertion(rp["id"], client_data_hash, allow_list,
                                            login_type="multi",
                                            user_accept=True,
                                            check_users=registered_users,
@@ -250,14 +249,14 @@ def test_get_assertion_allow_list_ok(client, test_name):
                                            select_user_idx=3)
 
     credential_data = users_credential_data[2]
-    assertion.verify(client_data_hash, t.credential_data.public_key)
+    assertion.verify(client_data_hash, credential_data.public_key)
 
     with pytest.raises(InvalidSignature):
         credential_data = users_credential_data[1]
-        assertion.verify(client_data_hash, t.credential_data.public_key)
+        assertion.verify(client_data_hash, credential_data.public_key)
 
     assert len(assertion.auth_data) == 37
-    assert sha256(t.args.rp["id"].encode()) == assertion.auth_data.rp_id_hash
+    assert sha256(rp["id"].encode()) == assertion.auth_data.rp_id_hash
     assert assertion.auth_data.flags == AuthenticatorData.FLAG.USER_PRESENT
     assert assertion.user is None
     assert assertion.number_of_credentials is None

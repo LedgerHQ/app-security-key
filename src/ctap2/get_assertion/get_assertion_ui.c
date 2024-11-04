@@ -65,6 +65,11 @@ static void ctap_ux_on_user_choice(bool confirm, uint16_t idx) {
     ctap2UxState = CTAP2_UX_STATE_NONE;
 
     if (confirm) {
+        // As the choice is made authenticator-side, according to the spec SK should not let the
+        // client being aware of additional credentials. This will prevent the client to call
+        // getNextAssertion to discover more credentials.
+        globals_get_ctap2_assert_data()->availableCredentials =
+            MIN(globals_get_ctap2_assert_data()->availableCredentials, 1);
         get_assertion_confirm(idx);
 #ifdef HAVE_NBGL
         app_nbgl_status("Login request signed", true, ui_idle);

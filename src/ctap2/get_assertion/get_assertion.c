@@ -344,18 +344,25 @@ void ctap2_get_assertion_handle(u2f_service_t *service, uint8_t *buffer, uint16_
         goto exit;
     }
 
+    ctap2_copy_info_on_buffers();
+
+    /* if (true) { */
+    /*     nfc_handle_get_assertion(); */
+
+    /* } else */
+
     if (CMD_IS_OVER_U2F_NFC) {
         // No up nor uv requested, skip UX and reply immediately
-        ctap2_copy_info_on_buffers();
-
         nfc_handle_get_assertion();
-
     } else if (!ctap2AssertData->userPresenceRequired && !ctap2AssertData->pinRequired) {
         // No up nor uv required, skip UX and reply immediately
         get_assertion_confirm(1);
     } else {
         // Look for a potential rk entry if no allow list was provided
         if (!ctap2AssertData->allowListPresent) {
+            // This value will be set to 1 further into the code, because in this case (non-NFC,
+            // non-RK), credential is chosen authenticator-side, *not* client-side (through
+            // getNextAssertion).
             ctap2AssertData->availableCredentials =
                 rk_build_RKList_from_rpID(ctap2AssertData->rpIdHash);
             if (ctap2AssertData->availableCredentials == 1) {
