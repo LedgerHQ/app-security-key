@@ -351,13 +351,12 @@ static void on_user_select_callback(int token, uint8_t index) {
 
 static void on_user_select(void) {
     // Reuse useCaseSettings which fit our needs
-    nbgl_useCaseSettings("User IDs",
-                         0,
-                         (available_credentials - 1) / SELECT_MAX_ID_NB + 1,
-                         false,
-                         on_user_select_exit,
-                         on_user_select_navigation_callback,
-                         on_user_select_callback);
+    nbgl_useCaseNavigableContent("User IDs",
+                                 0,
+                                 (available_credentials - 1) / SELECT_MAX_ID_NB + 1,
+                                 on_user_select_exit,
+                                 on_user_select_navigation_callback,
+                                 on_user_select_callback);
 }
 
 static void on_no_assertion_user_choice(int token, uint8_t index) {
