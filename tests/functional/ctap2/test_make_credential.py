@@ -1,12 +1,11 @@
 import pytest
-
 from fido2.cose import ES256, EdDSA, RS256, PS256
 from fido2.ctap import CtapError
 from fido2.webauthn import AuthenticatorData, AttestedCredentialData
 
-from client import TESTS_SPECULOS_DIR, LedgerAttestationVerifier
-from utils import generate_random_bytes, generate_make_credentials_params
-from utils import generate_get_assertion_params
+from ..client import TESTS_SPECULOS_DIR, LedgerAttestationVerifier
+from ..utils import generate_random_bytes, generate_make_credentials_params, \
+    ctap2_get_assertion
 
 
 def test_make_credential(client, test_name):
@@ -113,6 +112,7 @@ def test_make_credential_exclude_list_ok(client, test_name):
     assert e.value.code == CtapError.ERR.CREDENTIAL_EXCLUDED
 
 
+@pytest.mark.skip_endpoint("NFC", reason="User can't refuse a MAKE_CREDENTIAL on NFC")
 def test_make_credential_user_refused(client, test_name):
     compare_args = (TESTS_SPECULOS_DIR, test_name)
     args = generate_make_credentials_params(client, ref=0)
@@ -154,12 +154,12 @@ def test_make_credential_algos(client):
 
         if not expected_alg:
             with pytest.raises(CtapError) as e:
-                generate_get_assertion_params(client, key_params=key_params, user_accept=None)
+                ctap2_get_assertion(client, key_params=key_params, user_accept=None)
 
             assert e.value.code == CtapError.ERR.UNSUPPORTED_ALGORITHM
             continue
 
-        t = generate_get_assertion_params(client, key_params=key_params)
+        t = ctap2_get_assertion(client, key_params=key_params)
         assert t.credential_data.public_key.ALGORITHM == expected_alg.ALGORITHM
 
         client_data_hash = generate_random_bytes(32)
@@ -184,6 +184,7 @@ def test_make_credential_rpid_filter(client):
         client.ctap2.make_credential(args)
 
 
+@pytest.mark.skip_endpoint("NFC", reason="User can't cancel a MAKE_CREDENTIAL on NFC")
 def test_make_credential_cancel(client, test_name):
     if client.ctap2_u2f_proxy:
         pytest.skip("Does not work with this transport")

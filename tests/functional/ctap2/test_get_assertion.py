@@ -1,17 +1,17 @@
 import pytest
-
 from cryptography.exceptions import InvalidSignature
 from fido2.ctap import CtapError
 from fido2.utils import sha256
 from fido2.webauthn import AuthenticatorData, AttestedCredentialData
 
-from client import TESTS_SPECULOS_DIR
-from utils import generate_random_bytes, generate_get_assertion_params
-from utils import generate_make_credentials_params, fido_known_app
+from ..client import TESTS_SPECULOS_DIR
+from ..transport import TransportType
+from ..utils import generate_random_bytes, ctap2_get_assertion, \
+    generate_make_credentials_params, fido_known_app
 
 
-def test_get_assertion_ok(client, test_name):
-    compare_args = (TESTS_SPECULOS_DIR, test_name)
+def test_get_assertion_ok(client, test_name: str):
+    compare_args = (TESTS_SPECULOS_DIR, client.transported_path(test_name))
     # This test use the fact that after a reboot of the device
     # the ctap2WrappingKey should stay the same.
     # Hence a non rk credential created before the reboot will remains
@@ -26,9 +26,8 @@ def test_get_assertion_ok(client, test_name):
     # test since the last call to client.simulate_reboot().
     # Therefore we call client.simulate_reboot() here to make sure that
     # resetGeneration won't change!
-    client.simulate_reboot()
 
-    t = generate_get_assertion_params(client, ref=0)
+    t = ctap2_get_assertion(client, ref=0)
 
     client_data_hash = generate_random_bytes(32)
     allow_list = [{"id": t.credential_data.credential_id, "type": "public-key"}]
@@ -61,9 +60,9 @@ def test_get_assertion_ok(client, test_name):
     assert assertion.number_of_credentials is None
 
 
-def test_get_assertion_uv(client, test_name):
-    compare_args = (TESTS_SPECULOS_DIR, test_name)
-    t = generate_get_assertion_params(client, ref=0)
+def test_get_assertion_uv(client, test_name: str):
+    compare_args = (TESTS_SPECULOS_DIR, client.transported_path(test_name))
+    t = ctap2_get_assertion(client, ref=0)
 
     client_data_hash = generate_random_bytes(32)
     allow_list = [{"id": t.credential_data.credential_id, "type": "public-key"}]
@@ -87,7 +86,7 @@ def test_get_assertion_uv(client, test_name):
 
 
 def test_get_assertion_no_up(client):
-    t = generate_get_assertion_params(client)
+    t = ctap2_get_assertion(client)
 
     client_data_hash = generate_random_bytes(32)
     allow_list = [{"id": t.credential_data.credential_id, "type": "public-key"}]
@@ -105,9 +104,10 @@ def test_get_assertion_no_up(client):
     assert assertion.number_of_credentials is None
 
 
-def test_get_assertion_user_refused(client, test_name):
+@pytest.mark.skip_endpoint("NFC", reason="User can't refuse a GET_ASSERTION on NFC")
+def test_get_assertion_user_refused(client, test_name: str):
     compare_args = (TESTS_SPECULOS_DIR, test_name)
-    t = generate_get_assertion_params(client, ref=0)
+    t = ctap2_get_assertion(client, ref=0)
 
     client_data_hash = generate_random_bytes(32)
     allow_list = [{"id": t.credential_data.credential_id, "type": "public-key"}]
@@ -121,8 +121,8 @@ def test_get_assertion_user_refused(client, test_name):
     assert e.value.code == CtapError.ERR.OPERATION_DENIED
 
 
-def test_get_assertion_no_credentials(client, test_name):
-    compare_args = (TESTS_SPECULOS_DIR, test_name)
+def test_get_assertion_no_existing_credentials_simple(client, test_name: str):
+    compare_args = (TESTS_SPECULOS_DIR, client.transported_path(test_name))
     args = generate_make_credentials_params(client, ref=0)
     rp = args.rp
     # Try without allow_list
@@ -145,7 +145,7 @@ def test_get_assertion_no_credentials(client, test_name):
     assert e.value.code == CtapError.ERR.NO_CREDENTIALS
 
 
-def test_get_assertion_no_credentials_no_up(client, test_name):
+def test_get_assertion_no_credentials_no_up(client, test_name: str):
     options = {"up": False}
     args = generate_make_credentials_params(client, ref=0)
 
@@ -165,9 +165,9 @@ def test_get_assertion_no_credentials_no_up(client, test_name):
     assert e.value.code == CtapError.ERR.NO_CREDENTIALS
 
 
-def test_get_assertion_wrong_id(client, test_name):
-    compare_args = (TESTS_SPECULOS_DIR, test_name)
-    t = generate_get_assertion_params(client, ref=0)
+def test_get_assertion_wrong_id(client, test_name: str):
+    compare_args = (TESTS_SPECULOS_DIR, client.transported_path(test_name))
+    t = ctap2_get_assertion(client, ref=0)
     client_data_hash = generate_random_bytes(32)
 
     # Test changing the version field, the tag, or the ciphered data
@@ -175,9 +175,7 @@ def test_get_assertion_wrong_id(client, test_name):
         # Change id first bit
         wrong_id = bytearray(t.credential_data.credential_id)
         wrong_id[pos] ^= 0x80
-        wrong_id = bytes(wrong_id)
-
-        allow_list = [{"id": wrong_id, "type": "public-key"}]
+        allow_list = [{"id": bytes(wrong_id), "type": "public-key"}]
 
     with pytest.raises(CtapError) as e:
         client.ctap2.get_assertion(t.args.rp["id"], client_data_hash,
@@ -188,9 +186,9 @@ def test_get_assertion_wrong_id(client, test_name):
     assert e.value.code == CtapError.ERR.NO_CREDENTIALS
 
 
-def test_get_assertion_wrong_rp(client, test_name):
-    compare_args = (TESTS_SPECULOS_DIR, test_name)
-    t = generate_get_assertion_params(client, ref=0)
+def test_get_assertion_wrong_rp(client, test_name: str):
+    compare_args = (TESTS_SPECULOS_DIR, client.transported_path(test_name))
+    t = ctap2_get_assertion(client, ref=0)
     client_data_hash = generate_random_bytes(32)
     allow_list = [{"id": t.credential_data.credential_id, "type": "public-key"}]
 
@@ -206,8 +204,8 @@ def test_get_assertion_wrong_rp(client, test_name):
     assert e.value.code == CtapError.ERR.NO_CREDENTIALS
 
 
-def test_get_assertion_allow_list_ok(client, test_name):
-    compare_args = (TESTS_SPECULOS_DIR, test_name)
+def test_get_assertion_allow_list_ok(client, test_name: str, transport: TransportType):
+    compare_args = (TESTS_SPECULOS_DIR, client.transported_path(test_name))
 
     # On u2f proxy, our app enforce rpid to start with "webctap."
     # Comply with it for this test.
@@ -222,7 +220,7 @@ def test_get_assertion_allow_list_ok(client, test_name):
     users_credential_data = []
 
     # Register a first user with a random RP
-    t = generate_get_assertion_params(client)
+    t = ctap2_get_assertion(client)
     allow_list.append({"id": t.credential_data.credential_id, "type": "public-key"})
 
     # Register 3 users for a known RP
@@ -235,7 +233,7 @@ def test_get_assertion_allow_list_ok(client, test_name):
         users_credential_data.append(credential_data)
 
     # Register another user with another RP
-    new_t = generate_get_assertion_params(client)
+    new_t = ctap2_get_assertion(client)
     allow_list.append({"id": new_t.credential_data.credential_id, "type": "public-key"})
 
     # Generate get assertion request checking presented users
@@ -248,12 +246,21 @@ def test_get_assertion_allow_list_ok(client, test_name):
                                            compare_args=compare_args,
                                            select_user_idx=3)
 
-    credential_data = users_credential_data[2]
+    if transport is TransportType.NFC:
+        # in NFC, SK does not allow user selection: the first working credentials is used.
+        expected_idx = 0
+    else:
+        # else the user will choose the third credentials
+        expected_idx = 2
+
+    credential_data = users_credential_data[expected_idx]
     assertion.verify(client_data_hash, credential_data.public_key)
 
-    with pytest.raises(InvalidSignature):
-        credential_data = users_credential_data[1]
-        assertion.verify(client_data_hash, credential_data.public_key)
+    for idx in [i for i in range(0, len(users_credential_data)) if i is not expected_idx]:
+        # The signature does not match the other identities
+        with pytest.raises(InvalidSignature):
+            credential_data = users_credential_data[1]
+            assertion.verify(client_data_hash, credential_data.public_key)
 
     assert len(assertion.auth_data) == 37
     assert sha256(rp["id"].encode()) == assertion.auth_data.rp_id_hash
@@ -263,7 +270,7 @@ def test_get_assertion_allow_list_ok(client, test_name):
 
 
 def test_get_assertion_rpid_filter(client):
-    t = generate_get_assertion_params(client)
+    t = ctap2_get_assertion(client)
 
     client_data_hash = generate_random_bytes(32)
     allow_list = [{"id": t.credential_data.credential_id, "type": "public-key"}]
@@ -287,12 +294,13 @@ def test_get_assertion_rpid_filter(client):
         assert e.value.code == CtapError.ERR.NO_CREDENTIALS
 
 
+@pytest.mark.skip_endpoint("NFC", reason="User can't cancel a GET_ASSERTION on NFC")
 def test_get_assertion_cancel(client, test_name):
-    compare_args = (TESTS_SPECULOS_DIR, test_name)
+    compare_args = (TESTS_SPECULOS_DIR, client.transported_path(test_name))
     if client.ctap2_u2f_proxy:
         pytest.skip("Does not work with this transport")
 
-    t = generate_get_assertion_params(client, ref=0)
+    t = ctap2_get_assertion(client, ref=0)
     client_data_hash = generate_random_bytes(32)
     allow_list = [{"id": t.credential_data.credential_id, "type": "public-key"}]
     with pytest.raises(CtapError) as e:
@@ -306,7 +314,7 @@ def test_get_assertion_cancel(client, test_name):
 
 
 def test_get_assertion_bad_allow_list(client):
-    t = generate_get_assertion_params(client)
+    t = ctap2_get_assertion(client)
     client_data_hash = generate_random_bytes(32)
 
     # With an element that is not of type MAP
@@ -351,8 +359,8 @@ def test_get_assertion_bad_allow_list(client):
 
 
 def test_get_assertion_duplicate_allow_list_entries(client, test_name):
-    compare_args = (TESTS_SPECULOS_DIR, test_name)
-    t = generate_get_assertion_params(client, ref=0)
+    compare_args = (TESTS_SPECULOS_DIR, client.transported_path(test_name))
+    t = ctap2_get_assertion(client, ref=0)
 
     client_data_hash = generate_random_bytes(32)
     allow_list = [{"id": t.credential_data.credential_id, "type": "public-key"}] * 2

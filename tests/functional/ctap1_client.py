@@ -8,7 +8,8 @@ from ragger.navigator import Navigator, NavInsID
 from fido2.ctap1 import Ctap1, ApduError, RegistrationData, SignatureData
 from fido2.hid import CTAPHID
 
-from utils import prepare_apdu, LedgerCTAP
+from .transport import TransportType
+from .utils import prepare_apdu, LedgerCTAP
 
 
 class APDU(IntEnum):
@@ -50,6 +51,10 @@ class LedgerCtap1(Ctap1, LedgerCTAP):
         Ctap1.__init__(self, device)
         LedgerCTAP.__init__(self, firmware, navigator, debug)
 
+    @property
+    def nfc(self) -> bool:
+        return self.device.transport is TransportType.NFC
+
     def parse_response(self, response):
         status = struct.unpack(">H", response[-2:])[0]
         try:
@@ -85,23 +90,27 @@ class LedgerCtap1(Ctap1, LedgerCTAP):
         text = None
         nav_ins = None
         val_ins = None
+        check_navigation = (user_accept is not None or self.nfc)
 
-        if self.firmware.is_nano:
-            nav_ins = NavInsID.RIGHT_CLICK
-            val_ins = [NavInsID.BOTH_CLICK]
-            if user_accept is not None:
-                if user_accept:
-                    text = "Register"
-                else:
-                    text = "Abort"
-        elif self.firmware in [Firmware.STAX, Firmware.FLEX]:
-            if user_accept is not None:
-                if not user_accept:
-                    val_ins = [NavInsID.USE_CASE_CHOICE_REJECT]
-                else:
-                    val_ins = [NavInsID.USE_CASE_CHOICE_CONFIRM]
+        if self.nfc:
+            check_navigation = False
+        else:
+            if self.firmware.is_nano:
+                nav_ins = NavInsID.RIGHT_CLICK
+                val_ins = [NavInsID.BOTH_CLICK]
+                if user_accept is not None:
+                    if user_accept:
+                        text = "Register"
+                    else:
+                        text = "Abort"
+            elif self.firmware in [Firmware.STAX, Firmware.FLEX]:
+                if user_accept is not None:
+                    if user_accept:
+                        val_ins = [NavInsID.USE_CASE_CHOICE_CONFIRM]
+                    else:
+                        val_ins = [NavInsID.USE_CASE_CHOICE_REJECT]
 
-        self.navigate(user_accept,
+        self.navigate(check_navigation,
                       check_screens,
                       False,  # Never check cancel
                       compare_args,
@@ -146,23 +155,27 @@ class LedgerCtap1(Ctap1, LedgerCTAP):
         text = None
         nav_ins = None
         val_ins = None
+        check_navigation = (user_accept is not None or self.nfc)
 
-        if self.firmware.is_nano:
-            nav_ins = NavInsID.RIGHT_CLICK
-            val_ins = [NavInsID.BOTH_CLICK]
-            if user_accept is not None:
-                if user_accept:
-                    text = "Login"
-                else:
-                    text = "Abort"
-        elif self.firmware in [Firmware.STAX, Firmware.FLEX]:
-            if user_accept is not None:
-                if not user_accept:
-                    val_ins = [NavInsID.USE_CASE_CHOICE_REJECT]
-                else:
-                    val_ins = [NavInsID.USE_CASE_CHOICE_CONFIRM]
+        if self.nfc:
+            check_navigation = False
+        else:
+            if self.firmware.is_nano:
+                nav_ins = NavInsID.RIGHT_CLICK
+                val_ins = [NavInsID.BOTH_CLICK]
+                if user_accept is not None:
+                    if user_accept:
+                        text = "Login"
+                    else:
+                        text = "Abort"
+            elif self.firmware in [Firmware.STAX, Firmware.FLEX]:
+                if user_accept is not None:
+                    if user_accept:
+                        val_ins = [NavInsID.USE_CASE_CHOICE_CONFIRM]
+                    else:
+                        val_ins = [NavInsID.USE_CASE_CHOICE_REJECT]
 
-        self.navigate(user_accept,
+        self.navigate(check_navigation,
                       check_screens,
                       False,  # Never check cancel
                       compare_args,

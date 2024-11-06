@@ -4,11 +4,12 @@ import time
 
 from ragger.navigator import NavInsID
 
-from client import TESTS_SPECULOS_DIR
-from utils import generate_random_bytes, fido_known_appid
-from utils import ENABLE_RK_CONFIG_UI_SETTING
+from ..client import TESTS_SPECULOS_DIR
+from ..utils import generate_random_bytes, fido_known_appid
+from ..utils import ENABLE_RK_CONFIG_UI_SETTING
 
 
+@pytest.mark.skip_endpoint("NFC", reason="CTAP1 is not available on NFC - 0x6D00")
 def test_u2f_screens_idle(client, test_name, firmware):
     # Refresh navigator screen content reference
     time.sleep(0.1)
@@ -36,10 +37,8 @@ def test_u2f_screens_idle(client, test_name, firmware):
                                           screen_change_before_first_instruction=False)
 
 
-@pytest.mark.skipif(
-    "--fast" in sys.argv,
-    reason="running in fast mode",
-)
+@pytest.mark.skipif("--fast" in sys.argv, reason="running in fast mode")
+@pytest.mark.skip_endpoint("NFC", reason="CTAP1 is not available on NFC - 0x6D00")
 def test_u2f_screens_fido_known_list(client, test_name):
     # test on all fido_known_appid
     for idx, app_param in enumerate(fido_known_appid.keys()):

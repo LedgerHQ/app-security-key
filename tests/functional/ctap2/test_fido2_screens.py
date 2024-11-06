@@ -1,15 +1,12 @@
 import pytest
 import sys
-
 from fido2.webauthn import AttestedCredentialData
-
-from client import TESTS_SPECULOS_DIR
-from utils import generate_random_bytes
-from utils import generate_make_credentials_params
-from utils import ENABLE_RK_CONFIG_UI_SETTING
-
 from ragger.firmware import Firmware
 from ragger.navigator import NavInsID, NavIns
+
+from ..client import TESTS_SPECULOS_DIR
+from ..utils import generate_random_bytes, generate_make_credentials_params, \
+    ENABLE_RK_CONFIG_UI_SETTING
 
 
 @pytest.mark.skipif(not ENABLE_RK_CONFIG_UI_SETTING, reason="settings not enable")
@@ -70,7 +67,7 @@ def test_fido_screens_settings(client, test_name):
 def register_then_assert(client, test_name, user):
     args = generate_make_credentials_params(client, ref=0)
     args.user = user
-    compare_args = (TESTS_SPECULOS_DIR, test_name + "/make")
+    compare_args = (TESTS_SPECULOS_DIR, client.transported_path(test_name) + "/make")
     attestation = client.ctap2.make_credential(args,
                                                check_screens="fast",
                                                compare_args=compare_args)
@@ -79,7 +76,7 @@ def register_then_assert(client, test_name, user):
     # Generate get assertion request
     client_data_hash = generate_random_bytes(32)
     allow_list = [{"id": credential_data.credential_id, "type": "public-key"}]
-    compare_args = (TESTS_SPECULOS_DIR, test_name + "/get")
+    compare_args = (TESTS_SPECULOS_DIR, client.transported_path(test_name) + "/get")
     assertion = client.ctap2.get_assertion(args.rp["id"], client_data_hash, allow_list,
                                            user_accept=True,
                                            check_users=[args.user],
@@ -93,7 +90,7 @@ def register_then_assert(client, test_name, user):
     "--fast" in sys.argv,
     reason="running in fast mode",
 )
-def test_fido2_screens_short_id(client, test_name):
+def test_fido2_screens_short_id(client, test_name: str):
     # User ID: https://www.w3.org/TR/webauthn/#user-handle
     # => an opaque byte sequence with a maximum size of 64 bytes
 

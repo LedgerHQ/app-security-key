@@ -1,7 +1,8 @@
-from hashlib import sha256
 from fido2.ctap2.base import Ctap2, Info
+from hashlib import sha256
 from ragger.firmware import Firmware
-from utils import ENABLE_RK_CONFIG
+
+from ..utils import ENABLE_RK_CONFIG
 
 
 def test_get_info(client):

@@ -5,7 +5,7 @@ import sys
 from fido2.hid import TYPE_INIT, CTAPHID
 from fido2.ctap import CtapError
 
-from utils import generate_random_bytes
+from .utils import generate_random_bytes
 
 BROADCAST_CID = 0xFFFFFFFF
 PACKET_SIZE = 64
@@ -23,7 +23,7 @@ def send_cmd(client, cid, cmd, payload):
     data += payload
     assert len(data) <= PACKET_SIZE
     data = data.ljust(PACKET_SIZE, b"\xee")
-    client.hid_dev.write_packet(data)
+    client.device._connection.write_packet(data)
 
 
 def send_cont_frame(client, cid, seq, payload):
@@ -31,11 +31,11 @@ def send_cont_frame(client, cid, seq, payload):
     data += payload
     assert len(data) <= PACKET_SIZE
     data = data.ljust(PACKET_SIZE, b"\xee")
-    client.hid_dev.write_packet(data)
+    client.device._connection.write_packet(data)
 
 
 def recv_resp(client, cid, cmd):
-    resp = client.hid_dev.read_packet()
+    resp = client.device._connection.read_packet()
     assert len(resp) == PACKET_SIZE
     resp_cid, resp_cmd, resp_len = struct.unpack(">IBH", resp[:7])
     assert resp_cid == cid
@@ -67,80 +67,60 @@ def init_channel(client, cid=BROADCAST_CID):
     return recv_init_resp(client, cid, cmd, nonce)
 
 
-@pytest.mark.skipif(
-    "--fast" in sys.argv,
-    reason="running in fast mode",
-)
+@pytest.mark.skipif("--fast" in sys.argv, reason="running in fast mode")
+@pytest.mark.skip_endpoint(["HID", "NFC"])
 def test_no_unexpected_tx(client):
-    if client.use_raw_HID_endpoint:
-        pytest.skip("Does not work with this transport")
-
     with pytest.raises(TimeoutError):
-        client.hid_dev.read_packet()
+        client.device._connection.read_packet()
 
 
-@pytest.mark.skipif(
-    "--fast" in sys.argv,
-    reason="running in fast mode",
-)
+@pytest.mark.skipif("--fast" in sys.argv, reason="running in fast mode")
+@pytest.mark.skip_endpoint(["HID", "NFC"])
 def test_no_resp_to_unexpected_cont(client):
-    if client.use_raw_HID_endpoint:
-        pytest.skip("Does not work with this transport")
-
     cid = struct.unpack(">I", generate_random_bytes(4))[0]
     payload = generate_random_bytes(CONT_FRAME_MAX_PAYLOAD_SIZE)
     send_cont_frame(client, cid, 1, payload)
     with pytest.raises(TimeoutError):
-        client.hid_dev.read_packet()
+        client.device._connection.read_packet()
 
 
+@pytest.mark.skip_endpoint(["HID", "NFC"])
 def test_init(client):
-    if client.use_raw_HID_endpoint:
-        pytest.skip("Does not work with this transport")
-
     new_cid = init_channel(client)
     assert new_cid != 0
 
 
+@pytest.mark.skip_endpoint(["HID", "NFC"])
 def test_init_multiples(client):
-    if client.use_raw_HID_endpoint:
-        pytest.skip("Does not work with this transport")
-
     cid1 = init_channel(client)
     cid2 = init_channel(client)
     cid3 = init_channel(client)
     assert len(set([cid1, cid2, cid3])) == 3
 
 
+@pytest.mark.skip_endpoint(["HID", "NFC"])
 def test_ping(client):
-    if client.use_raw_HID_endpoint:
-        pytest.skip("Does not work with this transport")
-
     payload = generate_random_bytes(50)
-    resp = client.dev.call(CTAPHID.PING, payload)
+    resp = client.device.call(CTAPHID.PING, payload)
     assert resp == payload
 
 
+@pytest.mark.skip_endpoint(["HID", "NFC"])
 def test_long_ping(client):
-    if client.use_raw_HID_endpoint:
-        pytest.skip("Does not work with this transport")
-
     payload = generate_random_bytes(1024)
-    resp = client.dev.call(CTAPHID.PING, payload)
+    resp = client.device.call(CTAPHID.PING, payload)
     assert resp == payload
 
 
+@pytest.mark.skip_endpoint(["HID", "NFC"])
 def test_reinit_during_ping(client):
-    if client.use_raw_HID_endpoint:
-        pytest.skip("Does not work with this transport")
-
     cid = init_channel(client)
 
     # Send start of ping
     cmd = TYPE_INIT | CTAPHID.PING
     data = struct.pack(">IBH", cid, cmd, 1024)
     data += generate_random_bytes(INIT_CMD_MAX_PAYLOAD_SIZE)
-    client.hid_dev.write_packet(data)
+    client.device._connection.write_packet(data)
 
     # Send cont frame
     for i in range(5):
@@ -152,29 +132,23 @@ def test_reinit_during_ping(client):
     assert cid == cid1
 
 
+@pytest.mark.skip_endpoint(["HID", "NFC"])
 def test_invalid_cmd(client):
-    if client.use_raw_HID_endpoint:
-        pytest.skip("Does not work with this transport")
-
     cmd = 0x21
     with pytest.raises(CtapError) as e:
-        client.dev.call(cmd, b"")
+        client.device.call(cmd, b"")
     assert e.value.code == CtapError.ERR.INVALID_COMMAND
 
 
+@pytest.mark.skip_endpoint(["HID", "NFC"])
 def test_invalid_init_cid(client):
-    if client.use_raw_HID_endpoint:
-        pytest.skip("Does not work with this transport")
-
     with pytest.raises(CtapError) as e:
         init_channel(client, cid=0)
     assert e.value.code == CtapError.ERR.INVALID_CHANNEL
 
 
+@pytest.mark.skip_endpoint(["HID", "NFC"])
 def test_ping_on_invalid_cid(client):
-    if client.use_raw_HID_endpoint:
-        pytest.skip("Does not work with this transport")
-
     for cid in [0, BROADCAST_CID]:
         cmd = TYPE_INIT | CTAPHID.PING
         data = generate_random_bytes(50)
@@ -184,17 +158,15 @@ def test_ping_on_invalid_cid(client):
         assert e.value.code == CtapError.ERR.INVALID_CHANNEL
 
 
+@pytest.mark.skip_endpoint(["HID", "NFC"])
 def test_invalid_seq(client):
-    if client.use_raw_HID_endpoint:
-        pytest.skip("Does not work with this transport")
-
     cid = init_channel(client)
 
     # Send start of ping
     cmd = TYPE_INIT | CTAPHID.PING
     data = struct.pack(">IBH", cid, cmd, 1024)
     data += generate_random_bytes(INIT_CMD_MAX_PAYLOAD_SIZE)
-    client.hid_dev.write_packet(data)
+    client.device._connection.write_packet(data)
 
     # Send cont frame
     for i in range(3):
@@ -209,10 +181,8 @@ def test_invalid_seq(client):
     assert e.value.code == CtapError.ERR.INVALID_SEQ
 
 
+@pytest.mark.skip_endpoint(["HID", "NFC"])
 def test_cbor_invalid_length(client):
-    if client.use_raw_HID_endpoint:
-        pytest.skip("Does not work with this transport")
-
     cid = init_channel(client)
 
     cmd = TYPE_INIT | CTAPHID.CBOR
@@ -223,16 +193,14 @@ def test_cbor_invalid_length(client):
     assert e.value.code == CtapError.ERR.INVALID_COMMAND
 
 
+@pytest.mark.skip_endpoint(["HID", "NFC"])
 def test_cmd_to_long(client):
-    if client.use_raw_HID_endpoint:
-        pytest.skip("Does not work with this transport")
-
     cid = init_channel(client)
 
     cmd = TYPE_INIT | CTAPHID.PING
     data = struct.pack(">IBH", cid, cmd, 2000)
     data = data.ljust(PACKET_SIZE, b"\xee")
-    client.hid_dev.write_packet(data)
+    client.device._connection.write_packet(data)
 
     with pytest.raises(CtapError) as e:
         recv_resp(client, cid, cmd)
@@ -240,10 +208,8 @@ def test_cmd_to_long(client):
 
 
 # TODO spec behavior to confirm
+# @pytest.mark.skip_endpoint(["HID", "NFC"])
 # def test_init_while_processing(client):
-#     if client.use_raw_HID_endpoint:
-#         pytest.skip("Does not work with this transport")
-#
 #     challenge = generate_random_bytes(32)
 #     app_param = generate_random_bytes(32)
 #     data = challenge + app_param
@@ -259,31 +225,29 @@ def test_cmd_to_long(client):
 #     init_channel(client)
 
 
+@pytest.mark.skip_endpoint(["HID", "NFC"])
 def test_check_busy(client):
-    if client.use_raw_HID_endpoint:
-        pytest.skip("Does not work with this transport")
-
-    cid = client.dev._channel_id
+    cid = client.device._channel_id
     cmd = TYPE_INIT | CTAPHID.PING
 
     # Send start of ping
     ping_data = generate_random_bytes(INIT_CMD_MAX_PAYLOAD_SIZE + 20)
     data = struct.pack(">IBH", cid, cmd, len(ping_data))
     data += ping_data[:INIT_CMD_MAX_PAYLOAD_SIZE]
-    client.hid_dev.write_packet(data)
+    client.device._connection.write_packet(data)
 
     # Send start of ping on another CID
     new_cid = cid + 1
     data = struct.pack(">IBH", new_cid, cmd, 1024)
     data += generate_random_bytes(INIT_CMD_MAX_PAYLOAD_SIZE)
-    client.hid_dev.write_packet(data)
+    client.device._connection.write_packet(data)
     with pytest.raises(CtapError) as e:
         recv_resp(client, new_cid, cmd)
     assert e.value.code == CtapError.ERR.CHANNEL_BUSY
 
     # Finish ping on first channel
     send_cont_frame(client, cid, 0, ping_data[INIT_CMD_MAX_PAYLOAD_SIZE:])
-    resp = client.dev.recv(cmd)
+    resp = client.device.recv(cmd)
     assert resp == ping_data
 
 # TODO missing CBOR keep-alive check

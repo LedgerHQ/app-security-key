@@ -1,9 +1,12 @@
-from utils import generate_random_bytes, MakeCredentialArguments
-from fido2.webauthn import AttestedCredentialData
-from fido2.utils import sha256
+import pytest
 from fido2.cose import ES256
+from fido2.utils import sha256
+from fido2.webauthn import AttestedCredentialData
+
+from ..utils import generate_random_bytes, MakeCredentialArguments
 
 
+@pytest.mark.skip_endpoint("NFC", reason="CTAP1 register is not available on NFC - 0x6D00")
 def test_interop_u2f_reg_then_ctap2_auth(client):
     rp_id = "webctap.example.org"
 
@@ -35,6 +38,7 @@ def test_interop_u2f_reg_then_ctap2_auth(client):
     assert assertion.credential["id"] == registration_data.key_handle
 
 
+@pytest.mark.skip_endpoint("NFC", reason="CTAP1 authenticate is not available on NFC - 0x6D00")
 def test_interop_ctap2_reg_then_u2f_auth(client):
 
     rp_id = "webctap.example.org"

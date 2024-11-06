@@ -4,8 +4,8 @@ from fido2.ctap import CtapError
 from fido2.ctap2.pin import ClientPin, PinProtocolV1, PinProtocolV2
 from fido2.webauthn import AttestedCredentialData, AuthenticatorData
 
-from utils import generate_random_bytes, generate_make_credentials_params
-from utils import generate_get_assertion_params
+from ..utils import generate_random_bytes, generate_make_credentials_params, \
+    ctap2_get_assertion
 
 
 PIN_A = "aaaa"
@@ -23,9 +23,6 @@ def test_client_pin_test_bad_protocol(client):
     with pytest.raises(CtapError) as e:
         bad_pin_protocol.set_pin(PIN_A)
     assert e.value.code == CtapError.ERR.INVALID_PARAMETER
-
-    # Reset device for next tests
-    client.ctap2.reset()
 
 
 def test_client_pin_check_not_set(client):
@@ -58,7 +55,7 @@ def test_client_pin_check_not_set(client):
     assert e.value.code == CtapError.ERR.PIN_NOT_SET
 
     # Check get assertion request behavior with zero length pinAuth
-    t = generate_get_assertion_params(client)
+    t = ctap2_get_assertion(client)
 
     client_data_hash = generate_random_bytes(32)
     allow_list = [{"id": t.credential_data.credential_id, "type": "public-key"}]
@@ -74,9 +71,6 @@ def test_client_pin_check_not_set(client):
                                    pin_uv_protocol=client.client_pin.protocol.VERSION,
                                    user_accept=None)
     assert e.value.code == CtapError.ERR.PIN_NOT_SET
-
-    # Reset device for next tests
-    client.ctap2.reset()
 
 
 def test_client_pin_check_set(client):
@@ -114,7 +108,7 @@ def test_client_pin_check_set(client):
     assert e.value.code == CtapError.ERR.PIN_INVALID
 
     # Check get assertion request behavior with zero length pinAuth
-    t = generate_get_assertion_params(client, pin=PIN_B)
+    t = ctap2_get_assertion(client, pin=PIN_B)
 
     client_data_hash = generate_random_bytes(32)
     allow_list = [{"id": t.credential_data.credential_id, "type": "public-key"}]
@@ -131,9 +125,6 @@ def test_client_pin_check_set(client):
                                    pin_uv_protocol=client.client_pin.protocol.VERSION,
                                    user_accept=None)
     assert e.value.code == CtapError.ERR.PIN_INVALID
-
-    # Reset device for next tests
-    client.ctap2.reset()
 
 
 def test_use_pin(client):
@@ -222,9 +213,6 @@ def test_use_pin(client):
 
     assertion.verify(client_data_hash, credential_data.public_key)
 
-    # Reset device for next tests
-    client.ctap2.reset()
-
 
 def test_client_pin_unique_token(client):
     client.client_pin.set_pin(PIN_A)
@@ -260,9 +248,6 @@ def test_client_pin_unique_token(client):
     args.pin_uv_param = client.client_pin.protocol.authenticate(token_b, args.client_data_hash)
     client.ctap2.make_credential(args)
 
-    # Reset device for next tests
-    client.ctap2.reset()
-
 
 def test_client_pin_block(client):
     client.client_pin.set_pin(PIN_A)
@@ -274,7 +259,7 @@ def test_client_pin_block(client):
             err = CtapError.ERR.PIN_AUTH_BLOCKED
 
         with pytest.raises(CtapError) as e:
-            generate_get_assertion_params(client, pin=PIN_B)
+            ctap2_get_assertion(client, pin=PIN_B)
         assert e.value.code == err
 
         retries = 8 - i
@@ -289,9 +274,6 @@ def test_client_pin_block(client):
     # - that retries counter doesn't restart upon reboot.
     # - that when retries counter reach 0, the return code is
     #   CTAP2_ERR_PIN_BLOCKED.
-
-    # Reset device for next tests
-    client.ctap2.reset()
 
 
 def test_client_pin_set_errors(client):
@@ -316,10 +298,8 @@ def test_client_pin_set_errors(client):
         )
     assert e.value.code == CtapError.ERR.PIN_POLICY_VIOLATION
 
-    # Reset device for next tests
-    client.ctap2.reset()
 
-
+@pytest.mark.skip_endpoint("NFC", reason="CTAP2 reset is not available on NFC - 0x27")
 def test_client_pin_reset(client):
     info = client.ctap2.info
     # Value depends on if a pin as been set.
@@ -346,10 +326,8 @@ def test_client_pin_reset(client):
         client.client_pin.get_pin_retries()
     assert e.value.code == CtapError.ERR.PIN_AUTH_INVALID
 
-    # Reset device for next tests
-    client.ctap2.reset()
 
-
+@pytest.mark.skip_endpoint("NFC", reason="CTAP2 reset is not available on NFC - 0x27")
 def test_client_pin_blocked_reset(client):
     # Set pin and validate it has been set
     client.client_pin.set_pin(PIN_A)
@@ -362,7 +340,7 @@ def test_client_pin_blocked_reset(client):
             err = CtapError.ERR.PIN_AUTH_BLOCKED
 
         with pytest.raises(CtapError) as e:
-            generate_get_assertion_params(client, pin=PIN_B)
+            ctap2_get_assertion(client, pin=PIN_B)
         assert e.value.code == err
 
     # Reset device and check pin is not set anymore
@@ -380,8 +358,6 @@ def test_client_pin_blocked_reset(client):
     client.client_pin.set_pin(PIN_A)
     client.client_pin.get_pin_token(PIN_A)
 
-    # Reset device for next tests
-    client.ctap2.reset()
 
 # Todo
 # If NVM feature is implemented using this framework, some test should be added

@@ -4,8 +4,9 @@ import socket
 from fido2.ctap1 import ApduError, Ctap1
 from fido2.hid import CTAPHID
 
-from ctap1_client import APDU
-from utils import generate_random_bytes
+from ..transport import TransportType
+from ..ctap1_client import APDU
+from ..utils import generate_random_bytes
 
 
 def test_register_raw_u2f_fake_channel_security_length(client):
@@ -14,7 +15,7 @@ def test_register_raw_u2f_fake_channel_security_length(client):
     data = challenge + app_param
 
     # This test is specific for U2F endpoint
-    if not client.use_U2F_endpoint:
+    if client.transport is not TransportType.U2F:
         pytest.skip("Does not work with this transport")
 
     # On U2F endpoint, the device should return APDU.SW_CONDITIONS_NOT_SATISFIED

@@ -1,18 +1,19 @@
 import struct
 
-from typing import Mapping, Optional
-
 from ragger.firmware import Firmware
 from ragger.navigator import Navigator, NavInsID, NavIns
+from typing import List, Mapping, Optional, Union
 
 from fido2 import cbor
 from fido2.ctap import CtapError
 from fido2.ctap1 import ApduError
 from fido2.ctap2.base import Ctap2, args, AttestationResponse, AssertionResponse
 from fido2.hid import CTAPHID
+from fido2.hid import CtapHidDevice
 
-from ctap1_client import APDU
-from utils import LedgerCTAP, prepare_apdu, MakeCredentialArguments
+from .ctap1_client import APDU
+from .transport import TransportType
+from .utils import LedgerCTAP, prepare_apdu, MakeCredentialArguments
 
 
 class LedgerCtap2(Ctap2, LedgerCTAP):
@@ -28,11 +29,15 @@ class LedgerCtap2(Ctap2, LedgerCTAP):
     - directly in CTAPHID.CBOR command
     - encapsulated in U2F APDU with INS=0x10 in CTAPHID.MSG command
     """
-    def __init__(self, device, firmware: Firmware, navigator: Navigator,
+    def __init__(self, device: CtapHidDevice, firmware: Firmware, navigator: Navigator,
                  ctap2_u2f_proxy, debug: bool = False):
         self.ctap2_u2f_proxy = ctap2_u2f_proxy
         Ctap2.__init__(self, device)
         LedgerCTAP.__init__(self, firmware, navigator, debug)
+
+    @property
+    def nfc(self) -> bool:
+        return self.device.transport is TransportType.NFC
 
     def send_cbor_nowait(self, cmd, data=None, *, event=None, on_keepalive=None):
         request = struct.pack(">B", cmd)
@@ -50,8 +55,7 @@ class LedgerCtap2(Ctap2, LedgerCTAP):
         return ctaphid_cmd
 
     def send_cbor(self, cmd, data=None, *, event=None, on_keepalive=None):
-        ctaphid_cmd = self.send_cbor_nowait(cmd, data=data, event=event,
-                                            on_keepalive=on_keepalive)
+        ctaphid_cmd = self.send_cbor_nowait(cmd, data=data, event=event, on_keepalive=on_keepalive)
         response = self.device.recv(ctaphid_cmd)
         return self.parse_response(response)
 
@@ -104,24 +108,29 @@ class LedgerCtap2(Ctap2, LedgerCTAP):
 
         text = None
         nav_ins = None
-        val_ins = None
+        val_ins: List[Union[NavIns, NavInsID]] = list()
+        check_navigation = (user_accept is not None or self.nfc)
 
-        if self.firmware.is_nano:
-            nav_ins = NavInsID.RIGHT_CLICK
-            val_ins = [NavInsID.BOTH_CLICK]
-            if user_accept is not None:
-                if not user_accept:
-                    text = "Don't register"
-                else:
-                    text = "Register$"
-        elif self.firmware in [Firmware.STAX, Firmware.FLEX]:
-            if user_accept is not None:
-                if not user_accept:
-                    val_ins = [NavInsID.USE_CASE_CHOICE_REJECT]
-                else:
-                    val_ins = [NavInsID.USE_CASE_CHOICE_CONFIRM]
+        # No confirmation needed on NFC
+        if self.nfc:
+            check_navigation = False
+        else:
+            if self.firmware.is_nano:
+                nav_ins = NavInsID.RIGHT_CLICK
+                val_ins = [NavInsID.BOTH_CLICK]
+                if user_accept is not None:
+                    if user_accept:
+                        text = "Register$"
+                    else:
+                        text = "Don't register"
+            elif self.firmware in [Firmware.STAX, Firmware.FLEX]:
+                if user_accept is not None:
+                    if user_accept:
+                        val_ins = [NavInsID.USE_CASE_CHOICE_CONFIRM]
+                    else:
+                        val_ins = [NavInsID.USE_CASE_CHOICE_REJECT]
 
-        self.navigate(user_accept,
+        self.navigate(check_navigation,
                       check_screens,
                       check_cancel,
                       compare_args,
@@ -138,16 +147,14 @@ class LedgerCtap2(Ctap2, LedgerCTAP):
         if user_accept is not None:
             self.wait_for_return_on_dashboard()
 
-        response = self.parse_response(response)
-
-        return AttestationResponse.from_dict(response)
+        return AttestationResponse.from_dict(self.parse_response(response))
 
     def get_assertion(self, rp_id, client_data_hash, allow_list=None,
                       extensions=None, options=None, pin_uv_param=None,
                       pin_uv_protocol=None, *, event=None, on_keepalive=None,
-                      login_type="simple", user_accept=True, check_users=None,
+                      login_type="simple", user_accept: Optional[bool] = True, check_users=None,
                       check_screens=False, check_cancel=False, compare_args=None,
-                      select_user_idx=1, no_check: bool = False):
+                      select_user_idx=1):
         # Refresh navigator screen content reference
         self.navigator._backend.get_current_screen_content()
         assert login_type in ["simple", "multi", "none"]
@@ -164,54 +171,58 @@ class LedgerCtap2(Ctap2, LedgerCTAP):
         ctap_hid_cmd = self.send_cbor_nowait(cmd, data, event=event, on_keepalive=on_keepalive)
         text = None
         nav_ins = None
-        val_ins = None
+        val_ins: List[Union[NavIns, NavInsID]] = list()
+        check_navigation = (user_accept is not None or self.nfc)
 
-        if self.firmware.is_nano:
-            nav_ins = NavInsID.RIGHT_CLICK
-            val_ins = [NavInsID.BOTH_CLICK]
-            if user_accept is not None:
-                if login_type == "none":
-                    text = "Close"
-                elif login_type == "multi":
-                    if check_users and len(check_users) == 1:
-                        raise ValueError("Found 1 user while expecting multiple")
-                    if user_accept:
-                        text = f"Log in user {select_user_idx}/"
+        # No confirmation needed on NFC
+        if self.nfc:
+            check_navigation = False
+        else:
+            if self.firmware.is_nano:
+                nav_ins = NavInsID.RIGHT_CLICK
+                val_ins = [NavInsID.BOTH_CLICK]
+                if user_accept is not None:
+                    if login_type == "none":
+                        text = "Close"
+                    elif login_type == "multi":
+                        if check_users and len(check_users) == 1:
+                            raise ValueError("Found 1 user while expecting multiple")
+                        if user_accept:
+                            text = f"Log in user {select_user_idx}/"
+                        else:
+                            text = "Reject"
                     else:
-                        text = "Reject"
-                else:
-                    if check_users and len(check_users) != 1:
-                        raise ValueError("Found multiple users while expecting 1")
-                    if user_accept:
-                        text = "Log in"
+                        if check_users and len(check_users) != 1:
+                            raise ValueError("Found multiple users while expecting 1")
+                        if user_accept:
+                            text = "Log in"
+                        else:
+                            text = "Reject"
+            elif self.firmware in [Firmware.STAX, Firmware.FLEX]:
+                if user_accept is not None:
+                    if login_type == "none":
+                        val_ins = [NavInsID.TAPPABLE_CENTER_TAP]
+                    if not user_accept:
+                        val_ins = [NavInsID.USE_CASE_CHOICE_REJECT]
                     else:
-                        text = "Reject"
-        elif self.firmware in [Firmware.STAX, Firmware.FLEX]:
-            if user_accept is not None:
-                if login_type == "none":
-                    val_ins = [NavInsID.TAPPABLE_CENTER_TAP]
-                if not user_accept:
-                    val_ins = [NavInsID.USE_CASE_CHOICE_REJECT]
-                else:
-                    if login_type == "multi" and select_user_idx != 1:
-                        assert select_user_idx <= 5
-                        val_ins = [NavIns(NavInsID.TOUCH, (200, 350)),
-                                   NavIns(NavInsID.TOUCH, (200, 40 + 90 * select_user_idx)),
-                                   NavInsID.USE_CASE_CHOICE_CONFIRM]
-                    else:
-                        val_ins = [NavInsID.USE_CASE_CHOICE_CONFIRM]
-        if not no_check:
-            self.navigate(user_accept,
-                          check_screens and not no_check,
-                          check_cancel or no_check,
-                          compare_args,
-                          text,
-                          nav_ins,
-                          val_ins)
-            if check_cancel:
-                # Send a cancel command
-                self.device.send(CTAPHID.CANCEL, b"")
-        if not no_check and user_accept is not None:
+                        if login_type == "multi" and select_user_idx != 1:
+                            assert select_user_idx <= 5
+                            val_ins = [NavIns(NavInsID.TOUCH, (200, 350)),
+                                       NavIns(NavInsID.TOUCH, (200, 40 + 90 * select_user_idx)),
+                                       NavInsID.USE_CASE_CHOICE_CONFIRM]
+                        else:
+                            val_ins = [NavInsID.USE_CASE_CHOICE_CONFIRM]
+        self.navigate(check_navigation,
+                      check_screens,
+                      check_cancel,
+                      compare_args,
+                      text,
+                      nav_ins,
+                      val_ins)
+        if check_cancel:
+            # Send a cancel command
+            self.device.send(CTAPHID.CANCEL, b"")
+        if check_navigation and user_accept is not None:
             self.wait_for_return_on_dashboard()
         response = self.device.recv(ctap_hid_cmd)
         response = self.parse_response(response)
@@ -224,8 +235,8 @@ class LedgerCtap2(Ctap2, LedgerCTAP):
         response = self.parse_response(response)
         return AssertionResponse.from_dict(response)
 
-    def reset(self, *, event=None, on_keepalive=None, user_accept=True,
-              check_screens=False, check_cancel=False, compare_args=None):
+    def reset(self, *, event=None, on_keepalive=None, user_accept: Optional[bool] = True,
+              check_screens=False, check_cancel=False, compare_args=None) -> None:
         # Refresh navigator screen content reference
         self.navigator._backend.get_current_screen_content()
 
@@ -234,24 +245,32 @@ class LedgerCtap2(Ctap2, LedgerCTAP):
 
         text = None
         nav_ins = None
-        val_ins = None
+        val_ins: List[Union[NavIns, NavInsID]] = list()
 
-        if self.firmware.is_nano:
-            nav_ins = NavInsID.RIGHT_CLICK
-            val_ins = [NavInsID.BOTH_CLICK]
-            if user_accept is not None:
-                if user_accept:
-                    text = "Yes, delete"
-                else:
-                    text = "No, don't delete"
-        elif self.firmware in [Firmware.STAX, Firmware.FLEX]:
-            if user_accept is not None:
-                if not user_accept:
-                    val_ins = [NavInsID.USE_CASE_CHOICE_REJECT]
-                else:
-                    val_ins = [NavInsID.USE_CASE_CHOICE_CONFIRM]
+        check_navigation = (user_accept is not None or self.nfc)
 
-        self.navigate(user_accept,
+        # No confirmation needed on NFC
+        if self.nfc:
+            # Anyway, this function is not implemented through
+            # NFC, and will always return an error
+            check_navigation = False
+        else:
+            if self.firmware.is_nano:
+                nav_ins = NavInsID.RIGHT_CLICK
+                val_ins = [NavInsID.BOTH_CLICK]
+                if user_accept is not None:
+                    if user_accept:
+                        text = "Yes, delete"
+                    else:
+                        text = "No, don't delete"
+            elif self.firmware in [Firmware.STAX, Firmware.FLEX]:
+                if user_accept is not None:
+                    if not user_accept:
+                        val_ins = [NavInsID.USE_CASE_CHOICE_REJECT]
+                    else:
+                        val_ins = [NavInsID.USE_CASE_CHOICE_CONFIRM]
+
+        self.navigate(check_navigation,
                       check_screens,
                       check_cancel,
                       compare_args,

@@ -3,7 +3,7 @@ import secrets
 import string
 import struct
 from dataclasses import asdict, dataclass
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 from fido2.cose import ES256
 from fido2.ctap2.base import args, AttestationResponse
@@ -26,11 +26,11 @@ FIDO_RP_ID_HASH_1 = bytes.fromhex("000102030405060708090a0b0c0d0e0f"
 @dataclass
 class MakeCredentialArguments:
     client_data_hash: str
-    rp: str
-    user: str
+    rp: Dict
+    user: Dict[str, Union[str, bytes]]
     key_params: List[Dict]
     exclude_list: Optional[List] = None
-    extensions: Optional[Dict] = None
+    extensions: Optional[List] = None
     options: Optional[Dict] = None
     pin_uv_param: Optional[Any] = None
     pin_uv_protocol: Optional[Any] = None
@@ -74,7 +74,7 @@ def generate_make_credentials_params(client,
                                      key_params=None,
                                      pin: Optional[bytes] = None,
                                      pin_uv_param: Optional[bytes] = None,
-                                     ref: int = None,
+                                     ref: Optional[int] = None,
                                      exclude_list: Optional[List] = None,
                                      extensions: Optional[List] = None,
                                      options: Optional[Dict] = None) -> MakeCredentialArguments:
@@ -98,7 +98,7 @@ def generate_make_credentials_params(client,
     client_data_hash = generate_random_bytes(32)
     if rp is None:
         rp = {"id": rp_id}
-    user = {"id": user_id}
+    user: Dict[str, Union[str, bytes]] = {"id": user_id}
     if user_name:
         user["name"] = user_name
     key_params = (key_params if key_params is not None
@@ -127,9 +127,9 @@ def generate_make_credentials_params(client,
     return params
 
 
-def generate_get_assertion_params(client,
-                                  user_accept: Optional[bool] = True,
-                                  **kwargs) -> MakeCredentialTransaction:
+def ctap2_get_assertion(client,
+                        user_accept: Optional[bool] = True,
+                        **kwargs) -> MakeCredentialTransaction:
     make_credentials_arguments = generate_make_credentials_params(client, **kwargs)
     attestation = client.ctap2.make_credential(make_credentials_arguments, user_accept=user_accept)
     return MakeCredentialTransaction(make_credentials_arguments, attestation)
@@ -194,13 +194,13 @@ class LedgerCTAP:
         self.navigator._backend.wait_for_home_screen()
 
     def navigate(self,
-                 user_accept: Optional[bool],
+                 check_navigation: bool,
                  check_screens: bool,
                  check_cancel: bool,
-                 compare_args,
+                 compare_args: Optional[Tuple],
                  text: Optional[str],
-                 nav_ins,
-                 val_ins):
+                 nav_ins: Optional[Union[NavIns, NavInsID]],
+                 val_ins: List[Union[NavIns, NavInsID]]):
 
         if check_screens:
             assert compare_args
@@ -208,11 +208,12 @@ class LedgerCTAP:
         else:
             root, test_name = None, None
 
-        if user_accept is not None:
+        if check_navigation:
             # Over U2F endpoint (but not over HID) the device needs the
             # response to be retrieved before continuing the UX flow.
 
             if text:
+                assert nav_ins is not None, "Can't wait for a text without navigation instruction"
                 self.navigator.navigate_until_text_and_compare(
                     nav_ins,
                     val_ins,

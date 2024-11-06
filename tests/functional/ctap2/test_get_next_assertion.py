@@ -1,8 +1,7 @@
 import pytest
-
 from fido2.ctap import CtapError
 
-from utils import generate_random_bytes, generate_get_assertion_params
+from ..utils import generate_random_bytes, ctap2_get_assertion
 
 
 def test_get_next_assertion_no_context(client):
@@ -14,10 +13,10 @@ def test_get_next_assertion_no_context(client):
     assert e.value.code == CtapError.ERR.NOT_ALLOWED
 
 
-def test_get_next_assertion_no_credentials(client):
-    t1 = generate_get_assertion_params(client)
+def test_get_next_assertion_two_credentials_allowlist(client):
+    t1 = ctap2_get_assertion(client)
     rp = t1.args.rp
-    t2 = generate_get_assertion_params(client, rp=rp)
+    t2 = ctap2_get_assertion(client, rp=rp)
 
     registered_users = [t1.args.user, t1.args.user]
     client_data_hash = generate_random_bytes(32)
@@ -42,5 +41,4 @@ def test_get_next_assertion_no_credentials(client):
     # request should be refused.
     with pytest.raises(CtapError) as e:
         client.ctap2.get_next_assertion()
-
     assert e.value.code == CtapError.ERR.NOT_ALLOWED
