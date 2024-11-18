@@ -4,7 +4,7 @@ RM ?= rm -f
 CFLAGS ?= -O2 -Wall -Wextra -Wformat=2 -Wp,-MT,$@ -Wp,-MD,$(dir $@).$(notdir $@).d -fstack-protector
 CFLAGS += -DPRINTF=printf
 CFLAGS += -DUNIT_TESTS
-CFLAGS += -I. -I../../include -I../../cbor-src
+CFLAGS += -I. -I../../include -I../../cbor-src -I../../src/ctap2/
 
 LDFLAGS ?= -Wl,-O1,-as-needed,-no-undefined,-z,relro,-z,now,--fatal-warnings -fstack-protector
 

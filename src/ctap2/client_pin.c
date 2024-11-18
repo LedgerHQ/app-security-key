@@ -16,11 +16,12 @@
 *   limitations under the License.
 ********************************************************************************/
 
-#include "os.h"
-#include "cx.h"
-#include "ledger_assert.h"
+#include <os.h>
+#include <cx.h>
+#include <ledger_assert.h>
 
 #include "ctap2.h"
+#include "ctap2_utils.h"
 #include "config.h"
 #include "cbip_helper.h"
 #include "cose_keys.h"
@@ -383,7 +384,7 @@ static void handle_store_pin(u2f_service_t *service,
     authTokeninUse = false;
 
     responseBuffer[0] = ERROR_NONE;
-    send_cbor_response(&G_io_u2f, 1);
+    send_cbor_response(&G_io_u2f, 1, NULL);
 }
 
 static int check_pin_hash(int protocol,
@@ -450,7 +451,7 @@ static void ctap2_handle_get_pin_retries(u2f_service_t *service,
     cbip_add_int(&encoder, N_u2f.pinRetries);
 
     responseBuffer[0] = ERROR_NONE;
-    send_cbor_response(&G_io_u2f, 1 + encoder.offset);
+    send_cbor_response(&G_io_u2f, 1 + encoder.offset, NULL);
 }
 
 static void ctap2_handle_get_key_agreement(u2f_service_t *service,
@@ -483,7 +484,7 @@ static void ctap2_handle_get_key_agreement(u2f_service_t *service,
     }
 
     responseBuffer[0] = ERROR_NONE;
-    send_cbor_response(&G_io_u2f, 1 + encoder.offset);
+    send_cbor_response(&G_io_u2f, 1 + encoder.offset, NULL);
 }
 
 static void ctap2_handle_set_pin(u2f_service_t *service,
@@ -664,7 +665,7 @@ static void ctap2_handle_get_pin_token(u2f_service_t *service,
     cbip_add_byte_string(&encoder, tokenEnc, encryptedLength);
 
     responseBuffer[0] = ERROR_NONE;
-    send_cbor_response(&G_io_u2f, 1 + encoder.offset);
+    send_cbor_response(&G_io_u2f, 1 + encoder.offset, NULL);
 }
 
 /******************************************/

@@ -18,6 +18,8 @@
 
 #pragma once
 
+#include "make_credential_struct.h"
+
 #define TAG_ALGORITHM        "alg"
 #define TAG_SIGNATURE        "sig"
 #define TAG_CERTIFICATE_X509 "x5c"
@@ -27,3 +29,7 @@ void ctap2_make_credential_user_cancel(void);
 #ifdef HAVE_NFC
 void check_and_generate_new_pubkey(void);
 #endif
+
+static inline ctap2_register_data_t *globals_get_ctap2_register_data(void) {
+    return &shared_ctx.u.ctap2Data.u.ctap2RegisterData;
+}

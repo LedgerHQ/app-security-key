@@ -17,6 +17,7 @@
 ********************************************************************************/
 
 #include <string.h>
+#include <lib_standard_app/format.h>
 
 #include "ctap2.h"
 #include "config.h"
@@ -279,6 +280,20 @@ static void nfc_handle_get_assertion() {
     }
 }
 
+static void copy_assert_info_on_buffers(void) {
+    ctap2_assert_data_t *ctap2AssertData = globals_get_ctap2_assert_data();
+
+    ctap2_display_copy_rp(ctap2AssertData->rpId, ctap2AssertData->rpIdLen);
+
+    if (ctap2AssertData->credId) {
+        ctap2_display_copy_username((char *) ctap2AssertData->credId, ctap2AssertData->credIdLen);
+    } else {
+        uint8_t nameLength = MIN(CX_SHA256_SIZE, (sizeof(g.buffer2_65) - 1) / 2);
+        format_hex(ctap2AssertData->clientDataHash, nameLength, g.buffer2_65, sizeof(g.buffer2_65));
+    }
+    PRINTF("After copy, buffer content:\n1 - '%s'\n2 - '%s'\n", g.buffer1_65, g.buffer2_65);
+}
+
 void ctap2_get_assertion_handle(u2f_service_t *service, uint8_t *buffer, uint16_t length) {
     ctap2_assert_data_t *ctap2AssertData = globals_get_ctap2_assert_data();
     cbipDecoder_t decoder;
@@ -344,7 +359,7 @@ void ctap2_get_assertion_handle(u2f_service_t *service, uint8_t *buffer, uint16_
         goto exit;
     }
 
-    ctap2_copy_info_on_buffers();
+    copy_assert_info_on_buffers();
 
     /* if (true) { */
     /*     nfc_handle_get_assertion(); */

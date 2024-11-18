@@ -16,10 +16,11 @@
 *   limitations under the License.
 ********************************************************************************/
 
-#include "os.h"
-#include "cx.h"
+#include <os.h>
+#include <cx.h>
 
 #include "ctap2.h"
+#include "ctap2_utils.h"
 #include "cbip_encode.h"
 #include "config.h"
 #include "globals.h"
@@ -97,5 +98,5 @@ void ctap2_get_info_handle(u2f_service_t *service, uint8_t *buffer, uint16_t len
     cbip_add_int(&encoder, PIN_PROTOCOL_VERSION_V1);
 
     responseBuffer[0] = ERROR_NONE;
-    send_cbor_response(service, 1 + encoder.offset);
+    send_cbor_response(service, 1 + encoder.offset, NULL);
 }

@@ -51,25 +51,12 @@ static void copy_name_in_buffer65(char *buffer, const char *name, uint8_t nameLe
     }
 }
 
-static void ctap2_display_copy_username(const char *name, uint8_t nameLength) {
+void ctap2_display_copy_username(const char *name, uint8_t nameLength) {
     copy_name_in_buffer65(g.buffer2_65, name, nameLength);
 }
 
-static void ctap2_display_copy_rp(const char *name, uint8_t nameLength) {
+void ctap2_display_copy_rp(const char *name, uint8_t nameLength) {
     copy_name_in_buffer65(g.buffer1_65, name, nameLength);
-}
-
-void ctap2_copy_info_on_buffers(void) {
-    ctap2_register_data_t *ctap2RegisterData = globals_get_ctap2_register_data();
-
-    ctap2_display_copy_rp(ctap2RegisterData->rpId, ctap2RegisterData->rpIdLen);
-
-    if (ctap2RegisterData->userStr) {
-        ctap2_display_copy_username(ctap2RegisterData->userStr, ctap2RegisterData->userStrLen);
-    } else {
-        uint8_t nameLength = MIN(ctap2RegisterData->userIdLen, (sizeof(g.buffer2_65) - 1) / 2);
-        format_hex(ctap2RegisterData->userId, nameLength, g.buffer2_65, sizeof(g.buffer2_65));
-    }
 }
 
 void truncate_pairs_for_display(bool large) {

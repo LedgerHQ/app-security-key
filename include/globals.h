@@ -18,11 +18,12 @@
 
 #pragma once
 
-#include "u2f_service.h"
+#include <u2f_service.h>
 
 #include "credential.h"
 #include "u2f_process.h"
-#include "ctap2.h"
+#include "ctap2/make_credential/make_credential_struct.h"
+#include "ctap2/get_assertion/get_assertion_struct.h"
 
 #define U2F_VERSION      "U2F_V2"
 #define U2F_VERSION_SIZE (sizeof(U2F_VERSION) - 1)
@@ -68,6 +69,31 @@ static const uint8_t FIDO_AID[FIDO_AID_SIZE] = {0xA0, 0x00, 0x00, 0x06, 0x47, 0x
 #define EXT_ENC_DEFAULT_LE 65536
 
 #define NAME_BUFFER_SIZE 65
+
+// Helper to detect if CTAP2_CBOR_CMD command is proxyied over U2F_CMD
+// - CTAP2 calls that are CTAP2_CMD_CBOR commands:
+//   There is a direct call from lib_stusb_impl/u2f_impl.c:u2f_message_complete()
+//   to ctap2_handle_cmd_cbor(), hence G_io_app.apdu_state = APDU_IDLE
+// - CTAP2 calls that are encapsulated on an APDU over U2F_CMD_MSG command
+//   This calls goes through:
+//   - lib_stusb_impl/u2f_impl.c:u2f_message_complete()
+//   - lib_stusb_impl/u2f_impl.c:u2f_handle_cmd_msg()
+//   - ....
+//   - src/main.c:sample_main()
+//   - src/u2f_processing.c:handleApdu()
+//   In this case G_io_app.apdu_state is set to APDU_U2F in
+//   lib_stusb_impl/u2f_impl.c:u2f_handle_cmd_msg()
+#define CMD_IS_OVER_U2F_CMD        (G_io_app.apdu_state != APDU_IDLE)
+#define CMD_IS_OVER_CTAP2_CBOR_CMD (G_io_app.apdu_state == APDU_IDLE)
+
+#define CMD_IS_OVER_U2F_USB (G_io_u2f.media == U2F_MEDIA_USB)
+
+#ifdef HAVE_NFC
+#define CMD_IS_OVER_U2F_NFC (G_io_app.apdu_media == IO_APDU_MEDIA_NFC)
+void nfc_idle_work2(void);
+#else
+#define CMD_IS_OVER_U2F_NFC false
+#endif
 
 typedef struct global_s {
     char buffer_20[20];
@@ -115,14 +141,6 @@ static inline ctap2_data_t *globals_get_ctap2_data(void) {
     return &shared_ctx.u.ctap2Data;
 }
 
-static inline ctap2_register_data_t *globals_get_ctap2_register_data(void) {
-    return &shared_ctx.u.ctap2Data.u.ctap2RegisterData;
-}
-
-static inline ctap2_assert_data_t *globals_get_ctap2_assert_data(void) {
-    return &shared_ctx.u.ctap2Data.u.ctap2AssertData;
-}
-
 /*
  * Truncate strings stored in global buffers to fit screen width. Truncation depends on police size:
  * - on classic review screens, the police is larger, argument `large` should be `true` .
@@ -147,5 +165,8 @@ void truncate_pairs_for_display(bool large);
  * @param clean_buffer: always insert a '\0' character at the beginning of the buffer
  */
 void prepare_display_status(bool clean_buffer);
+
+void ctap2_display_copy_username(const char *name, uint8_t nameLength);
+void ctap2_display_copy_rp(const char *name, uint8_t nameLength);
 
 void ctap2_copy_info_on_buffers(void);

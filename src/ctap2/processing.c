@@ -23,18 +23,14 @@
 #include "u2f_processing.h"
 #include "io.h"
 
-#include "ctap2.h"
 #include "cbip_helper.h"
 #include "globals.h"
 #include "fido_known_apps.h"
 #include "ui_shared.h"
 #include "sw_code.h"
 #include "nfc_io.h"
-
-static uint8_t cmdType;
-
-#define RPID_FILTER      "webctap."
-#define RPID_FILTER_SIZE (sizeof(RPID_FILTER) - 1)
+#include "ctap2_utils.h"
+#include "ctap2.h"
 
 #define CBOR_MAKE_CREDENTIAL    0x01
 #define CBOR_GET_ASSERTION      0x02
@@ -42,51 +38,6 @@ static uint8_t cmdType;
 #define CBOR_GET_INFO           0x04
 #define CBOR_CLIENT_PIN         0x06
 #define CBOR_RESET              0x07
-
-bool ctap2_check_rpid_filter(const char *rpId, uint32_t rpIdLen) {
-    if ((rpIdLen < RPID_FILTER_SIZE) || (memcmp(rpId, RPID_FILTER, RPID_FILTER_SIZE) != 0)) {
-        return true;
-    } else {
-        return false;
-    }
-}
-
-void send_cbor_error(u2f_service_t *service, uint8_t error) {
-    if (CMD_IS_OVER_U2F_CMD) {
-        io_send_response_pointer((uint8_t *) &error, 1, SW_NO_ERROR);
-    } else {
-        u2f_message_reply(service, CTAP2_CMD_CBOR, (uint8_t *) &error, 1);
-    }
-}
-
-void send_cbor_response(u2f_service_t *service, uint32_t length) {
-    if (CMD_IS_OVER_U2F_NFC) {
-        const char *status = NULL;
-        if (cmdType == CBOR_MAKE_CREDENTIAL) {
-            status = "Registration details\nsent";
-        } else if (cmdType == CBOR_GET_ASSERTION) {
-            status = "Login request signed";
-        }
-        nfc_io_set_response_ready(SW_NO_ERROR, length, status);
-        nfc_io_send_prepared_response();
-    } else if (CMD_IS_OVER_U2F_CMD) {
-        io_send_response_pointer(responseBuffer, length, SW_NO_ERROR);
-    } else {
-        u2f_message_reply(service, CTAP2_CMD_CBOR, responseBuffer, length);
-    }
-}
-
-void ctap2_send_keepalive_processing() {
-    if (CMD_IS_OVER_CTAP2_CBOR_CMD) {
-        u2f_transport_ctap2_send_keepalive(&G_io_u2f, KEEPALIVE_REASON_PROCESSING);
-        io_seproxyhal_io_heartbeat();
-    }
-}
-
-void performBuiltInUv(void) {
-    PRINTF("performBuiltInUv\n");
-    // No-op as the user is verified through the session PIN.
-}
 
 void ctap2_handle_cmd_cbor(u2f_service_t *service, uint8_t *buffer, uint16_t length) {
     int status;
@@ -108,7 +59,6 @@ void ctap2_handle_cmd_cbor(u2f_service_t *service, uint8_t *buffer, uint16_t len
         send_cbor_error(service, ERROR_INVALID_CBOR);
         return;
     }
-    cmdType = buffer[0];
 
     switch (buffer[0]) {
         case CBOR_MAKE_CREDENTIAL:

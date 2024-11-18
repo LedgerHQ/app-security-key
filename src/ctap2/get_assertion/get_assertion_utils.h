@@ -18,7 +18,9 @@
 
 #pragma once
 
+#include "globals.h"
 #include "cbip_helper.h"
+#include "get_assertion_struct.h"
 
 #define TAG_RP_ID            0x01
 #define TAG_CLIENT_DATA_HASH 0x02
@@ -49,3 +51,7 @@ void get_assertion_send(void);
 void get_assertion_user_cancel();
 
 int handle_allowList_item(cbipDecoder_t *decoder, cbipItem_t *item, bool unwrap);
+
+static inline ctap2_assert_data_t *globals_get_ctap2_assert_data(void) {
+    return &shared_ctx.u.ctap2Data.u.ctap2AssertData;
+}

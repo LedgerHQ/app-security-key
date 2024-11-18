@@ -16,14 +16,17 @@
 *   limitations under the License.
 ********************************************************************************/
 
+#include <u2f_transport.h>
+
 #include "config.h"
 #include "globals.h"
+#include "ctap2_utils.h"
 
 void ctap2_reset_confirm() {
     config_process_ctap2_reset();
 
     responseBuffer[0] = ERROR_NONE;
-    send_cbor_response(&G_io_u2f, 1);
+    send_cbor_response(&G_io_u2f, 1, NULL);
 }
 
 void ctap2_reset_cancel() {

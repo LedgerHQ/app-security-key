@@ -1,7 +1,7 @@
 /*
 *******************************************************************************
 *   Ledger App Security Key
-*   (c) 2022 Ledger
+*   (c) 2024 Ledger
 *
 *  Licensed under the Apache License, Version 2.0 (the "License");
 *  you may not use this file except in compliance with the License.
@@ -16,26 +16,22 @@
 *   limitations under the License.
 ********************************************************************************/
 
-#include <os.h>
+#pragma once
 
-#include "ctap2.h"
-#include "ui_shared.h"
-#include "globals.h"
+#ifndef UNIT_TESTS
+#include <u2f_service.h>
+#else
+#include "unit_test.h"
+#endif
 
-#include "reset_utils.h"
-#include "reset_ui.h"
+bool ctap2_check_rpid_filter(const char *rpId, uint32_t rpIdLen);
+void send_cbor_error(u2f_service_t *service, uint8_t error);
 
-void ctap2_reset_handle(u2f_service_t *service, uint8_t *buffer, uint16_t length) {
-    UNUSED(service);
-    UNUSED(buffer);
-    UNUSED(length);
-
-    if (CMD_IS_OVER_U2F_NFC) {
-        // Denied authenticatorReset over NFC as it can't be approved by the user.
-        // Note, this is a behavior allowed by the FIDO spec.
-        send_cbor_error(&G_io_u2f, ERROR_OPERATION_DENIED);
-    }
-
-    PRINTF("ctap2_reset_handle\n");
-    ctap2_reset_ux();
-}
+/*
+ * Sends the CBOR response on the relevant transport.
+ *
+ * If the `status` is not NULL AND the transport is NFC, displays a `status`
+ * message on the screen (this is for GET_ASSERTION and MAKE_CREDENTIALS cmds).
+ */
+void send_cbor_response(u2f_service_t *service, uint32_t length, const char *status);
+void ctap2_send_keepalive_processing(void);

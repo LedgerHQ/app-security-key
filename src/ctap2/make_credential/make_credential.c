@@ -17,6 +17,7 @@
 ********************************************************************************/
 
 #include <string.h>
+#include <lib_standard_app/format.h>
 
 #include "ctap2.h"
 #include "cbip_helper.h"
@@ -398,6 +399,20 @@ static int process_makeCred_authnr_pin(cbipDecoder_t *decoder, cbipItem_t *mapIt
     return 0;
 }
 
+static void copy_register_info_on_buffers(void) {
+    ctap2_register_data_t *ctap2RegisterData = globals_get_ctap2_register_data();
+
+    ctap2_display_copy_rp(ctap2RegisterData->rpId, ctap2RegisterData->rpIdLen);
+
+    if (ctap2RegisterData->userStr) {
+        ctap2_display_copy_username(ctap2RegisterData->userStr, ctap2RegisterData->userStrLen);
+    } else {
+        uint8_t nameLength = MIN(ctap2RegisterData->userIdLen, (sizeof(g.buffer2_65) - 1) / 2);
+        format_hex(ctap2RegisterData->userId, nameLength, g.buffer2_65, sizeof(g.buffer2_65));
+    }
+    PRINTF("After copy, buffer content:\n1 - '%s'\n2 - '%s'\n", g.buffer1_65, g.buffer2_65);
+}
+
 void ctap2_make_credential_handle(u2f_service_t *service, uint8_t *buffer, uint16_t length) {
     ctap2_register_data_t *ctap2RegisterData = globals_get_ctap2_register_data();
     cbipDecoder_t decoder;
@@ -437,7 +452,7 @@ void ctap2_make_credential_handle(u2f_service_t *service, uint8_t *buffer, uint1
     }
 
     // RP & user decoded, we can store them into display buffer for future usage
-    ctap2_copy_info_on_buffers();
+    copy_register_info_on_buffers();
 
     // Handle cryptographic algorithms
     status = process_makeCred_authnr_keyCredParams(&decoder, &mapItem);
