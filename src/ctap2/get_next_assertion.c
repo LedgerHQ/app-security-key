@@ -45,6 +45,7 @@ void ctap2_get_next_assertion_handle(u2f_service_t *service, uint8_t *buffer, ui
             send_cbor_error(service, ERROR_NOT_ALLOWED);
             return;
         }
+        g.is_getNextAssertion = true;
         get_assertion_send();
     }
 }

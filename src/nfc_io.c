@@ -84,7 +84,7 @@ int nfc_io_send_prepared_response() {
     if (sw == SW_NO_ERROR && nfc_status != NULL && !g.is_getNextAssertion) {
         app_nbgl_status(nfc_status, true, ui_idle);
     }
-
+    g.is_getNextAssertion = false;
     return ret;
 }
 
