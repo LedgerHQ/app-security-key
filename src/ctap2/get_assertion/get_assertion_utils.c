@@ -359,9 +359,11 @@ static int build_and_encode_getAssertion_response(uint8_t *buffer,
     // Calculate the number of fields to encode
     if (credData->residentKey) {
         mapSize++;
-    }
-    if (ctap2AssertData->availableCredentials >= 2) {
-        mapSize++;
+        // TAG_RESP_NB_OF_CREDS != NULL will allow GET_NEXT_ASSERTION
+        // which is currently only available on RKs
+        if (ctap2AssertData->availableCredentials >= 2) {
+            mapSize++;
+        }
     }
 
     // Initialize encoder
@@ -399,13 +401,16 @@ static int build_and_encode_getAssertion_response(uint8_t *buffer,
         }
 
         PRINTF("Adding user to response %.*H\n", credData->userIdLen, credData->userId);
+
+        // If several possible credentials, encoding the number
+        // TAG_RESP_NB_OF_CREDS != NULL will allow GET_NEXT_ASSERTION
+        // which is currently only available on RKs
+        if (ctap2AssertData->availableCredentials >= 2) {
+            cbip_add_int(&encoder, TAG_RESP_NB_OF_CREDS);
+            cbip_add_int(&encoder, ctap2AssertData->availableCredentials);
+        }
     }
 
-    // If several possible credentials, encoding the number
-    if (ctap2AssertData->availableCredentials >= 2) {
-        cbip_add_int(&encoder, TAG_RESP_NB_OF_CREDS);
-        cbip_add_int(&encoder, ctap2AssertData->availableCredentials);
-    }
     *resultLen = encoder.offset;
     return ERROR_NONE;
 }
