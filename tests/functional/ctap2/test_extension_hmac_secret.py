@@ -4,7 +4,7 @@ from fido2.ctap import CtapError
 from fido2.ctap2.extensions import HmacSecretExtension
 from fido2.webauthn import AttestedCredentialData
 
-from utils import generate_random_bytes, generate_make_credentials_params
+from ..utils import generate_random_bytes, generate_make_credentials_params
 
 
 def test_extensions_hmac_secret_ok(client):

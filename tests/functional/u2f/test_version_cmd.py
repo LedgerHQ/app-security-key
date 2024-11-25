@@ -2,9 +2,10 @@ import pytest
 
 from fido2.ctap1 import Ctap1, ApduError
 
-from ctap1_client import APDU
+from ..ctap1_client import APDU
 
 
+@pytest.mark.skip_endpoint("NFC", reason="CTAP1 is not available on NFC - 0x6D00")
 def test_get_version_raw(client):
     version = client.ctap1.send_apdu(cla=0x00,
                                      ins=Ctap1.INS.VERSION,
@@ -15,12 +16,14 @@ def test_get_version_raw(client):
     assert version == "U2F_V2"
 
 
+@pytest.mark.skip_endpoint("NFC", reason="CTAP1 is not available on NFC - 0x6D00")
 def test_get_version(client):
     version = client.ctap1.get_version()
 
     assert version == "U2F_V2"
 
 
+@pytest.mark.skip_endpoint("NFC", reason="CTAP1 is not available on NFC - 0x6D00")
 def test_get_version_bad_length(client):
     with pytest.raises(ApduError) as e:
         client.ctap1.send_apdu(cla=0x00,
@@ -31,6 +34,7 @@ def test_get_version_bad_length(client):
     assert e.value.code == APDU.SW_WRONG_LENGTH
 
 
+@pytest.mark.skip_endpoint("NFC", reason="CTAP1 is not available on NFC - 0x6D00")
 def test_get_version_wrong_p1p2(client):
     # Only supported P1 is 0x00
     for p1 in range(1, 0xff + 1):

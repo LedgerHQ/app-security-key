@@ -1,13 +1,12 @@
 import cryptography
 import pytest
 import struct
-
 from fido2.ctap1 import Ctap1, ApduError, SignatureData
 from fido2.hid import CTAPHID
 
-from client import TESTS_SPECULOS_DIR
-from ctap1_client import APDU, U2F_P1
-from utils import FIDO_RP_ID_HASH_1, generate_random_bytes
+from ..client import TESTS_SPECULOS_DIR
+from ..ctap1_client import APDU, U2F_P1
+from ..utils import FIDO_RP_ID_HASH_1, generate_random_bytes
 
 
 def register(client, _app_param=None):
@@ -22,6 +21,7 @@ def register(client, _app_param=None):
     return app_param, registration_data
 
 
+@pytest.mark.skip_endpoint("NFC", reason="CTAP1 is not available on NFC - 0x6D00")
 def test_authenticate_check_only_ok(client):
     app_param, registration_data = register(client)
     challenge = generate_random_bytes(32)
@@ -42,6 +42,7 @@ def test_authenticate_check_only_ok(client):
     assert e.value.code == APDU.SW_CONDITIONS_NOT_SATISFIED
 
 
+@pytest.mark.skip_endpoint("NFC", reason="CTAP1 is not available on NFC - 0x6D00")
 def test_authenticate_check_only_wrong_key_handle(client):
     app_param, registration_data = register(client)
     challenge = generate_random_bytes(32)
@@ -60,6 +61,7 @@ def test_authenticate_check_only_wrong_key_handle(client):
     assert e.value.code == APDU.SW_WRONG_DATA
 
 
+@pytest.mark.skip_endpoint("NFC", reason="CTAP1 is not available on NFC - 0x6D00")
 def test_authenticate_check_only_wrong_app_param(client):
     app_param, registration_data = register(client)
     challenge = generate_random_bytes(32)
@@ -79,6 +81,7 @@ def test_authenticate_check_only_wrong_app_param(client):
     assert e.value.code == APDU.SW_WRONG_DATA
 
 
+@pytest.mark.skip_endpoint("NFC", reason="CTAP1 is not available on NFC - 0x6D00")
 def test_authenticate_ok(client, test_name):
     app_param, registration_data = register(client, FIDO_RP_ID_HASH_1)
     challenge = generate_random_bytes(32)
@@ -94,6 +97,7 @@ def test_authenticate_ok(client, test_name):
     authentication_data.verify(app_param, challenge, registration_data.public_key)
 
 
+@pytest.mark.skip_endpoint("NFC", reason="CTAP1 is not available on NFC - 0x6D00")
 def test_authenticate_user_refused(client, test_name):
     app_param, registration_data = register(client, FIDO_RP_ID_HASH_1)
     challenge = generate_random_bytes(32)
@@ -111,6 +115,7 @@ def test_authenticate_user_refused(client, test_name):
     assert e.value.code == APDU.SW_USER_REFUSED
 
 
+@pytest.mark.skip_endpoint("NFC", reason="CTAP1 is not available on NFC - 0x6D00")
 def test_authenticate_with_reboot_ok(client):
     app_param, registration_data = register(client)
     challenge = generate_random_bytes(32)
@@ -124,6 +129,7 @@ def test_authenticate_with_reboot_ok(client):
     authentication_data.verify(app_param, challenge, registration_data.public_key)
 
 
+@pytest.mark.skip_endpoint("NFC", reason="CTAP1 is not available on NFC - 0x6D00")
 def test_authenticate_multiple_ok(client):
     registrations = []
     for _ in range(5):
@@ -140,6 +146,7 @@ def test_authenticate_multiple_ok(client):
         authentication_data.verify(app_param, challenge, registration_data.public_key)
 
 
+@pytest.mark.skip_endpoint("NFC", reason="CTAP1 is not available on NFC - 0x6D00")
 def test_authenticate_counter_increment(client):
     app_param, registration_data = register(client)
 
@@ -161,6 +168,7 @@ def test_authenticate_counter_increment(client):
         # doesn't keep NVM data.
 
 
+@pytest.mark.skip_endpoint("NFC", reason="CTAP1 is not available on NFC - 0x6D00")
 def test_authenticate_no_registration(client):
     challenge = generate_random_bytes(32)
 
@@ -177,6 +185,7 @@ def test_authenticate_no_registration(client):
     assert e.value.code == APDU.SW_WRONG_DATA
 
 
+@pytest.mark.skip_endpoint("NFC", reason="CTAP1 is not available on NFC - 0x6D00")
 def test_authenticate_wrong_challenge(client):
     app_param, registration_data = register(client)
     challenge = bytearray(generate_random_bytes(32))
@@ -192,6 +201,7 @@ def test_authenticate_wrong_challenge(client):
         authentication_data.verify(app_param, challenge, registration_data.public_key)
 
 
+@pytest.mark.skip_endpoint("NFC", reason="CTAP1 is not available on NFC - 0x6D00")
 def test_authenticate_wrong_app_param(client):
     app_param, registration_data = register(client)
     challenge = generate_random_bytes(32)
@@ -209,6 +219,7 @@ def test_authenticate_wrong_app_param(client):
     assert e.value.code == APDU.SW_WRONG_DATA
 
 
+@pytest.mark.skip_endpoint("NFC", reason="CTAP1 is not available on NFC - 0x6D00")
 def test_authenticate_wrong_key_handle(client):
     app_param, registration_data = register(client)
     challenge = generate_random_bytes(32)
@@ -226,6 +237,7 @@ def test_authenticate_wrong_key_handle(client):
     assert e.value.code == APDU.SW_WRONG_DATA
 
 
+@pytest.mark.skip_endpoint("NFC", reason="CTAP1 is not available on NFC - 0x6D00")
 def test_authenticate_length_too_short(client):
     app_param, registration_data = register(client)
     challenge = generate_random_bytes(32)
@@ -242,6 +254,7 @@ def test_authenticate_length_too_short(client):
     assert e.value.code == APDU.SW_WRONG_DATA
 
 
+@pytest.mark.skip_endpoint("NFC", reason="CTAP1 is not available on NFC - 0x6D00")
 def test_authenticate_length_too_long(client):
     app_param, registration_data = register(client)
     challenge = generate_random_bytes(32)
@@ -258,6 +271,7 @@ def test_authenticate_length_too_long(client):
     assert e.value.code == APDU.SW_WRONG_DATA
 
 
+@pytest.mark.skip_endpoint("NFC", reason="CTAP1 is not available on NFC - 0x6D00")
 def test_authenticate_wrong_p1p2(client):
     app_param, registration_data = register(client)
     challenge = generate_random_bytes(32)
@@ -294,10 +308,8 @@ def test_authenticate_wrong_p1p2(client):
         assert e.value.code == APDU.SW_INCORRECT_P1P2
 
 
+@pytest.mark.skip_endpoint(["NFC", "HID"], reason="This test is meant for U2F transport only")
 def test_authenticate_raw(client):
-    if client.use_raw_HID_endpoint:
-        pytest.skip("Does not work with this transport")
-
     valid_p1 = [
         U2F_P1.CHECK_IS_REGISTERED,
         U2F_P1.REQUEST_USER_PRESENCE,
@@ -348,6 +360,7 @@ def test_authenticate_raw(client):
             authentication_data.verify(app_param, challenge, registration_data.public_key)
 
 
+@pytest.mark.skip_endpoint("NFC", reason="CTAP1 is not available on NFC - 0x6D00")
 def test_authenticate_retrocompat(client):
     # Make sure that app update will still works with previously generated
     # key handles and public key already shared with some Relying Party

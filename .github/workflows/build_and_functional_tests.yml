@@ -31,19 +31,18 @@ jobs:
       matrix:
         include:
           - model: nanox
-
-          - model: stax
-
-          - model: flex
-
           - model: nanosp
             args: "--fast"
-
           - model: nanos
             args: "--fast"
-
+          - model: stax
+          - model: flex
           - model: nanox
             args: "--transport HID --fast"
+          - model: stax
+            args: "--transport NFC"
+          - model: flex
+            args: "--transport NFC"
 
     needs: build_application
 

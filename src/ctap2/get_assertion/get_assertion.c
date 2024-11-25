@@ -252,7 +252,6 @@ static void nfc_handle_get_assertion() {
     if (ctap2AssertData->allowListPresent) {
         // Allow list -> non-RK credentials.
         // Falling back to previous behavior: login with the first compatible credential
-        g.is_getNextAssertion = false;
         get_assertion_confirm(1);
     } else {
         // No allow list -> RK credentials
@@ -266,6 +265,10 @@ static void nfc_handle_get_assertion() {
             // This settings will disable the app_nbgl_status call (nothing displayed on SK)
             // Else, this would lead the app to respond too slowly, and the client to bug out
             g.is_getNextAssertion = true;
+        }
+        if (ctap2AssertData->availableCredentials == 0) {
+            send_cbor_error(&G_io_u2f, ERROR_NO_CREDENTIALS);
+            return;
         }
         PRINTF("Matching credentials: %d\n", ctap2AssertData->availableCredentials);
         rk_next_credential_from_RKList(&slotIdx,

@@ -6,9 +6,10 @@ from fido2.ctap import CtapError
 from fido2.ctap1 import ApduError
 from fido2.ctap2 import Ctap2
 
-from ctap1_client import APDU
+from ..ctap1_client import APDU
 
 
+@pytest.mark.skip_endpoint("NFC", reason="CTAP1 proxy to CTAP2 is not available on NFC - 0x6D00")
 def test_u2f_fido2_proxy_get_info_raw(client):
     request = struct.pack(">B", Ctap2.CMD.GET_INFO)
     response = client.ctap1.send_apdu(cla=0x00,
@@ -30,6 +31,7 @@ def test_u2f_fido2_proxy_get_info_raw(client):
     assert decoded[1] == ['U2F_V2', 'FIDO_2_0']
 
 
+@pytest.mark.skip_endpoint("NFC", reason="CTAP1 proxy to CTAP2 is not available on NFC - 0x6D00")
 def test_u2f_fido2_proxy_wrong_p1p2(client):
     request = struct.pack(">B", Ctap2.CMD.GET_INFO)
 
@@ -54,6 +56,7 @@ def test_u2f_fido2_proxy_wrong_p1p2(client):
         assert e.value.code == APDU.SW_INCORRECT_P1P2
 
 
+@pytest.mark.skip_endpoint("NFC", reason="CTAP1 proxy to CTAP2 is not available on NFC - 0x6D00")
 def test_u2f_fido2_proxy_no_length(client):
 
     response = client.ctap1.send_apdu(cla=0x00,

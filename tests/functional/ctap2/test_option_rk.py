@@ -3,14 +3,14 @@ import sys
 
 from fido2.ctap import CtapError
 from fido2.webauthn import AttestedCredentialData
-
-from client import TESTS_SPECULOS_DIR
-from utils import generate_random_bytes, generate_make_credentials_params
-from utils import generate_get_assertion_params
-from utils import ENABLE_RK_CONFIG_UI_SETTING
-
 from ragger.firmware import Firmware
 from ragger.navigator import NavInsID, NavIns
+from typing import Dict, List
+
+from ..client import TESTS_SPECULOS_DIR
+from ..transport import TransportType
+from ..utils import generate_random_bytes, generate_make_credentials_params, \
+    ctap2_get_assertion, ENABLE_RK_CONFIG_UI_SETTING, MakeCredentialArguments
 
 
 @pytest.mark.skipif(not ENABLE_RK_CONFIG_UI_SETTING,
@@ -80,8 +80,7 @@ def enable_rk_option(client):
     client.ctap2._info = client.ctap2.get_info()
 
 
-@pytest.mark.skipif(not ENABLE_RK_CONFIG_UI_SETTING,
-                    reason="settings not enable")
+@pytest.mark.skipif(not ENABLE_RK_CONFIG_UI_SETTING, reason="settings not enable")
 def test_option_rk_enabled(client):
     enable_rk_option(client)
 
@@ -89,8 +88,7 @@ def test_option_rk_enabled(client):
     assert info.options["rk"]
 
 
-@pytest.mark.skipif(not ENABLE_RK_CONFIG_UI_SETTING,
-                    reason="settings not enable")
+@pytest.mark.skipif(not ENABLE_RK_CONFIG_UI_SETTING, reason="settings not enable")
 def test_option_rk_make_cred_exclude_refused(client, test_name):
     enable_rk_option(client)
 
@@ -102,7 +100,7 @@ def test_option_rk_make_cred_exclude_refused(client, test_name):
     # CTAP2_ERR_CREDENTIAL_EXCLUDED.
 
     # Create a first credential with rk=True
-    t = generate_get_assertion_params(client, rk=True)
+    t = ctap2_get_assertion(client, rk=True)
 
     # Now create a new one with:
     # - Same RP
@@ -129,13 +127,9 @@ def test_option_rk_make_cred_exclude_refused(client, test_name):
 
     client.ctap2.make_credential(args, check_screens="fast", compare_args=compare_args)
 
-    # Reset device to clean rk credentials for next tests
-    client.ctap2.reset()
 
-
-@pytest.mark.skipif(not ENABLE_RK_CONFIG_UI_SETTING,
-                    reason="settings not enable")
-def test_option_rk_get_assertion(client, test_name):
+@pytest.mark.skipif(not ENABLE_RK_CONFIG_UI_SETTING, reason="settings not enable")
+def test_option_rk_get_assertion(client, test_name, transport: TransportType):
     enable_rk_option(client)
 
     user1 = generate_make_credentials_params(client, ref=1, rk=True)
@@ -144,14 +138,14 @@ def test_option_rk_get_assertion(client, test_name):
 
     user2.user["name"] = "user name"
 
-    users = []
-    allow_list = []
+    users: list[MakeCredentialArguments] = []
+    allow_list: List[Dict] = []
 
     for idx, user in enumerate([user1, user2, user3]):
         if idx == 2 and "--fast" in sys.argv:
             # Skip additional step on fast mode
             continue
-        compare_args = (TESTS_SPECULOS_DIR, test_name + "/" + str(idx) + "/make")
+        compare_args = (TESTS_SPECULOS_DIR, test_name + f"/{idx}/make")
         attestation = client.ctap2.make_credential(user,
                                                    check_screens="fast",
                                                    compare_args=compare_args)
@@ -161,7 +155,7 @@ def test_option_rk_get_assertion(client, test_name):
         login_type = "simple" if len(users) == 1 else "multi"
 
         client_data_hash = generate_random_bytes(32)
-        compare_args = (TESTS_SPECULOS_DIR, test_name + "/" + str(idx) + "/get_rk")
+        compare_args = (TESTS_SPECULOS_DIR, test_name + f"/{idx}/get_rk")
         assertion = client.ctap2.get_assertion(user.rp["id"], client_data_hash,
                                                check_users=users, check_screens="fast",
                                                login_type=login_type, compare_args=compare_args)
@@ -174,7 +168,7 @@ def test_option_rk_get_assertion(client, test_name):
         allow_list = [{"id": credential_data.credential_id, "type": "public-key"}] + allow_list
 
         client_data_hash = generate_random_bytes(32)
-        compare_args = (TESTS_SPECULOS_DIR, test_name + "/" + str(idx) + "/get_allow_list")
+        compare_args = (TESTS_SPECULOS_DIR, test_name + f"/{idx}/get_allow_list")
         assertion = client.ctap2.get_assertion(user.rp["id"], client_data_hash,
                                                allow_list=allow_list,
                                                check_users=[u.user for u in users],
@@ -183,49 +177,41 @@ def test_option_rk_get_assertion(client, test_name):
         assertion.verify(client_data_hash, credential_data.public_key)
         assert assertion.user["id"] == users[0].user["id"]  # first of allow_list selected
 
-    # Check that nothing remains after a reset
-    client.ctap2.reset()
+    # CTAP2 reset is not available on NFC
+    if transport is not TransportType.NFC:
+        # Check that nothing remains after a reset
+        client.ctap2.reset()
+        client_data_hash = generate_random_bytes(32)
+        with pytest.raises(CtapError) as e:
+            client.ctap2.get_assertion(user1.rp["id"], client_data_hash, login_type="none")
+        assert e.value.code == CtapError.ERR.NO_CREDENTIALS
 
-    client_data_hash = generate_random_bytes(32)
-    with pytest.raises(CtapError) as e:
-        client.ctap2.get_assertion(user1.rp["id"], client_data_hash, login_type="none")
-    assert e.value.code == CtapError.ERR.NO_CREDENTIALS
 
-
-@pytest.mark.skipif(
-    "--fast" in sys.argv,
-    reason="running in fast mode",
-)
-@pytest.mark.skipif(not ENABLE_RK_CONFIG_UI_SETTING,
-                    reason="settings not enable")
-def test_option_rk_key_store_full(client):
+@pytest.mark.skipif("--fast" in sys.argv, reason="running in fast mode")
+@pytest.mark.skipif(not ENABLE_RK_CONFIG_UI_SETTING, reason="settings not enable")
+def test_option_rk_key_store_full(client, transport: TransportType):
     enable_rk_option(client)
 
     # Check that at some point KEY_STORE_FULL error is returned
     with pytest.raises(CtapError) as e:
         for _ in range(30):
-            generate_get_assertion_params(client, rk=True)
+            ctap2_get_assertion(client, rk=True)
     assert e.value.code == CtapError.ERR.KEY_STORE_FULL
 
     # Check that it is consistently returned
     with pytest.raises(CtapError) as e:
-        generate_get_assertion_params(client, rk=True)
+        ctap2_get_assertion(client, rk=True)
     assert e.value.code == CtapError.ERR.KEY_STORE_FULL
 
-    # Check that credentials can be stored again after a reset
-    client.ctap2.reset()
-    generate_get_assertion_params(client, rk=True)
+    # CTAP2 reset is not available on NFC
+    if transport is not TransportType.NFC:
+        # Check that credentials can be stored again after a reset
+        client.ctap2.reset()
+        ctap2_get_assertion(client, rk=True)
 
-    # Reset device to clean rk credentials for next tests
-    client.ctap2.reset()
 
-
-@pytest.mark.skipif(
-    "--fast" in sys.argv,
-    reason="running in fast mode",
-)
-@pytest.mark.skipif(not ENABLE_RK_CONFIG_UI_SETTING,
-                    reason="settings not enable")
+@pytest.mark.skipif("--fast" in sys.argv, reason="running in fast mode")
+@pytest.mark.skipif(not ENABLE_RK_CONFIG_UI_SETTING, reason="settings not enable")
 def test_option_rk_overwrite_get_assertion(client, test_name):
     enable_rk_option(client)
 

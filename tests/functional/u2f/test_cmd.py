@@ -1,12 +1,12 @@
 import pytest
 import struct
-
 from fido2.ctap1 import Ctap1, ApduError
 
-from ctap1_client import APDU
-from utils import generate_random_bytes
+from ..ctap1_client import APDU
+from ..utils import generate_random_bytes
 
 
+@pytest.mark.skip_endpoint("NFC", reason="CTAP1 is not available on NFC - 0x6D00")
 def test_cmd_wrong_cla(client):
     # Only supported CLA is 0x00
     for cla in range(1, 0xff + 1):
@@ -19,6 +19,7 @@ def test_cmd_wrong_cla(client):
         assert e.value.code == APDU.SW_CLA_NOT_SUPPORTED
 
 
+@pytest.mark.skip_endpoint("NFC", reason="CTAP1 is not available on NFC - 0x6D00")
 def test_cmd_wrong_ins(client):
     for ins in range(0xff + 1):
         # Only supported INS are [0x01, 0x02, 0x03, 0x10, 0xa4]
@@ -36,6 +37,7 @@ def test_cmd_wrong_ins(client):
         assert e.value.code == APDU.SW_INS_NOT_SUPPORTED
 
 
+@pytest.mark.skip_endpoint("NFC", reason="CTAP1 is not available on NFC - 0x6D00")
 def test_cmd_length(client):
     challenge = generate_random_bytes(32)
     app_param = generate_random_bytes(32)
@@ -72,6 +74,7 @@ def test_cmd_length(client):
         assert e.value.code == APDU.SW_WRONG_LENGTH
 
 
+@pytest.mark.skip_endpoint("NFC", reason="CTAP1 is not available on NFC - 0x6D00")
 def test_cmd_no_data_extended_encoding(client):
     cla = 0x00
     ins = Ctap1.INS.VERSION
@@ -97,7 +100,7 @@ def test_cmd_no_data_extended_encoding(client):
     assert e.value.code == APDU.SW_WRONG_LENGTH
 
 
-@pytest.mark.skip_endpoint("u2f")
+@pytest.mark.skip_endpoint(["U2F", "NFC"])
 def test_cmd_no_data_extended_encoding_hid_only(client):
     cla = 0x00
     ins = Ctap1.INS.VERSION
@@ -114,7 +117,7 @@ def test_cmd_no_data_extended_encoding_hid_only(client):
     assert result == client.ctap1.send_raw_apdu(apdu)
 
 
-@pytest.mark.skip_endpoint("hid")
+@pytest.mark.skip_endpoint(["HID", "NFC"])
 def test_cmd_no_data_short_encoding_u2f_only(client):
     cla = 0x00
     ins = Ctap1.INS.VERSION
@@ -128,7 +131,7 @@ def test_cmd_no_data_short_encoding_u2f_only(client):
     assert e.value.code == APDU.SW_WRONG_LENGTH
 
 
-@pytest.mark.skip_endpoint("u2f")
+@pytest.mark.skip_endpoint(["U2F", "NFC"])
 def test_cmd_no_data_short_encoding_hid_only(client):
     cla = 0x00
     ins = Ctap1.INS.VERSION

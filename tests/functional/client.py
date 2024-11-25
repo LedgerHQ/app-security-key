@@ -1,27 +1,23 @@
 import json
 import os
-import socket
-import struct
 
 from base64 import b64decode
-
-from cryptography.x509 import load_pem_x509_certificate
 from cryptography.hazmat.primitives import serialization
-
-from pathlib import Path
-
+from cryptography.x509 import load_pem_x509_certificate
 from fido2.attestation import AttestationVerifier
-from fido2.ctap import CtapError
+from fido2.ctap import CtapDevice
 from fido2.ctap2.pin import ClientPin
-from fido2.hid import CtapHidDevice, TYPE_INIT, CAPABILITY, CTAPHID
-from fido2.hid.base import CtapHidConnection, HidDescriptor
-
-from ctap1_client import LedgerCtap1
-from ctap2_client import LedgerCtap2
-
-from ragger.firmware import Firmware
+from pathlib import Path
 from ragger.backend import BackendInterface
+from ragger.firmware import Firmware
 from ragger.navigator import Navigator, NavInsID, NavIns
+from typing import Optional
+
+from .ctap1_client import LedgerCtap1
+from .ctap2_client import LedgerCtap2
+from .transport import TransportType
+from .transport.hid import LedgerCtapHidDevice
+from .transport.nfc import LedgerCtapNFCDevice
 
 
 TESTS_SPECULOS_DIR = Path(__file__).absolute().parent
@@ -62,204 +58,55 @@ class LedgerAttestationVerifier(AttestationVerifier):
         return metadata_cert
 
 
-class LedgerCtapHidConnection(CtapHidConnection):
-    """ Overriding fido2.hid.base.CtapHidConnection
-
-    This is mostly a redirection of write_packet() and read_packet()
-    to speculos raw socket.
-    """
-    def __init__(self, transport, debug=False):
-        self.sock = socket.create_connection(('127.0.0.1', 5001))
-        self.u2f_hid_endpoint = (transport.upper() == "U2F")
-        self.debug = debug
-
-        # Set a timeout to allow tests to raise on socket rx failure
-        self.sock.settimeout(5)
-
-    def write_packet(self, packet):
-        packet = bytes(packet)
-        if self.debug:
-            print(f"> pkt = {packet.hex()}")
-        self.sock.send(struct.pack('>I', len(packet)) + packet)
-
-    def read_packet(self):
-        resp_size_bytes = b''
-        while len(resp_size_bytes) < 4:
-            new_bytes = self.sock.recv(4 - len(resp_size_bytes))
-            assert new_bytes, "connection closed"
-            resp_size_bytes += new_bytes
-        resp_size = (int.from_bytes(resp_size_bytes, 'big') + 2) & 0xffffffff
-        if self.u2f_hid_endpoint:
-            assert resp_size == 64
-
-        packet = b''
-        while len(packet) < resp_size:
-            new_bytes = self.sock.recv(resp_size - len(packet))
-            assert new_bytes, "connection closed"
-            packet += new_bytes
-        if self.debug:
-            print(f"< pkt = {packet.hex()}")
-
-        return packet
-
-    def close(self):
-        self.sock.close()
-
-
-class LedgerCtapHidDevice(CtapHidDevice):
-    """ Overriding fido2.hid.CtapHidDevice
-
-    This is mostly to split call() function in send() and recv() functions.
-    This allow Ctap1 and Ctap2 clients to interact with the buttons between
-    the sending of a command and the reception of the response.
-
-    This overriding also handle the particularity of sending commands over
-    the raw HID endpoint, which means without using the U2F HID encapsulation.
-    """
-    def __init__(self, descriptor, connection, transport, debug=False):
-        self.raw_hid_endpoint = (transport.upper() == "HID")
-        self.debug = debug
-        super().__init__(descriptor, connection)
-
-    def send(self, cmd, data=b""):
-
-        if self.raw_hid_endpoint:
-            # Send raw request without encapsulation
-            self._connection.write_packet(data)
-            return
-
-        # Send request with U2F encapsulation
-        remaining = data
-        seq = 0
-
-        header = struct.pack(">IBH", self._channel_id, TYPE_INIT | cmd, len(remaining))
-
-        while remaining or seq == 0:
-            size = min(len(remaining), self._packet_size - len(header))
-            body, remaining = remaining[:size], remaining[size:]
-            packet = header + body
-            # Padding packet can be done with anything.
-            # Reasonable implementations use 0x00 which might be more intuitive.
-            # However using 0xee can help discover APDU Lc field parsing issues.
-            # Note: this is what the Fido Conformance tool is using on some tests.
-            packet = packet.ljust(self._packet_size, b"\xee")
-            self._connection.write_packet(packet)
-            header = struct.pack(">IB", self._channel_id, 0x7F & seq)
-            seq += 1
-
-    def recv(self, cmd):
-        seq = 0
-        response = b""
-
-        if self.raw_hid_endpoint:
-            return self._connection.read_packet()
-
-        while True:
-            recv = self._connection.read_packet()
-
-            r_channel = struct.unpack_from(">I", recv)[0]
-            recv = recv[4:]
-            if r_channel != self._channel_id:
-                raise Exception("Wrong channel")
-
-            if not response:  # Initialization packet
-                r_cmd, r_len = struct.unpack_from(">BH", recv)
-                recv = recv[3:]
-                if r_cmd == TYPE_INIT | cmd:
-                    pass  # first data packet
-                elif r_cmd == TYPE_INIT | CTAPHID.KEEPALIVE:
-                    continue
-                elif r_cmd == TYPE_INIT | CTAPHID.ERROR:
-                    raise CtapError(struct.unpack_from(">B", recv)[0])
-                else:
-                    raise CtapError(CtapError.ERR.INVALID_COMMAND)
-            else:  # Continuation packet
-                r_seq = struct.unpack_from(">B", recv)[0]
-                recv = recv[1:]
-                if r_seq != seq:
-                    raise Exception("Wrong sequence number")
-                seq += 1
-
-            response += recv
-            if len(response) >= r_len:
-                break
-
-        return response[:r_len]
-
-    def exchange(self, cmd, data=b""):
-        if self.raw_hid_endpoint and cmd != CTAPHID.MSG:
-            # Only CTAPHID.MSG without header are supported over raw HID endpoint
-            if cmd == CTAPHID.INIT:
-                # Fake CTAPHID.INIT call so that CtapHidDevice().__init__()
-                # don't fail. Indeed at init, it makes a call to
-                # self.call(CTAPHID.INIT, nonce) which is not really necessary
-                # but we don't want to override CtapHidDevice().__init__().
-                print("Faking CTAPHID.INIT over HID endpoint")
-                response = data  # Nonce
-                u2fhid_version = 0x02
-                capabilities = CAPABILITY.CBOR
-                response += struct.pack(">IBBBBB", self._channel_id,
-                                        u2fhid_version, 0, 0, 0, capabilities)
-                return response
-
-            raise ValueError("Unexpected cmd over HID endpoint {}".format(hex(cmd)))
-
-        self.send(cmd, data)
-        return self.recv(cmd)
-
-    def call(self, cmd, data=b"", event=None, on_keepalive=None):
-        if event:
-            raise ValueError("event handling is not supported")
-
-        if on_keepalive:
-            raise ValueError("on_keepalive handling is not supported")
-
-        return self.exchange(cmd, data)
-
-
 class TestClient:
     def __init__(self, firmware: Firmware,
                  ragger_backend: BackendInterface,
                  navigator: Navigator,
-                 transport: str,
+                 transport: TransportType,
                  ctap2_u2f_proxy: bool,
                  debug=False):
         self.firmware = firmware
         self.ragger_backend = ragger_backend
         self.navigator = navigator
         self.debug = debug
-
-        # USB transport configuration
-        self.USB_transport = transport
-        self.use_U2F_endpoint = (self.USB_transport.upper() == "U2F")
-        self.use_raw_HID_endpoint = (self.USB_transport.upper() == "HID")
-        if not self.use_U2F_endpoint and not self.use_raw_HID_endpoint:
-            assert ValueError("Invalid endpoint")
+        self._transport = transport
+        self._device: Optional[CtapDevice] = None
 
         # CTAP2 (cbor) messages can be sent using CTAPHID.CBOR command or
         # they can be encapsulated in an U2F (APDU) message using INS=0x10
         self.ctap2_u2f_proxy = ctap2_u2f_proxy
 
-        # On USB_HID transport endpoint, only CTAPHID.MSG are supported
-        # and they must be sent without encapsulation, e.g. without the
-        # header containing the channel_id, the command type and the command
-        # length.
-        if self.use_raw_HID_endpoint and not self.ctap2_u2f_proxy:
+        # On USB_HID transport endpoint, only CTAPHID.MSG are supported and they
+        # must be sent without encapsulation, e.g. without the header containing
+        # the channel ID, the command type and the command length.
+        if self._transport is TransportType.HID and not self.ctap2_u2f_proxy:
             print("Enforce using CTAP2 U2F proxy over raw HID endpoint")
             self.ctap2_u2f_proxy = True
 
+    @property
+    def device(self) -> CtapDevice:
+        assert self._device is not None, "Client must be started before accessing its inner device"
+        return self._device
+
+    @property
+    def transport(self) -> TransportType:
+        return self._transport
+
+    def transported_path(self, name: str) -> str:
+        if self.firmware.is_nano:
+            return name
+        return "/".join([name, ("nfc" if self.transport is TransportType.NFC else "usb")])
+
     def start(self):
         try:
-            self.hid_dev = LedgerCtapHidConnection(self.USB_transport,
-                                                   self.debug)
-            descriptor = HidDescriptor("sim", 0, 0, 64, 64, "speculos", "0000")
-            self.dev = LedgerCtapHidDevice(descriptor, self.hid_dev,
-                                           self.USB_transport, self.debug)
+            if self.transport is TransportType.NFC:
+                self._device = LedgerCtapNFCDevice(self.ragger_backend, self.debug)
+            else:
+                self._device = LedgerCtapHidDevice(self.transport, self.debug)
 
-            self.ctap1 = LedgerCtap1(self.dev, self.firmware, self.navigator,
-                                     self.debug)
+            self.ctap1 = LedgerCtap1(self._device, self.firmware, self.navigator, self.debug)
             try:
-                self.ctap2 = LedgerCtap2(self.dev, self.firmware, self.navigator,
+                self.ctap2 = LedgerCtap2(self._device, self.firmware, self.navigator,
                                          self.ctap2_u2f_proxy, self.debug)
                 self.client_pin = ClientPin(self.ctap2)
             except Exception:

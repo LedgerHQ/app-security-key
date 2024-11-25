@@ -2,17 +2,18 @@ import pytest
 
 from fido2.ctap import CtapError
 
-from client import TESTS_SPECULOS_DIR
-from utils import generate_random_bytes, generate_get_assertion_params
-from utils import HAVE_NO_RESET_GENERATION_INCREMENT
+from ..client import TESTS_SPECULOS_DIR
+from ..utils import generate_random_bytes, ctap2_get_assertion, \
+    HAVE_NO_RESET_GENERATION_INCREMENT
 
 
+@pytest.mark.skip_endpoint("NFC", reason="CTAP2 reset is not available on NFC - 0x27")
 def test_reset(client, test_name):
     for user_accept in [True, False]:
         compare_args = (TESTS_SPECULOS_DIR, test_name + "/" + str(user_accept))
 
         # Create a credential
-        t = generate_get_assertion_params(client)
+        t = ctap2_get_assertion(client)
 
         # Validate the credential by getting an assertion
         client_data_hash = generate_random_bytes(32)
@@ -48,6 +49,7 @@ def test_reset(client, test_name):
                 assert e.value.code == CtapError.ERR.NO_CREDENTIALS
 
 
+@pytest.mark.skip_endpoint("NFC", reason="CTAP2 reset is not available on NFC - 0x27")
 def test_reset_cancel(client, test_name):
     if client.ctap2_u2f_proxy:
         pytest.skip("Does not work with this transport")
