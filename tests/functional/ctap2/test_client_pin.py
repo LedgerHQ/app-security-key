@@ -51,7 +51,7 @@ def test_client_pin_check_not_set(client):
     # Impact is minor because user as still manually unlocked it's device.
     # therefore user presence is somehow guarantee.
     with pytest.raises(CtapError) as e:
-        client.ctap2.make_credential(args, user_accept=None)
+        client.ctap2.make_credential(args, user_accept=None, will_fail=True)
     assert e.value.code == CtapError.ERR.PIN_NOT_SET
 
     # Check get assertion request behavior with zero length pinAuth
@@ -69,7 +69,8 @@ def test_client_pin_check_not_set(client):
                                    allow_list,
                                    pin_uv_param=b"",
                                    pin_uv_protocol=client.client_pin.protocol.VERSION,
-                                   user_accept=None)
+                                   user_accept=None,
+                                   will_fail=True)
     assert e.value.code == CtapError.ERR.PIN_NOT_SET
 
 
@@ -104,7 +105,7 @@ def test_client_pin_check_set(client):
     # Impact is minor because user as still manually unlocked it's device.
     # therefore user presence is somehow guarantee.
     with pytest.raises(CtapError) as e:
-        client.ctap2.make_credential(args, user_accept=None)
+        client.ctap2.make_credential(args, user_accept=None, will_fail=True)
     assert e.value.code == CtapError.ERR.PIN_INVALID
 
     # Check get assertion request behavior with zero length pinAuth
@@ -123,7 +124,8 @@ def test_client_pin_check_set(client):
                                    allow_list,
                                    pin_uv_param=b"",
                                    pin_uv_protocol=client.client_pin.protocol.VERSION,
-                                   user_accept=None)
+                                   user_accept=None,
+                                   will_fail=True)
     assert e.value.code == CtapError.ERR.PIN_INVALID
 
 
@@ -151,7 +153,7 @@ def test_use_pin(client):
 
     # Check should use pin
     with pytest.raises(CtapError) as e:
-        client.ctap2.make_credential(args, user_accept=None)
+        client.ctap2.make_credential(args, user_accept=None, will_fail=True)
     assert e.value.code == CtapError.ERR.PUAT_REQUIRED
 
     # Check should use correct token

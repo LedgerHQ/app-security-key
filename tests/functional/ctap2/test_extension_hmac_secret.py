@@ -89,6 +89,7 @@ def test_extensions_hmac_secret_error(client):
         client.ctap2.get_assertion(args.rp["id"],
                                    args.client_data_hash,
                                    allow_list,
+                                   will_fail=True,
                                    extensions=extensions)
     # TODO: understand why this sometimes (quite often actually) raises
     #       INVALID_CBOR instead of the expected MISSING_PARAMETER

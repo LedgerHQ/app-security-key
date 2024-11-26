@@ -97,8 +97,10 @@ class LedgerCtap2(Ctap2, LedgerCTAP):
 
     def make_credential(self, args: MakeCredentialArguments,
                         event=None, on_keepalive=None, user_accept: Optional[bool] = True,
-                        check_screens=False, check_cancel=False,
-                        compare_args=None) -> AttestationResponse:
+                        check_screens=False, client_cancel=False,
+                        compare_args=None,
+                        # if the call is expected to raise an error
+                        will_fail: bool = False) -> AttestationResponse:
         # Refresh navigator screen content reference
         self.navigator._backend.get_current_screen_content()
 
@@ -109,11 +111,13 @@ class LedgerCtap2(Ctap2, LedgerCTAP):
         text = None
         nav_ins = None
         val_ins: List[Union[NavIns, NavInsID]] = list()
-        check_navigation = (user_accept is not None or self.nfc)
+        check_navigation = (user_accept is not None) if not self.nfc \
+            else (user_accept is not None and not will_fail)
 
-        # No confirmation needed on NFC
+        # No navigation in NFC, only a screen change, so we enable navigation just to check the
+        # snapshot, except in cases where an error is expected.
         if self.nfc:
-            check_navigation = False
+            pass
         else:
             if self.firmware.is_nano:
                 nav_ins = NavInsID.RIGHT_CLICK
@@ -132,13 +136,13 @@ class LedgerCtap2(Ctap2, LedgerCTAP):
 
         self.navigate(check_navigation,
                       check_screens,
-                      check_cancel,
+                      client_cancel,
                       compare_args,
                       text,
                       nav_ins,
                       val_ins)
 
-        if check_cancel:
+        if client_cancel:
             # Send a cancel command
             self.device.send(CTAPHID.CANCEL, b"")
 
@@ -151,13 +155,22 @@ class LedgerCtap2(Ctap2, LedgerCTAP):
 
     def get_assertion(self, rp_id, client_data_hash, allow_list=None,
                       extensions=None, options=None, pin_uv_param=None,
-                      pin_uv_protocol=None, *, event=None, on_keepalive=None,
-                      login_type="simple", user_accept: Optional[bool] = True, check_users=None,
-                      check_screens=False, check_cancel=False, compare_args=None,
+                      pin_uv_protocol=None, *,
+                      event=None,
+                      on_keepalive=None,
+                      # if the call is expected to raise an error
+                      will_fail: bool = False,
+                      # if the login is simple (one choice) or not (multiple choices)
+                      simple_login: bool = True,
+                      user_accept: Optional[bool] = True,
+                      check_users=None,
+                      check_screens=False,
+                      # if the command is expected to be canceled by the client (with an APDU)
+                      client_cancel: bool = False,
+                      compare_args=None,
                       select_user_idx=1):
         # Refresh navigator screen content reference
         self.navigator._backend.get_current_screen_content()
-        assert login_type in ["simple", "multi", "none"]
 
         cmd = Ctap2.CMD.GET_ASSERTION
         data = args(rp_id,
@@ -172,19 +185,22 @@ class LedgerCtap2(Ctap2, LedgerCTAP):
         text = None
         nav_ins = None
         val_ins: List[Union[NavIns, NavInsID]] = list()
-        check_navigation = (user_accept is not None or self.nfc)
+        check_navigation = (user_accept is not None) if not self.nfc \
+            else (user_accept is not None and not will_fail)
 
-        # No confirmation needed on NFC
+        assert not check_navigation
+        # No navigation in NFC, only a screen change, so we enable navigation just to check the
+        # snapshot, except in cases where an error is expected.
         if self.nfc:
-            check_navigation = False
+            pass
         else:
             if self.firmware.is_nano:
                 nav_ins = NavInsID.RIGHT_CLICK
                 val_ins = [NavInsID.BOTH_CLICK]
                 if user_accept is not None:
-                    if login_type == "none":
+                    if will_fail:
                         text = "Close"
-                    elif login_type == "multi":
+                    elif not simple_login:
                         if check_users and len(check_users) == 1:
                             raise ValueError("Found 1 user while expecting multiple")
                         if user_accept:
@@ -200,12 +216,12 @@ class LedgerCtap2(Ctap2, LedgerCTAP):
                             text = "Reject"
             elif self.firmware in [Firmware.STAX, Firmware.FLEX]:
                 if user_accept is not None:
-                    if login_type == "none":
+                    if will_fail:
                         val_ins = [NavInsID.TAPPABLE_CENTER_TAP]
                     if not user_accept:
                         val_ins = [NavInsID.USE_CASE_CHOICE_REJECT]
                     else:
-                        if login_type == "multi" and select_user_idx != 1:
+                        if not simple_login and select_user_idx != 1:
                             assert select_user_idx <= 5
                             val_ins = [NavIns(NavInsID.TOUCH, (200, 350)),
                                        NavIns(NavInsID.TOUCH, (200, 40 + 90 * select_user_idx)),
@@ -214,12 +230,12 @@ class LedgerCtap2(Ctap2, LedgerCTAP):
                             val_ins = [NavInsID.USE_CASE_CHOICE_CONFIRM]
         self.navigate(check_navigation,
                       check_screens,
-                      check_cancel,
+                      client_cancel,
                       compare_args,
                       text,
                       nav_ins,
                       val_ins)
-        if check_cancel:
+        if client_cancel:
             # Send a cancel command
             self.device.send(CTAPHID.CANCEL, b"")
         if check_navigation and user_accept is not None:
@@ -236,7 +252,7 @@ class LedgerCtap2(Ctap2, LedgerCTAP):
         return AssertionResponse.from_dict(response)
 
     def reset(self, *, event=None, on_keepalive=None, user_accept: Optional[bool] = True,
-              check_screens=False, check_cancel=False, compare_args=None) -> None:
+              check_screens=False, client_cancel=False, compare_args=None) -> None:
         # Refresh navigator screen content reference
         self.navigator._backend.get_current_screen_content()
 
@@ -247,13 +263,14 @@ class LedgerCtap2(Ctap2, LedgerCTAP):
         nav_ins = None
         val_ins: List[Union[NavIns, NavInsID]] = list()
 
-        check_navigation = (user_accept is not None or self.nfc)
+        check_navigation = (user_accept is not None) if not self.nfc \
+            else (user_accept is not None and not will_fail)
 
         # No confirmation needed on NFC
         if self.nfc:
-            # Anyway, this function is not implemented through
+            # Anyways, this function is not implemented through
             # NFC, and will always return an error
-            check_navigation = False
+            pass
         else:
             if self.firmware.is_nano:
                 nav_ins = NavInsID.RIGHT_CLICK
@@ -272,13 +289,13 @@ class LedgerCtap2(Ctap2, LedgerCTAP):
 
         self.navigate(check_navigation,
                       check_screens,
-                      check_cancel,
+                      client_cancel,
                       compare_args,
                       text,
                       nav_ins,
                       val_ins)
 
-        if check_cancel:
+        if client_cancel:
             # Send a cancel command
             self.device.send(CTAPHID.CANCEL, b"")
 

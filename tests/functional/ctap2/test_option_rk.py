@@ -22,7 +22,7 @@ def test_option_rk_disabled(client):
     args = generate_make_credentials_params(client, rk=True)
 
     with pytest.raises(CtapError) as e:
-        client.ctap2.make_credential(args, user_accept=None)
+        client.ctap2.make_credential(args, user_accept=None, will_fail=True)
     assert e.value.code == CtapError.ERR.UNSUPPORTED_OPTION
 
 
@@ -113,7 +113,7 @@ def test_option_rk_make_cred_exclude_refused(client, test_name):
     args.credential_data = t.credential_data
 
     with pytest.raises(CtapError) as e:
-        client.ctap2.make_credential(args, user_accept=None)
+        client.ctap2.make_credential(args, user_accept=None, will_fail=True)
 
     assert e.value.code == CtapError.ERR.CREDENTIAL_EXCLUDED
     # DEVIATION from FIDO2.0 spec: Should prompt user to exclude
@@ -152,13 +152,13 @@ def test_option_rk_get_assertion(client, test_name, transport: TransportType):
 
         # Users are then shown in the order with the last created presented first
         users = [user] + users
-        login_type = "simple" if len(users) == 1 else "multi"
+        simple_login = len(users) == 1
 
         client_data_hash = generate_random_bytes(32)
         compare_args = (TESTS_SPECULOS_DIR, test_name + f"/{idx}/get_rk")
         assertion = client.ctap2.get_assertion(user.rp["id"], client_data_hash,
                                                check_users=users, check_screens="fast",
-                                               login_type=login_type, compare_args=compare_args)
+                                               simple_login=simple_login, compare_args=compare_args)
         credential_data = AttestedCredentialData(attestation.auth_data.credential_data)
 
         assertion.verify(client_data_hash, credential_data.public_key)
@@ -173,7 +173,7 @@ def test_option_rk_get_assertion(client, test_name, transport: TransportType):
                                                allow_list=allow_list,
                                                check_users=[u.user for u in users],
                                                check_screens="fast",
-                                               login_type=login_type, compare_args=compare_args)
+                                               simple_login=simple_login, compare_args=compare_args)
         assertion.verify(client_data_hash, credential_data.public_key)
         assert assertion.user["id"] == users[0].user["id"]  # first of allow_list selected
 
@@ -183,7 +183,7 @@ def test_option_rk_get_assertion(client, test_name, transport: TransportType):
         client.ctap2.reset()
         client_data_hash = generate_random_bytes(32)
         with pytest.raises(CtapError) as e:
-            client.ctap2.get_assertion(user1.rp["id"], client_data_hash, login_type="none")
+            client.ctap2.get_assertion(user1.rp["id"], client_data_hash, will_fail=True)
         assert e.value.code == CtapError.ERR.NO_CREDENTIALS
 
 
@@ -200,7 +200,7 @@ def test_option_rk_key_store_full(client, transport: TransportType):
 
     # Check that it is consistently returned
     with pytest.raises(CtapError) as e:
-        ctap2_get_assertion(client, rk=True)
+        ctap2_get_assertion(client, rk=True, will_fail=True)
     assert e.value.code == CtapError.ERR.KEY_STORE_FULL
 
     # CTAP2 reset is not available on NFC

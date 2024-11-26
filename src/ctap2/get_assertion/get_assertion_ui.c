@@ -29,36 +29,16 @@
 #include "get_assertion_ui.h"
 #include "get_assertion_utils.h"
 
-static void ux_display_user_assertion(char buffer[static 36]) {
-    ctap2_assert_data_t *ctap2AssertData = globals_get_ctap2_assert_data();
-    credential_data_t credData;
-    uint8_t nameLength = 0;
+#define SELECT_ID_BUFFER_SIZE 36
 
-    if (credential_decode(&credData,
-                          ctap2AssertData->credential,
-                          ctap2AssertData->credentialLen,
-                          true) != 0) {
-        // This should never happen, but keep a consistent state if it ever does
-        buffer[0] = '\0';
-    } else if (credData.userStr != NULL) {
-        nameLength = MIN(credData.userStrLen, 36 - 1);
-        memcpy(buffer, credData.userStr, nameLength);
-        buffer[nameLength] = '\0';
-    } else {
-        nameLength = MIN(credData.userIdLen, (36 / 2) - 1);
-        format_hex(credData.userId, nameLength, buffer, 36);
-#if defined(HAVE_BAGL)
-        nameLength = nameLength * 2;
-#endif  // HAVE_BAGL
-    }
+static void ux_display_user_assertion(char buffer[static SELECT_ID_BUFFER_SIZE]) {
+    uint8_t nameLength = load_user_in_buffer(buffer, SELECT_ID_BUFFER_SIZE);
 
 #if defined(HAVE_BAGL)
     if (nameLength > 32) {
         memcpy(buffer + 32, "...", sizeof("..."));
     }
 #endif  // HAVE_BAGL
-
-    PRINTF("GET_ASSERTION: name %s\n", buffer);
 }
 
 static void ctap_ux_on_user_choice(bool confirm, uint16_t idx) {
@@ -285,7 +265,6 @@ static const nbgl_layoutTagValue_t pairs[NB_OF_PAIRS] = {
 #define SELECT_MAX_ID_NB 4
 #endif
 
-#define SELECT_ID_BUFFER_SIZE 36
 static char user_id_list[SELECT_MAX_ID_NB][SELECT_ID_BUFFER_SIZE];
 static const char *const bar_texts[SELECT_MAX_ID_NB] = {
     user_id_list[0],
@@ -410,7 +389,6 @@ void get_assertion_ux(ctap2_ux_state_t state) {
     memcpy(g.buffer1_65, ctap2AssertData->rpId, len);
     g.buffer1_65[len] = '\0';
     PRINTF("GET_ASSERTION: rpId %s\n", g.buffer1_65);
-    PRINTF("GET_ASSERTION: buffer2_65 %s\n", g.buffer2_65);
 
     ctap2UxState = state;
 
@@ -427,6 +405,7 @@ void get_assertion_ux(ctap2_ux_state_t state) {
         // Only one possible credential
         case CTAP2_UX_STATE_GET_ASSERTION: {
             ux_display_user_assertion(g.buffer2_65);
+            PRINTF("GET_ASSERTION: buffer2_65 %s\n", g.buffer2_65);
 #if defined(HAVE_BAGL)
             ux_flow_init(0, ux_get_assertion_flow, NULL);
 #elif defined(HAVE_NBGL)
@@ -446,6 +425,7 @@ void get_assertion_ux(ctap2_ux_state_t state) {
             // If the user wants to use another one, it will be changed in `on_user_select_callback`
             get_assertion_credential_idx(selected_credential);
             ux_display_user_assertion(g.buffer2_65);
+            PRINTF("GET_ASSERTION: buffer2_65 %s\n", g.buffer2_65);
             app_nbgl_start_review(NB_OF_PAIRS, pairs, "Log in", on_user_choice, on_user_select);
 #endif
             break;

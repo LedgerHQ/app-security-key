@@ -196,7 +196,7 @@ def test_make_credential_cancel(client, test_name):
         client.ctap2.make_credential(args,
                                      user_accept=None,
                                      check_screens="full",
-                                     check_cancel=True,
+                                     client_cancel=True,
                                      compare_args=compare_args)
     assert e.value.code == CtapError.ERR.KEEPALIVE_CANCEL
 

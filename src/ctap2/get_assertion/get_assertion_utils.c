@@ -16,8 +16,9 @@
 *   limitations under the License.
 ********************************************************************************/
 
-#include <u2f_transport.h>
+#include <lib_standard_app/format.h>
 #include <os_io.h>
+#include <u2f_transport.h>
 
 #include "cbip_encode.h"
 
@@ -37,6 +38,39 @@
 #define TAG_RESP_SIGNATURE   0x03
 #define TAG_RESP_USER        0x04
 #define TAG_RESP_NB_OF_CREDS 0x05
+
+size_t load_user_in_buffer(char *buffer, uint8_t max_size) {
+    ctap2_assert_data_t *ctap2AssertData = globals_get_ctap2_assert_data();
+    credential_data_t credData;
+    uint8_t nameLength = 0;
+
+    if (credential_decode(&credData,
+                          ctap2AssertData->credential,
+                          ctap2AssertData->credentialLen,
+                          true) != 0) {
+        // This should never happen, but keep a consistent state if it ever does
+        buffer[0] = '\0';
+    } else if (credData.userStr != NULL) {
+        nameLength = MIN(credData.userStrLen, max_size - 1);
+        memcpy(buffer, credData.userStr, nameLength);
+        buffer[nameLength] = '\0';
+    } else {
+        nameLength = MIN(credData.userIdLen, (max_size / 2) - 1);
+        format_hex(credData.userId, nameLength, buffer, max_size);
+#if defined(HAVE_BAGL)
+        nameLength = nameLength * 2;
+#endif  // HAVE_BAGL
+    }
+    return nameLength;
+}
+
+static void copy_assert_info_on_buffers(void) {
+    ctap2_assert_data_t *ctap2AssertData = globals_get_ctap2_assert_data();
+
+    ctap2_display_copy_rp(ctap2AssertData->rpId, ctap2AssertData->rpIdLen);
+    load_user_in_buffer(g.buffer2_65, sizeof(g.buffer2_65));
+    PRINTF("After copy, buffer content:\n1 - '%s'\n2 - '%s'\n", g.buffer1_65, g.buffer2_65);
+}
 
 static int compute_hmacSecret_output(uint8_t **output, uint32_t *outputLen, uint8_t *credRandom) {
     ctap2_assert_data_t *ctap2AssertData = globals_get_ctap2_assert_data();
@@ -565,6 +599,11 @@ void get_assertion_send(void) {
     ctap2_assert_data_t *ctap2AssertData = globals_get_ctap2_assert_data();
     credential_data_t credData;
     uint32_t dataLen;
+
+    // Every successful GET ASSERTION (NFC, USB, RK or not, ...) comes through here, so it is a
+    // relevant place to copy the RP/credential into global buffers, in case they are displayed.
+    copy_assert_info_on_buffers();
+
     int status = credential_decode(&credData,
                                    ctap2AssertData->credential,
                                    ctap2AssertData->credentialLen,
@@ -585,7 +624,6 @@ void get_assertion_send(void) {
     }
 
     status = 0;
-
     responseBuffer[0] = ERROR_NONE;
 
 exit:

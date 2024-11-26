@@ -26,7 +26,7 @@ def test_get_next_assertion_two_credentials_allowlist(client):
     ]
     assertion = client.ctap2.get_assertion(rp["id"], client_data_hash,
                                            allow_list,
-                                           login_type="multi",
+                                           simple_login=False,
                                            check_users=registered_users)
 
     # Spec says that:

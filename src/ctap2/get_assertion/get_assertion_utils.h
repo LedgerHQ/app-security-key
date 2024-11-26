@@ -52,6 +52,8 @@ void get_assertion_user_cancel();
 
 int handle_allowList_item(cbipDecoder_t *decoder, cbipItem_t *item, bool unwrap);
 
+size_t load_user_in_buffer(char *buffer, uint8_t nameLength);
+
 static inline ctap2_assert_data_t *globals_get_ctap2_assert_data(void) {
     return &shared_ctx.u.ctap2Data.u.ctap2AssertData;
 }

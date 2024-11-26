@@ -57,6 +57,6 @@ def test_reset_cancel(client, test_name):
     compare_args = (TESTS_SPECULOS_DIR, test_name)
 
     with pytest.raises(CtapError) as e:
-        client.ctap2.reset(check_screens=True, check_cancel=True,
+        client.ctap2.reset(check_screens=True, client_cancel=True,
                            user_accept=None, compare_args=compare_args)
     assert e.value.code == CtapError.ERR.KEEPALIVE_CANCEL
