@@ -38,6 +38,8 @@ static void ux_display_user_assertion(char buffer[static SELECT_ID_BUFFER_SIZE])
     if (nameLength > 32) {
         memcpy(buffer + 32, "...", sizeof("..."));
     }
+#else
+    UNUSED(nameLength);
 #endif  // HAVE_BAGL
 }
 

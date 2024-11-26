@@ -4,13 +4,13 @@ from fido2.ctap import CtapError
 
 from ..client import TESTS_SPECULOS_DIR
 from ..utils import generate_random_bytes, ctap2_get_assertion, \
-    HAVE_NO_RESET_GENERATION_INCREMENT
+    HAVE_NO_RESET_GENERATION_INCREMENT, Nav
 
 
 @pytest.mark.skip_endpoint("NFC", reason="CTAP2 reset is not available on NFC - 0x27")
 def test_reset(client, test_name):
-    for user_accept in [True, False]:
-        compare_args = (TESTS_SPECULOS_DIR, test_name + "/" + str(user_accept))
+    for navigation in [Nav.USER_ACCEPT, Nav.USER_REFUSE]:
+        compare_args = (TESTS_SPECULOS_DIR, test_name + "/" + navigation.name)
 
         # Create a credential
         t = ctap2_get_assertion(client)
@@ -20,9 +20,9 @@ def test_reset(client, test_name):
         allow_list = [{"id": t.credential_data.credential_id, "type": "public-key"}]
         client.ctap2.get_assertion(t.args.rp["id"], client_data_hash, allow_list)
 
-        if not user_accept:  # Abort
+        if navigation is Nav.USER_REFUSE:
             with pytest.raises(CtapError) as e:
-                client.ctap2.reset(user_accept=user_accept, check_screens=True,
+                client.ctap2.reset(navigation=navigation, check_screens=True,
                                    compare_args=compare_args)
             assert e.value.code == CtapError.ERR.OPERATION_DENIED
 
@@ -31,8 +31,8 @@ def test_reset(client, test_name):
             allow_list = [{"id": t.credential_data.credential_id, "type": "public-key"}]
             client.ctap2.get_assertion(t.args.rp["id"], client_data_hash, allow_list)
 
-        else:  # Confirm
-            client.ctap2.reset(user_accept=user_accept, check_screens=True,
+        else:
+            client.ctap2.reset(navigation=navigation, check_screens=True,
                                compare_args=compare_args)
 
             client_data_hash = generate_random_bytes(32)
@@ -57,6 +57,5 @@ def test_reset_cancel(client, test_name):
     compare_args = (TESTS_SPECULOS_DIR, test_name)
 
     with pytest.raises(CtapError) as e:
-        client.ctap2.reset(check_screens=True, client_cancel=True,
-                           user_accept=None, compare_args=compare_args)
+        client.ctap2.reset(navigation=Nav.CLIENT_CANCEL, compare_args=compare_args)
     assert e.value.code == CtapError.ERR.KEEPALIVE_CANCEL

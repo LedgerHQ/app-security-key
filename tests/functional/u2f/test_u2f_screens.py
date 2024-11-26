@@ -49,7 +49,7 @@ def test_u2f_screens_fido_known_list(client, test_name):
         test_part_name = test_name + "/reg/" + app_name
         compare_args = (TESTS_SPECULOS_DIR, test_part_name)
         registration_data = client.ctap1.register(challenge, app_param,
-                                                  check_screens="fast",
+                                                  check_screens=True,
                                                   compare_args=compare_args)
         registration_data.verify(app_param, challenge)
 
@@ -61,7 +61,7 @@ def test_u2f_screens_fido_known_list(client, test_name):
         authentication_data = client.ctap1.authenticate(challenge,
                                                         app_param,
                                                         registration_data.key_handle,
-                                                        check_screens="fast",
+                                                        check_screens=True,
                                                         compare_args=compare_args)
 
         authentication_data.verify(app_param, challenge,

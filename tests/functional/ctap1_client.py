@@ -8,8 +8,7 @@ from ragger.navigator import Navigator, NavInsID
 from fido2.ctap1 import Ctap1, ApduError, RegistrationData, SignatureData
 from fido2.hid import CTAPHID
 
-from .transport import TransportType
-from .utils import prepare_apdu, LedgerCTAP
+from .utils import prepare_apdu, LedgerCTAP, Nav
 
 
 class APDU(IntEnum):
@@ -51,10 +50,6 @@ class LedgerCtap1(Ctap1, LedgerCTAP):
         Ctap1.__init__(self, device)
         LedgerCTAP.__init__(self, firmware, navigator, debug)
 
-    @property
-    def nfc(self) -> bool:
-        return self.device.transport is TransportType.NFC
-
     def parse_response(self, response):
         status = struct.unpack(">H", response[-2:])[0]
         try:
@@ -79,7 +74,7 @@ class LedgerCtap1(Ctap1, LedgerCTAP):
         apdu = prepare_apdu(cla=cla, ins=ins, p1=p1, p2=p2, data=data)
         self.device.send(CTAPHID.MSG, apdu)
 
-    def register(self, client_param, app_param, user_accept=True,
+    def register(self, client_param, app_param, navigation: Nav = Nav.USER_ACCEPT,
                  check_screens=None, compare_args=None):
         # Refresh navigator screen content reference
         self.navigator._backend.get_current_screen_content()
@@ -90,29 +85,22 @@ class LedgerCtap1(Ctap1, LedgerCTAP):
         text = None
         nav_ins = None
         val_ins = None
-        check_navigation = (user_accept is not None or self.nfc)
 
-        if self.nfc:
-            check_navigation = False
-        else:
-            if self.firmware.is_nano:
-                nav_ins = NavInsID.RIGHT_CLICK
-                val_ins = [NavInsID.BOTH_CLICK]
-                if user_accept is not None:
-                    if user_accept:
-                        text = "Register"
-                    else:
-                        text = "Abort"
-            elif self.firmware in [Firmware.STAX, Firmware.FLEX]:
-                if user_accept is not None:
-                    if user_accept:
-                        val_ins = [NavInsID.USE_CASE_CHOICE_CONFIRM]
-                    else:
-                        val_ins = [NavInsID.USE_CASE_CHOICE_REJECT]
+        if self.firmware.is_nano:
+            nav_ins = NavInsID.RIGHT_CLICK
+            val_ins = [NavInsID.BOTH_CLICK]
+            if navigation is Nav.USER_ACCEPT:
+                text = "Register"
+            else:
+                text = "Abort"
+        elif self.firmware in [Firmware.STAX, Firmware.FLEX]:
+            if navigation is Nav.USER_ACCEPT:
+                val_ins = [NavInsID.USE_CASE_CHOICE_CONFIRM]
+            else:
+                val_ins = [NavInsID.USE_CASE_CHOICE_REJECT]
 
-        self.navigate(check_navigation,
+        self.navigate(navigation,
                       check_screens,
-                      False,  # Never check cancel
                       compare_args,
                       text,
                       nav_ins,
@@ -132,17 +120,17 @@ class LedgerCtap1(Ctap1, LedgerCTAP):
                 response = self.device.recv(CTAPHID.MSG)
                 response = self.parse_response(response)
             else:
-                if user_accept is not None:
+                if navigation is not Nav.NONE:
                     self.wait_for_return_on_dashboard()
                 raise e
 
-        if user_accept is not None:
+        if navigation is not Nav.NONE:
             self.wait_for_return_on_dashboard()
 
         return RegistrationData(response)
 
     def authenticate(self, client_param, app_param, key_handle,
-                     check_only=False, user_accept=True,
+                     check_only=False, navigation: Nav = Nav.USER_ACCEPT,
                      check_screens=None, compare_args=None):
         # Refresh navigator screen content reference
         self.navigator._backend.get_current_screen_content()
@@ -155,29 +143,22 @@ class LedgerCtap1(Ctap1, LedgerCTAP):
         text = None
         nav_ins = None
         val_ins = None
-        check_navigation = (user_accept is not None or self.nfc)
 
-        if self.nfc:
-            check_navigation = False
-        else:
-            if self.firmware.is_nano:
-                nav_ins = NavInsID.RIGHT_CLICK
-                val_ins = [NavInsID.BOTH_CLICK]
-                if user_accept is not None:
-                    if user_accept:
-                        text = "Login"
-                    else:
-                        text = "Abort"
-            elif self.firmware in [Firmware.STAX, Firmware.FLEX]:
-                if user_accept is not None:
-                    if user_accept:
-                        val_ins = [NavInsID.USE_CASE_CHOICE_CONFIRM]
-                    else:
-                        val_ins = [NavInsID.USE_CASE_CHOICE_REJECT]
+        if self.firmware.is_nano:
+            nav_ins = NavInsID.RIGHT_CLICK
+            val_ins = [NavInsID.BOTH_CLICK]
+            if navigation is Nav.USER_ACCEPT:
+                text = "Login"
+            else:
+                text = "Abort"
+        elif self.firmware in [Firmware.STAX, Firmware.FLEX]:
+            if navigation is Nav.USER_ACCEPT:
+                val_ins = [NavInsID.USE_CASE_CHOICE_CONFIRM]
+            else:
+                val_ins = [NavInsID.USE_CASE_CHOICE_REJECT]
 
-        self.navigate(check_navigation,
+        self.navigate(navigation,
                       check_screens,
-                      False,  # Never check cancel
                       compare_args,
                       text,
                       nav_ins,
@@ -198,11 +179,11 @@ class LedgerCtap1(Ctap1, LedgerCTAP):
                 response = self.device.recv(CTAPHID.MSG)
                 response = self.parse_response(response)
             else:
-                if user_accept is not None:
+                if navigation is not Nav.NONE:
                     self.wait_for_return_on_dashboard()
                 raise e
 
-        if user_accept is not None:
+        if navigation is not Nav.NONE:
             self.wait_for_return_on_dashboard()
 
         return SignatureData(response)

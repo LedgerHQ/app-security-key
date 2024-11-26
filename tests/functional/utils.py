@@ -3,6 +3,7 @@ import secrets
 import string
 import struct
 from dataclasses import asdict, dataclass
+from enum import Enum, auto
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 from fido2.cose import ES256
@@ -21,6 +22,13 @@ ENABLE_RK_CONFIG_UI_SETTING = False
 
 FIDO_RP_ID_HASH_1 = bytes.fromhex("000102030405060708090a0b0c0d0e0f"
                                   "101112131415161718191a1b1c1d1e1f")
+
+
+class Nav(Enum):
+    NONE = auto()
+    USER_ACCEPT = auto()
+    USER_REFUSE = auto()
+    CLIENT_CANCEL = auto()
 
 
 @dataclass
@@ -77,6 +85,7 @@ def generate_make_credentials_params(client,
                                      ref: Optional[int] = None,
                                      exclude_list: Optional[List] = None,
                                      extensions: Optional[List] = None,
+                                     client_data_hash: Optional[bytes] = None,
                                      options: Optional[Dict] = None) -> MakeCredentialArguments:
     if ref is None:
         rp_base = generate_random_string(20)
@@ -95,7 +104,7 @@ def generate_make_credentials_params(client,
                                     f"0000000000000000000000000000000{ref}")
             user_name = f"My user {ref} name"
 
-    client_data_hash = generate_random_bytes(32)
+    client_data_hash = client_data_hash or generate_random_bytes(32)
     if rp is None:
         rp = {"id": rp_id}
     user: Dict[str, Union[str, bytes]] = {"id": user_id}
@@ -128,10 +137,13 @@ def generate_make_credentials_params(client,
 
 
 def ctap2_get_assertion(client,
-                        user_accept: Optional[bool] = True,
+                        navigation: Nav = Nav.USER_ACCEPT,
+                        will_fail: bool = False,
                         **kwargs) -> MakeCredentialTransaction:
     make_credentials_arguments = generate_make_credentials_params(client, **kwargs)
-    attestation = client.ctap2.make_credential(make_credentials_arguments, user_accept=user_accept)
+    attestation = client.ctap2.make_credential(make_credentials_arguments,
+                                               navigation=navigation,
+                                               will_fail=will_fail)
     return MakeCredentialTransaction(make_credentials_arguments, attestation)
 
 
@@ -194,21 +206,21 @@ class LedgerCTAP:
         self.navigator._backend.wait_for_home_screen()
 
     def navigate(self,
-                 check_navigation: bool,
+                 navigation: Nav,
                  check_screens: bool,
-                 check_cancel: bool,
                  compare_args: Optional[Tuple],
                  text: Optional[str],
                  nav_ins: Optional[Union[NavIns, NavInsID]],
-                 val_ins: List[Union[NavIns, NavInsID]]):
+                 val_ins: List[Union[NavIns, NavInsID]]) -> None:
+        if navigation is Nav.NONE:
+            return
 
         if check_screens:
             assert compare_args
             root, test_name = compare_args
         else:
             root, test_name = None, None
-
-        if check_navigation:
+        if navigation in [Nav.USER_ACCEPT, Nav.USER_REFUSE]:
             # Over U2F endpoint (but not over HID) the device needs the
             # response to be retrieved before continuing the UX flow.
 
@@ -228,6 +240,6 @@ class LedgerCTAP:
                     val_ins,
                     screen_change_after_last_instruction=False)
 
-        elif check_cancel:
+        elif navigation is Nav.CLIENT_CANCEL:
             self.navigator.navigate([NavIns(NavInsID.WAIT, (0.1,))],
                                     screen_change_after_last_instruction=False)

@@ -9,7 +9,7 @@ from fido2.webauthn import AttestationObject
 
 from ..client import TESTS_SPECULOS_DIR, LedgerAttestationVerifier
 from ..ctap1_client import APDU, U2F_P1
-from ..utils import FIDO_RP_ID_HASH_1, generate_random_bytes
+from ..utils import FIDO_RP_ID_HASH_1, generate_random_bytes, Nav
 
 
 @pytest.mark.skip_endpoint("NFC", reason="CTAP1 is not available on NFC - 0x6D00")
@@ -20,7 +20,7 @@ def test_register_ok(client, test_name):
     compare_args = (TESTS_SPECULOS_DIR, test_name)
 
     registration_data = client.ctap1.register(challenge, app_param,
-                                              check_screens="full",
+                                              check_screens=True,
                                               compare_args=compare_args)
     registration_data.verify(app_param, challenge)
 
@@ -62,8 +62,8 @@ def test_register_user_refused(client, test_name):
     compare_args = (TESTS_SPECULOS_DIR, test_name)
 
     with pytest.raises(ApduError) as e:
-        client.ctap1.register(challenge, app_param, user_accept=False,
-                              check_screens="full",
+        client.ctap1.register(challenge, app_param, navigation=Nav.USER_REFUSE,
+                              check_screens=True,
                               compare_args=compare_args)
 
     assert e.value.code == APDU.SW_USER_REFUSED
@@ -144,7 +144,7 @@ def test_register_length_too_short(client):
     app_param = generate_random_bytes(31)
 
     with pytest.raises(ApduError) as e:
-        client.ctap1.register(challenge, app_param, user_accept=None)
+        client.ctap1.register(challenge, app_param, navigation=Nav.NONE)
     assert e.value.code == APDU.SW_WRONG_LENGTH
 
 
@@ -156,7 +156,7 @@ def test_register_length_too_long(client):
     app_param = generate_random_bytes(33)
 
     with pytest.raises(ApduError) as e:
-        client.ctap1.register(challenge, app_param, user_accept=None)
+        client.ctap1.register(challenge, app_param, navigation=Nav.NONE)
     assert e.value.code == APDU.SW_WRONG_LENGTH
 
 

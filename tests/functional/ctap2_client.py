@@ -2,7 +2,7 @@ import struct
 
 from ragger.firmware import Firmware
 from ragger.navigator import Navigator, NavInsID, NavIns
-from typing import List, Mapping, Optional, Union
+from typing import List, Mapping, Union
 
 from fido2 import cbor
 from fido2.ctap import CtapError
@@ -13,7 +13,7 @@ from fido2.hid import CtapHidDevice
 
 from .ctap1_client import APDU
 from .transport import TransportType
-from .utils import LedgerCTAP, prepare_apdu, MakeCredentialArguments
+from .utils import LedgerCTAP, MakeCredentialArguments, Nav, prepare_apdu
 
 
 class LedgerCtap2(Ctap2, LedgerCTAP):
@@ -96,8 +96,15 @@ class LedgerCtap2(Ctap2, LedgerCTAP):
         raise TypeError("Decoded value of wrong type")
 
     def make_credential(self, args: MakeCredentialArguments,
-                        event=None, on_keepalive=None, user_accept: Optional[bool] = True,
-                        check_screens=False, client_cancel=False,
+                        event=None,
+                        on_keepalive=None,
+                        # if the user will accept the request or not (ignored in NFC)
+                        # if None, the navigation is not checked
+                        # if the command is expected to be canceled by the client (with an APDU)
+                        # if True, navigation and snapshot check are deactivated
+                        navigation: Nav = Nav.USER_ACCEPT,
+                        # if snapshots are checked against golden ones or not
+                        check_screens: bool = False,
                         compare_args=None,
                         # if the call is expected to raise an error
                         will_fail: bool = False) -> AttestationResponse:
@@ -111,44 +118,50 @@ class LedgerCtap2(Ctap2, LedgerCTAP):
         text = None
         nav_ins = None
         val_ins: List[Union[NavIns, NavInsID]] = list()
-        check_navigation = (user_accept is not None) if not self.nfc \
-            else (user_accept is not None and not will_fail)
+        if self.nfc and will_fail:
+            navigation = Nav.NONE
+        if navigation is Nav.CLIENT_CANCEL:
+            # when canceled from client side, no navigation checks
+            check_screens = False
 
         # No navigation in NFC, only a screen change, so we enable navigation just to check the
         # snapshot, except in cases where an error is expected.
-        if self.nfc:
-            pass
-        else:
+        if not self.nfc and navigation is not Nav.NONE:
             if self.firmware.is_nano:
                 nav_ins = NavInsID.RIGHT_CLICK
                 val_ins = [NavInsID.BOTH_CLICK]
-                if user_accept is not None:
-                    if user_accept:
-                        text = "Register$"
-                    else:
-                        text = "Don't register"
+                if navigation is Nav.USER_ACCEPT:
+                    text = "Register$"
+                else:
+                    text = "Don't register"
             elif self.firmware in [Firmware.STAX, Firmware.FLEX]:
-                if user_accept is not None:
-                    if user_accept:
-                        val_ins = [NavInsID.USE_CASE_CHOICE_CONFIRM]
-                    else:
-                        val_ins = [NavInsID.USE_CASE_CHOICE_REJECT]
+                if navigation is Nav.USER_ACCEPT:
+                    val_ins = [NavInsID.USE_CASE_CHOICE_CONFIRM]
+                else:
+                    val_ins = [NavInsID.USE_CASE_CHOICE_REJECT]
 
-        self.navigate(check_navigation,
+        if self.nfc:
+            # In NFC, the result is displayed after the device sends its RAPDU (no user
+            # interaction), so we need to receive *before* checking the navigation.
+            response = self.device.recv(ctap_hid_cmd)
+
+        self.navigate(navigation,
                       check_screens,
-                      client_cancel,
                       compare_args,
                       text,
                       nav_ins,
                       val_ins)
 
-        if client_cancel:
+        if navigation is Nav.CLIENT_CANCEL:
             # Send a cancel command
             self.device.send(CTAPHID.CANCEL, b"")
 
-        response = self.device.recv(ctap_hid_cmd)
+        if not self.nfc:
+            # In USB, the device requires user interaction before responding with RAPDU,
+            # so we need to receive *after* the navigation
+            response = self.device.recv(ctap_hid_cmd)
 
-        if user_accept is not None:
+        if navigation is not Nav.NONE:
             self.wait_for_return_on_dashboard()
 
         return AttestationResponse.from_dict(self.parse_response(response))
@@ -158,15 +171,14 @@ class LedgerCtap2(Ctap2, LedgerCTAP):
                       pin_uv_protocol=None, *,
                       event=None,
                       on_keepalive=None,
+                      navigation: Nav = Nav.USER_ACCEPT,
                       # if the call is expected to raise an error
                       will_fail: bool = False,
                       # if the login is simple (one choice) or not (multiple choices)
                       simple_login: bool = True,
-                      user_accept: Optional[bool] = True,
                       check_users=None,
-                      check_screens=False,
-                      # if the command is expected to be canceled by the client (with an APDU)
-                      client_cancel: bool = False,
+                      # if snapshots are checked against golden ones or not
+                      check_screens: bool = False,
                       compare_args=None,
                       select_user_idx=1):
         # Refresh navigator screen content reference
@@ -185,62 +197,67 @@ class LedgerCtap2(Ctap2, LedgerCTAP):
         text = None
         nav_ins = None
         val_ins: List[Union[NavIns, NavInsID]] = list()
-        check_navigation = (user_accept is not None) if not self.nfc \
-            else (user_accept is not None and not will_fail)
-
-        assert not check_navigation
+        if self.nfc and will_fail:
+            navigation = Nav.NONE
+        if navigation is Nav.CLIENT_CANCEL:
+            check_screens = False
         # No navigation in NFC, only a screen change, so we enable navigation just to check the
         # snapshot, except in cases where an error is expected.
-        if self.nfc:
-            pass
-        else:
+        if not self.nfc and navigation is not Nav.NONE:
             if self.firmware.is_nano:
                 nav_ins = NavInsID.RIGHT_CLICK
                 val_ins = [NavInsID.BOTH_CLICK]
-                if user_accept is not None:
-                    if will_fail:
-                        text = "Close"
-                    elif not simple_login:
-                        if check_users and len(check_users) == 1:
-                            raise ValueError("Found 1 user while expecting multiple")
-                        if user_accept:
-                            text = f"Log in user {select_user_idx}/"
-                        else:
-                            text = "Reject"
+                if will_fail:
+                    text = "Close"
+                elif not simple_login:
+                    if check_users and len(check_users) == 1:
+                        raise ValueError("Found 1 user while expecting multiple")
+                    if navigation is Nav.USER_ACCEPT:
+                        text = f"Log in user {select_user_idx}/"
                     else:
-                        if check_users and len(check_users) != 1:
-                            raise ValueError("Found multiple users while expecting 1")
-                        if user_accept:
-                            text = "Log in"
-                        else:
-                            text = "Reject"
+                        text = "Reject"
+                else:
+                    if check_users and len(check_users) != 1:
+                        raise ValueError("Found multiple users while expecting 1")
+                    if navigation is Nav.USER_ACCEPT:
+                        text = "Log in"
+                    else:
+                        text = "Reject"
             elif self.firmware in [Firmware.STAX, Firmware.FLEX]:
-                if user_accept is not None:
-                    if will_fail:
-                        val_ins = [NavInsID.TAPPABLE_CENTER_TAP]
-                    if not user_accept:
-                        val_ins = [NavInsID.USE_CASE_CHOICE_REJECT]
+                if will_fail:
+                    val_ins = [NavInsID.TAPPABLE_CENTER_TAP]
+                if navigation is Nav.USER_REFUSE:
+                    val_ins = [NavInsID.USE_CASE_CHOICE_REJECT]
+                else:
+                    if not simple_login and select_user_idx != 1:
+                        assert select_user_idx <= 5
+                        val_ins = [NavIns(NavInsID.TOUCH, (200, 350)),
+                                   NavIns(NavInsID.TOUCH, (200, 40 + 90 * select_user_idx)),
+                                   NavInsID.USE_CASE_CHOICE_CONFIRM]
                     else:
-                        if not simple_login and select_user_idx != 1:
-                            assert select_user_idx <= 5
-                            val_ins = [NavIns(NavInsID.TOUCH, (200, 350)),
-                                       NavIns(NavInsID.TOUCH, (200, 40 + 90 * select_user_idx)),
-                                       NavInsID.USE_CASE_CHOICE_CONFIRM]
-                        else:
-                            val_ins = [NavInsID.USE_CASE_CHOICE_CONFIRM]
-        self.navigate(check_navigation,
+                        val_ins = [NavInsID.USE_CASE_CHOICE_CONFIRM]
+        if self.nfc:
+            # In NFC, the result is displayed after the device sends its RAPDU (no user
+            # interaction), so we need to receive *before* checking the navigation.
+            response = self.device.recv(ctap_hid_cmd)
+
+        self.navigate(navigation,
                       check_screens,
-                      client_cancel,
                       compare_args,
                       text,
                       nav_ins,
                       val_ins)
-        if client_cancel:
+        if navigation is Nav.CLIENT_CANCEL:
             # Send a cancel command
             self.device.send(CTAPHID.CANCEL, b"")
-        if check_navigation and user_accept is not None:
+        if navigation is not Nav.NONE:
             self.wait_for_return_on_dashboard()
-        response = self.device.recv(ctap_hid_cmd)
+
+        if not self.nfc:
+            # In USB, the device requires user interaction before responding with RAPDU,
+            # so we need to receive *after* the navigation
+            response = self.device.recv(ctap_hid_cmd)
+
         response = self.parse_response(response)
         return AssertionResponse.from_dict(response)
 
@@ -251,8 +268,14 @@ class LedgerCtap2(Ctap2, LedgerCTAP):
         response = self.parse_response(response)
         return AssertionResponse.from_dict(response)
 
-    def reset(self, *, event=None, on_keepalive=None, user_accept: Optional[bool] = True,
-              check_screens=False, client_cancel=False, compare_args=None) -> None:
+    def reset(self, *,
+              event=None,
+              on_keepalive=None,
+              navigation: Nav = Nav.USER_ACCEPT,
+              # if snapshots are checked against golden ones or not
+              check_screens: bool = False,
+              compare_args=None,
+              will_fail: bool = False) -> None:
         # Refresh navigator screen content reference
         self.navigator._backend.get_current_screen_content()
 
@@ -263,39 +286,34 @@ class LedgerCtap2(Ctap2, LedgerCTAP):
         nav_ins = None
         val_ins: List[Union[NavIns, NavInsID]] = list()
 
-        check_navigation = (user_accept is not None) if not self.nfc \
-            else (user_accept is not None and not will_fail)
+        if navigation is Nav.CLIENT_CANCEL:
+            check_screens = False
+        if self.nfc and will_fail:
+            navigation = Nav.NONE
 
         # No confirmation needed on NFC
-        if self.nfc:
-            # Anyways, this function is not implemented through
-            # NFC, and will always return an error
-            pass
-        else:
+        if not self.nfc:
             if self.firmware.is_nano:
                 nav_ins = NavInsID.RIGHT_CLICK
                 val_ins = [NavInsID.BOTH_CLICK]
-                if user_accept is not None:
-                    if user_accept:
-                        text = "Yes, delete"
-                    else:
-                        text = "No, don't delete"
+                if navigation is Nav.USER_ACCEPT:
+                    text = "Yes, delete"
+                else:
+                    text = "No, don't delete"
             elif self.firmware in [Firmware.STAX, Firmware.FLEX]:
-                if user_accept is not None:
-                    if not user_accept:
-                        val_ins = [NavInsID.USE_CASE_CHOICE_REJECT]
-                    else:
-                        val_ins = [NavInsID.USE_CASE_CHOICE_CONFIRM]
+                if navigation is Nav.USER_ACCEPT:
+                    val_ins = [NavInsID.USE_CASE_CHOICE_CONFIRM]
+                else:
+                    val_ins = [NavInsID.USE_CASE_CHOICE_REJECT]
 
-        self.navigate(check_navigation,
+        self.navigate(navigation,
                       check_screens,
-                      client_cancel,
                       compare_args,
                       text,
                       nav_ins,
                       val_ins)
 
-        if client_cancel:
+        if navigation is Nav.CLIENT_CANCEL:
             # Send a cancel command
             self.device.send(CTAPHID.CANCEL, b"")
 

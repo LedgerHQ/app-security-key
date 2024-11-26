@@ -105,16 +105,9 @@ class TestClient:
                 self._device = LedgerCtapHidDevice(self.transport, self.debug)
 
             self.ctap1 = LedgerCtap1(self._device, self.firmware, self.navigator, self.debug)
-            try:
-                self.ctap2 = LedgerCtap2(self._device, self.firmware, self.navigator,
-                                         self.ctap2_u2f_proxy, self.debug)
-                self.client_pin = ClientPin(self.ctap2)
-            except Exception:
-                # Can occurs if the app is build without FIDO2 features.
-                # Then only U2F tests can be used.
-                print("FIDO2 not supported")
-                self.ctap2 = None
-                self.client_pin = None
+            self.ctap2 = LedgerCtap2(self._device, self.firmware, self.navigator,
+                                     self.ctap2_u2f_proxy, self.debug)
+            self.client_pin = ClientPin(self.ctap2)
 
         except Exception as e:
             raise e

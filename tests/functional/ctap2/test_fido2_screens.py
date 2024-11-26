@@ -69,7 +69,7 @@ def register_then_assert(client, test_name, user):
     args.user = user
     compare_args = (TESTS_SPECULOS_DIR, client.transported_path(test_name) + "/make")
     attestation = client.ctap2.make_credential(args,
-                                               check_screens="fast",
+                                               check_screens=True,
                                                compare_args=compare_args)
     credential_data = AttestedCredentialData(attestation.auth_data.credential_data)
 
@@ -78,9 +78,8 @@ def register_then_assert(client, test_name, user):
     allow_list = [{"id": credential_data.credential_id, "type": "public-key"}]
     compare_args = (TESTS_SPECULOS_DIR, client.transported_path(test_name) + "/get")
     assertion = client.ctap2.get_assertion(args.rp["id"], client_data_hash, allow_list,
-                                           user_accept=True,
                                            check_users=[args.user],
-                                           check_screens="fast",
+                                           check_screens=True,
                                            compare_args=compare_args)
 
     assertion.verify(client_data_hash, credential_data.public_key)

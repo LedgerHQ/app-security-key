@@ -1,4 +1,4 @@
-from fido2.ctap import CtapDevice
+from fido2.ctap import CtapDevice, CtapError
 from fido2.hid import CAPABILITY, CTAPHID
 
 from threading import Event
@@ -61,6 +61,8 @@ class LedgerCtapNFCDevice(CtapDevice):
             response += answer.data
             status, remaining_length = answer.status & 0xff00, answer.status & 0x00ff
             if status == 0x9000:
+                if len(response) == 1 and response[0]:
+                    raise CtapError(response[0])
                 return response
             if status == STATUS_MORE_DATA:
                 if remaining_length == 0:

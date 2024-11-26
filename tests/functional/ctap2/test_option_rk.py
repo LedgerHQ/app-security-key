@@ -10,7 +10,7 @@ from typing import Dict, List
 from ..client import TESTS_SPECULOS_DIR
 from ..transport import TransportType
 from ..utils import generate_random_bytes, generate_make_credentials_params, \
-    ctap2_get_assertion, ENABLE_RK_CONFIG_UI_SETTING, MakeCredentialArguments
+    ctap2_get_assertion, ENABLE_RK_CONFIG_UI_SETTING, MakeCredentialArguments, Nav
 
 
 @pytest.mark.skipif(not ENABLE_RK_CONFIG_UI_SETTING,
@@ -22,7 +22,7 @@ def test_option_rk_disabled(client):
     args = generate_make_credentials_params(client, rk=True)
 
     with pytest.raises(CtapError) as e:
-        client.ctap2.make_credential(args, user_accept=None, will_fail=True)
+        client.ctap2.make_credential(args, navigation=Nav.NONE, will_fail=True)
     assert e.value.code == CtapError.ERR.UNSUPPORTED_OPTION
 
 
@@ -46,7 +46,7 @@ def enable_rk_option(client):
             NavInsID.BOTH_CLICK
         ]
 
-        if client.firmware is Firmware.NANOS:
+        if client.firmware is not Firmware.NANOS:
             # Screen 0 -> 5
             instructions += [NavInsID.RIGHT_CLICK] * 5
         else:
@@ -92,7 +92,7 @@ def test_option_rk_enabled(client):
 def test_option_rk_make_cred_exclude_refused(client, test_name):
     enable_rk_option(client)
 
-    compare_args = (TESTS_SPECULOS_DIR, test_name)
+    compare_args = (TESTS_SPECULOS_DIR, client.transported_path(test_name))
     # Spec says that:
     # If the excludeList parameter is present and contains a credential ID that
     # is present on this authenticator and bound to the specified rpId, wait
@@ -113,7 +113,7 @@ def test_option_rk_make_cred_exclude_refused(client, test_name):
     args.credential_data = t.credential_data
 
     with pytest.raises(CtapError) as e:
-        client.ctap2.make_credential(args, user_accept=None, will_fail=True)
+        client.ctap2.make_credential(args, navigation=Nav.NONE, will_fail=True)
 
     assert e.value.code == CtapError.ERR.CREDENTIAL_EXCLUDED
     # DEVIATION from FIDO2.0 spec: Should prompt user to exclude
@@ -125,16 +125,21 @@ def test_option_rk_make_cred_exclude_refused(client, test_name):
                                             exclude_list=[{"id": t.credential_data.credential_id,
                                                            "type": "public-key"}])
 
-    client.ctap2.make_credential(args, check_screens="fast", compare_args=compare_args)
+    client.ctap2.make_credential(args, check_screens=True, compare_args=compare_args)
 
 
 @pytest.mark.skipif(not ENABLE_RK_CONFIG_UI_SETTING, reason="settings not enable")
 def test_option_rk_get_assertion(client, test_name, transport: TransportType):
+    test_prefix = client.transported_path(test_name)
     enable_rk_option(client)
 
     user1 = generate_make_credentials_params(client, ref=1, rk=True)
-    user2 = generate_make_credentials_params(client, ref=2, rk=True)
-    user3 = generate_make_credentials_params(client, ref=3, rk=True)
+    user2 = generate_make_credentials_params(client, ref=2, rk=True,
+                                             client_data_hash=user1.client_data_hash,
+                                             rp=user1.rp)
+    user3 = generate_make_credentials_params(client, ref=3, rk=True,
+                                             client_data_hash=user1.client_data_hash,
+                                             rp=user1.rp)
 
     user2.user["name"] = "user name"
 
@@ -145,9 +150,9 @@ def test_option_rk_get_assertion(client, test_name, transport: TransportType):
         if idx == 2 and "--fast" in sys.argv:
             # Skip additional step on fast mode
             continue
-        compare_args = (TESTS_SPECULOS_DIR, test_name + f"/{idx}/make")
+        compare_args = (TESTS_SPECULOS_DIR, test_prefix + f"/{idx}/make")
         attestation = client.ctap2.make_credential(user,
-                                                   check_screens="fast",
+                                                   check_screens=True,
                                                    compare_args=compare_args)
 
         # Users are then shown in the order with the last created presented first
@@ -155,9 +160,9 @@ def test_option_rk_get_assertion(client, test_name, transport: TransportType):
         simple_login = len(users) == 1
 
         client_data_hash = generate_random_bytes(32)
-        compare_args = (TESTS_SPECULOS_DIR, test_name + f"/{idx}/get_rk")
+        compare_args = (TESTS_SPECULOS_DIR, test_prefix + f"/{idx}/get_rk")
         assertion = client.ctap2.get_assertion(user.rp["id"], client_data_hash,
-                                               check_users=users, check_screens="fast",
+                                               check_users=users, check_screens=True,
                                                simple_login=simple_login, compare_args=compare_args)
         credential_data = AttestedCredentialData(attestation.auth_data.credential_data)
 
@@ -168,11 +173,11 @@ def test_option_rk_get_assertion(client, test_name, transport: TransportType):
         allow_list = [{"id": credential_data.credential_id, "type": "public-key"}] + allow_list
 
         client_data_hash = generate_random_bytes(32)
-        compare_args = (TESTS_SPECULOS_DIR, test_name + f"/{idx}/get_allow_list")
+        compare_args = (TESTS_SPECULOS_DIR, test_prefix + f"/{idx}/get_allow_list")
         assertion = client.ctap2.get_assertion(user.rp["id"], client_data_hash,
                                                allow_list=allow_list,
                                                check_users=[u.user for u in users],
-                                               check_screens="fast",
+                                               check_screens=True,
                                                simple_login=simple_login, compare_args=compare_args)
         assertion.verify(client_data_hash, credential_data.public_key)
         assert assertion.user["id"] == users[0].user["id"]  # first of allow_list selected
@@ -213,24 +218,24 @@ def test_option_rk_key_store_full(client, transport: TransportType):
 @pytest.mark.skipif("--fast" in sys.argv, reason="running in fast mode")
 @pytest.mark.skipif(not ENABLE_RK_CONFIG_UI_SETTING, reason="settings not enable")
 def test_option_rk_overwrite_get_assertion(client, test_name):
+    test_prefix = client.transported_path(test_name)
     enable_rk_option(client)
 
     # Make a first "user1" credential
     args = generate_make_credentials_params(client, ref=1, rk=True)
     args.user["name"] = "user1"
-    compare_args = (TESTS_SPECULOS_DIR, test_name + "/" + "1" + "/make")
+    compare_args = (TESTS_SPECULOS_DIR, test_prefix + "/1/make")
     attestation = client.ctap2.make_credential(args,
-                                               check_screens="fast",
+                                               check_screens=True,
                                                compare_args=compare_args)
     user1_credential_data = AttestedCredentialData(attestation.auth_data.credential_data)
 
     # Verify that a valid assertion can be requested
     client_data_hash = generate_random_bytes(32)
-    compare_args = (TESTS_SPECULOS_DIR, test_name + "/" + "1" + "/get_assertion")
+    compare_args = (TESTS_SPECULOS_DIR, test_prefix + "/1/get_assertion")
     assertion = client.ctap2.get_assertion(args.rp["id"], client_data_hash, None,
-                                           user_accept=True,
                                            check_users=[args.user],
-                                           check_screens="fast",
+                                           check_screens=True,
                                            compare_args=compare_args)
     assertion.verify(client_data_hash, user1_credential_data.public_key)
 
@@ -238,20 +243,19 @@ def test_option_rk_overwrite_get_assertion(client, test_name):
     # RP ID and account ID.
     args.user["name"] = "user2"
     args.client_data_hash = generate_random_bytes(32)
-    compare_args = (TESTS_SPECULOS_DIR, test_name + "/" + "2" + "/make")
+    compare_args = (TESTS_SPECULOS_DIR, test_prefix + "/2/make")
     attestation = client.ctap2.make_credential(args,
-                                               check_screens="fast",
+                                               check_screens=True,
                                                compare_args=compare_args)
     user2_credential_data = AttestedCredentialData(attestation.auth_data.credential_data)
 
     # Verify that a valid assertion can be requested and that the user
     # information displayed are for user2.
     client_data_hash = generate_random_bytes(32)
-    compare_args = (TESTS_SPECULOS_DIR, test_name + "/" + "2" + "/get_assertion")
+    compare_args = (TESTS_SPECULOS_DIR, test_prefix + "/2/get_assertion")
     assertion = client.ctap2.get_assertion(args.rp["id"], client_data_hash, None,
-                                           user_accept=True,
                                            check_users=[args.user],
-                                           check_screens="fast",
+                                           check_screens=True,
                                            compare_args=compare_args)
     assertion.verify(client_data_hash, user2_credential_data.public_key)
 

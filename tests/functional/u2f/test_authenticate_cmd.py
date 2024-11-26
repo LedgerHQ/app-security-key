@@ -6,7 +6,7 @@ from fido2.hid import CTAPHID
 
 from ..client import TESTS_SPECULOS_DIR
 from ..ctap1_client import APDU, U2F_P1
-from ..utils import FIDO_RP_ID_HASH_1, generate_random_bytes
+from ..utils import FIDO_RP_ID_HASH_1, generate_random_bytes, Nav
 
 
 def register(client, _app_param=None):
@@ -31,7 +31,7 @@ def test_authenticate_check_only_ok(client):
                                   app_param,
                                   registration_data.key_handle,
                                   check_only=True,
-                                  user_accept=None)
+                                  navigation=Nav.NONE)
 
     # 0x07 ("check-only"): if the control byte is set to 0x07 by the FIDO Client,
     # the U2F token is supposed to simply check whether the provided key handle
@@ -56,7 +56,7 @@ def test_authenticate_check_only_wrong_key_handle(client):
                                   app_param,
                                   key_handle,
                                   check_only=True,
-                                  user_accept=None)
+                                  navigation=Nav.NONE)
 
     assert e.value.code == APDU.SW_WRONG_DATA
 
@@ -76,7 +76,7 @@ def test_authenticate_check_only_wrong_app_param(client):
                                   app_param,
                                   key_handle,
                                   check_only=True,
-                                  user_accept=None)
+                                  navigation=Nav.NONE)
 
     assert e.value.code == APDU.SW_WRONG_DATA
 
@@ -91,7 +91,7 @@ def test_authenticate_ok(client, test_name):
     authentication_data = client.ctap1.authenticate(challenge,
                                                     app_param,
                                                     registration_data.key_handle,
-                                                    check_screens="full",
+                                                    check_screens=True,
                                                     compare_args=compare_args)
 
     authentication_data.verify(app_param, challenge, registration_data.public_key)
@@ -108,8 +108,8 @@ def test_authenticate_user_refused(client, test_name):
         client.ctap1.authenticate(challenge,
                                   app_param,
                                   registration_data.key_handle,
-                                  user_accept=False,
-                                  check_screens="full",
+                                  navigation=Nav.USER_REFUSE,
+                                  check_screens=True,
                                   compare_args=compare_args)
 
     assert e.value.code == APDU.SW_USER_REFUSED
@@ -180,7 +180,7 @@ def test_authenticate_no_registration(client):
         client.ctap1.authenticate(challenge,
                                   app_param,
                                   key_handle,
-                                  user_accept=None)
+                                  navigation=Nav.NONE)
 
     assert e.value.code == APDU.SW_WRONG_DATA
 
@@ -214,7 +214,7 @@ def test_authenticate_wrong_app_param(client):
         client.ctap1.authenticate(challenge,
                                   app_param,
                                   registration_data.key_handle,
-                                  user_accept=None)
+                                  navigation=Nav.NONE)
 
     assert e.value.code == APDU.SW_WRONG_DATA
 
@@ -232,7 +232,7 @@ def test_authenticate_wrong_key_handle(client):
         client.ctap1.authenticate(challenge,
                                   app_param,
                                   key_handle,
-                                  user_accept=None)
+                                  navigation=Nav.NONE)
 
     assert e.value.code == APDU.SW_WRONG_DATA
 
@@ -249,7 +249,7 @@ def test_authenticate_length_too_short(client):
         client.ctap1.authenticate(challenge,
                                   app_param,
                                   key_handle,
-                                  user_accept=None)
+                                  navigation=Nav.NONE)
 
     assert e.value.code == APDU.SW_WRONG_DATA
 
@@ -266,7 +266,7 @@ def test_authenticate_length_too_long(client):
         client.ctap1.authenticate(challenge,
                                   app_param,
                                   key_handle,
-                                  user_accept=None)
+                                  navigation=Nav.NONE)
 
     assert e.value.code == APDU.SW_WRONG_DATA
 

@@ -5,15 +5,15 @@ from fido2.webauthn import AuthenticatorData, AttestedCredentialData
 
 from ..client import TESTS_SPECULOS_DIR, LedgerAttestationVerifier
 from ..utils import generate_random_bytes, generate_make_credentials_params, \
-    ctap2_get_assertion
+    ctap2_get_assertion, Nav
 
 
 def test_make_credential(client, test_name):
-    compare_args = (TESTS_SPECULOS_DIR, test_name)
+    compare_args = (TESTS_SPECULOS_DIR, client.transported_path(test_name))
     args = generate_make_credentials_params(client, ref=0)
 
     attestation = client.ctap2.make_credential(args,
-                                               check_screens="full",
+                                               check_screens=True,
                                                compare_args=compare_args)
 
     assert attestation.fmt == "packed"
@@ -26,11 +26,11 @@ def test_make_credential(client, test_name):
 
 
 def test_make_credential_certificate(client, test_name):
-    compare_args = (TESTS_SPECULOS_DIR, test_name)
+    compare_args = (TESTS_SPECULOS_DIR, client.transported_path(test_name))
     args = generate_make_credentials_params(client, ref=0)
 
     attestation = client.ctap2.make_credential(args,
-                                               check_screens="full",
+                                               check_screens=True,
                                                compare_args=compare_args)
 
     verifier = LedgerAttestationVerifier(client.firmware)
@@ -38,11 +38,11 @@ def test_make_credential_certificate(client, test_name):
 
 
 def test_make_credential_uv(client, test_name):
-    compare_args = (TESTS_SPECULOS_DIR, test_name)
+    compare_args = (TESTS_SPECULOS_DIR, client.transported_path(test_name))
     args = generate_make_credentials_params(client, ref=0, uv=True)
 
     attestation = client.ctap2.make_credential(args,
-                                               check_screens="full",
+                                               check_screens=True,
                                                compare_args=compare_args)
 
     expected_flags = AuthenticatorData.FLAG.USER_PRESENT
@@ -59,39 +59,40 @@ def test_make_credential_uv(client, test_name):
 
 
 def test_make_credential_up(client, test_name):
-    compare_args = (TESTS_SPECULOS_DIR, test_name)
+    compare_args = (TESTS_SPECULOS_DIR, client.transported_path(test_name))
     # Specs says:
     # "If the "up" option is false, end the operation by returning CTAP2_ERR_INVALID_OPTION."
 
     args = generate_make_credentials_params(client, ref=0, options={"up": False})
 
     with pytest.raises(CtapError) as e:
-        client.ctap2.make_credential(args, user_accept=None)
+        print("YOLO1")
+        client.ctap2.make_credential(args, navigation=Nav.NONE, will_fail=True)
     assert e.value.code == CtapError.ERR.INVALID_OPTION
 
     args.options = {"up": True}
 
+    print("YOLO2")
     client.ctap2.make_credential(args,
-                                 user_accept=True,
-                                 check_screens="full",
+                                 check_screens=True,
                                  compare_args=compare_args)
 
 
-def test_make_credential_rk(client, test_name):
+def test_make_credential_rk(client):
     # Check that option RK can be passed with False value when not supporting RK.
     # This is used on Firefox on Linux and Mac and required by the spec.
     args = generate_make_credentials_params(client, ref=0, rk=False)
-    client.ctap2.make_credential(args, user_accept=True)
+    client.ctap2.make_credential(args)
 
 
 def test_make_credential_exclude_list_ok(client, test_name):
-    compare_args = (TESTS_SPECULOS_DIR, test_name)
+    compare_args = (TESTS_SPECULOS_DIR, client.transported_path(test_name))
     # First check with an absent credential in exclude list
     args1 = generate_make_credentials_params(client, ref=0,
                                              exclude_list=[{"id": generate_random_bytes(64),
                                                             "type": "public-key"}])
     attestation = client.ctap2.make_credential(args1,
-                                               check_screens="full",
+                                               check_screens=True,
                                                compare_args=compare_args)
 
     credential_data = AttestedCredentialData(attestation.auth_data.credential_data)
@@ -108,7 +109,7 @@ def test_make_credential_exclude_list_ok(client, test_name):
         # registered to behave similarly to CTAP1/U2F authenticators."
         # Impact is minor because user as still manually unlocked it's device.
         # therefore user presence is somehow guarantee.
-        attestation = client.ctap2.make_credential(args2, user_accept=None)
+        attestation = client.ctap2.make_credential(args2, navigation=Nav.NONE)
     assert e.value.code == CtapError.ERR.CREDENTIAL_EXCLUDED
 
 
@@ -119,8 +120,8 @@ def test_make_credential_user_refused(client, test_name):
 
     with pytest.raises(CtapError) as e:
         client.ctap2.make_credential(args,
-                                     user_accept=False,
-                                     check_screens="full",
+                                     navigation=Nav.USER_REFUSE,
+                                     check_screens=True,
                                      compare_args=compare_args)
 
     assert e.value.code == CtapError.ERR.OPERATION_DENIED
@@ -154,7 +155,7 @@ def test_make_credential_algos(client):
 
         if not expected_alg:
             with pytest.raises(CtapError) as e:
-                ctap2_get_assertion(client, key_params=key_params, user_accept=None)
+                ctap2_get_assertion(client, key_params=key_params, navigation=Nav.NONE)
 
             assert e.value.code == CtapError.ERR.UNSUPPORTED_ALGORITHM
             continue
@@ -177,7 +178,7 @@ def test_make_credential_rpid_filter(client):
     args.rp["id"] = args.rp["id"].replace("webctap", "www")
     if client.ctap2_u2f_proxy:
         with pytest.raises(CtapError) as e:
-            client.ctap2.make_credential(args, user_accept=None)
+            client.ctap2.make_credential(args, navigation=Nav.NONE)
 
         assert e.value.code == CtapError(0x8E).code
     else:
@@ -185,19 +186,13 @@ def test_make_credential_rpid_filter(client):
 
 
 @pytest.mark.skip_endpoint("NFC", reason="User can't cancel a MAKE_CREDENTIAL on NFC")
-def test_make_credential_cancel(client, test_name):
+def test_make_credential_cancel(client):
     if client.ctap2_u2f_proxy:
         pytest.skip("Does not work with this transport")
 
-    compare_args = (TESTS_SPECULOS_DIR, test_name)
-
     args = generate_make_credentials_params(client)
     with pytest.raises(CtapError) as e:
-        client.ctap2.make_credential(args,
-                                     user_accept=None,
-                                     check_screens="full",
-                                     client_cancel=True,
-                                     compare_args=compare_args)
+        client.ctap2.make_credential(args, navigation=Nav.CLIENT_CANCEL)
     assert e.value.code == CtapError.ERR.KEEPALIVE_CANCEL
 
 
@@ -208,35 +203,35 @@ def test_make_credential_bad_exclude_list(client):
     args.exclude_list = [{"id": generate_random_bytes(64), "type": "public-key"}]
     args.exclude_list.append(["toto"])
     with pytest.raises(CtapError) as e:
-        client.ctap2.make_credential(args, user_accept=None)
+        client.ctap2.make_credential(args, navigation=Nav.NONE)
     assert e.value.code == CtapError.ERR.INVALID_CBOR
 
     # With an element with missing "type"
     args.exclude_list = [{"id": generate_random_bytes(64), "type": "public-key"}]
     args.exclude_list.append({"id": generate_random_bytes(12)})
     with pytest.raises(CtapError) as e:
-        client.ctap2.make_credential(args, user_accept=None)
+        client.ctap2.make_credential(args, navigation=Nav.NONE)
     assert e.value.code == CtapError.ERR.MISSING_PARAMETER
 
     # With an element with bad type for "type"
     args.exclude_list = [{"id": generate_random_bytes(64), "type": "public-key"}]
     args.exclude_list.append({"id": generate_random_bytes(12), "type": b"012451"})
     with pytest.raises(CtapError) as e:
-        client.ctap2.make_credential(args, user_accept=None)
+        client.ctap2.make_credential(args, navigation=Nav.NONE)
     assert e.value.code == CtapError.ERR.INVALID_CBOR
 
     # With an element with missing "id"
     args.exclude_list = [{"id": generate_random_bytes(64), "type": "public-key"}]
     args.exclude_list.append({"type": "public-key"})
     with pytest.raises(CtapError) as e:
-        client.ctap2.make_credential(args, user_accept=None)
+        client.ctap2.make_credential(args, navigation=Nav.NONE)
     assert e.value.code == CtapError.ERR.MISSING_PARAMETER
 
     # With an element with bad type for "id"
     args.exclude_list = [{"id": generate_random_bytes(64), "type": "public-key"}]
     args.exclude_list.append({"id": "bad", "type": "public-key"})
     with pytest.raises(CtapError) as e:
-        client.ctap2.make_credential(args, user_accept=None)
+        client.ctap2.make_credential(args, navigation=Nav.NONE)
     assert e.value.code == CtapError.ERR.CBOR_UNEXPECTED_TYPE
 
 

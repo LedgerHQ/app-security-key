@@ -7,7 +7,7 @@ from fido2.webauthn import AuthenticatorData, AttestedCredentialData
 from ..client import TESTS_SPECULOS_DIR
 from ..transport import TransportType
 from ..utils import generate_random_bytes, ctap2_get_assertion, \
-    generate_make_credentials_params, fido_known_app
+    generate_make_credentials_params, fido_known_app, Nav
 
 
 def test_get_assertion_ok(client, test_name: str):
@@ -34,7 +34,7 @@ def test_get_assertion_ok(client, test_name: str):
     assertion = client.ctap2.get_assertion(t.args.rp["id"], client_data_hash,
                                            allow_list,
                                            check_users=[t.args.user],
-                                           check_screens="full",
+                                           check_screens=True,
                                            compare_args=compare_args)
 
     assertion.verify(client_data_hash, t.credential_data.public_key)
@@ -70,7 +70,7 @@ def test_get_assertion_uv(client, test_name: str):
     assertion = client.ctap2.get_assertion(t.args.rp["id"], client_data_hash,
                                            allow_list, options=options,
                                            check_users=[t.args.user],
-                                           check_screens="full",
+                                           check_screens=True,
                                            compare_args=compare_args)
 
     assertion.verify(client_data_hash, t.credential_data.public_key)
@@ -93,7 +93,7 @@ def test_get_assertion_no_up(client):
     options = {"up": False}
     assertion = client.ctap2.get_assertion(t.args.rp["id"], client_data_hash,
                                            allow_list, options=options,
-                                           user_accept=None)
+                                           navigation=Nav.NONE)
 
     assertion.verify(client_data_hash, t.credential_data.public_key)
 
@@ -114,9 +114,9 @@ def test_get_assertion_user_refused(client, test_name: str):
 
     with pytest.raises(CtapError) as e:
         client.ctap2.get_assertion(t.args.rp["id"], client_data_hash,
-                                   allow_list, user_accept=False,
+                                   allow_list, navigation=Nav.USER_REFUSE,
                                    check_users=[t.args.user],
-                                   check_screens="full",
+                                   check_screens=True,
                                    compare_args=compare_args)
     assert e.value.code == CtapError.ERR.OPERATION_DENIED
 
@@ -128,7 +128,7 @@ def test_get_assertion_no_existing_credentials_simple(client, test_name: str):
     # Try without allow_list
     with pytest.raises(CtapError) as e:
         client.ctap2.get_assertion(args.rp["id"], args.client_data_hash,
-                                   check_screens="full",
+                                   check_screens=True,
                                    compare_args=compare_args,
                                    will_fail=True)
     assert e.value.code == CtapError.ERR.NO_CREDENTIALS
@@ -139,7 +139,7 @@ def test_get_assertion_no_existing_credentials_simple(client, test_name: str):
     with pytest.raises(CtapError) as e:
         client.ctap2.get_assertion(rp["id"], args.client_data_hash,
                                    allow_list,
-                                   check_screens="full",
+                                   check_screens=True,
                                    compare_args=compare_args,
                                    will_fail=True)
     assert e.value.code == CtapError.ERR.NO_CREDENTIALS
@@ -153,7 +153,7 @@ def test_get_assertion_no_credentials_no_up(client, test_name: str):
     with pytest.raises(CtapError) as e:
         client.ctap2.get_assertion(args.rp["id"], args.client_data_hash,
                                    options=options,
-                                   user_accept=None,
+                                   navigation=Nav.NONE,
                                    will_fail=True)
     assert e.value.code == CtapError.ERR.NO_CREDENTIALS
 
@@ -162,7 +162,7 @@ def test_get_assertion_no_credentials_no_up(client, test_name: str):
     allow_list = [{"id": generate_random_bytes(32), "type": "public-key"}]
     with pytest.raises(CtapError) as e:
         client.ctap2.get_assertion(args.rp["id"], args.client_data_hash,
-                                   allow_list, options=options, user_accept=None, will_fail=True)
+                                   allow_list, options=options, navigation=Nav.NONE, will_fail=True)
     assert e.value.code == CtapError.ERR.NO_CREDENTIALS
 
 
@@ -181,7 +181,7 @@ def test_get_assertion_wrong_id(client, test_name: str):
     with pytest.raises(CtapError) as e:
         client.ctap2.get_assertion(t.args.rp["id"], client_data_hash,
                                    allow_list,
-                                   check_screens="full",
+                                   check_screens=True,
                                    compare_args=compare_args,
                                    will_fail=True)
     assert e.value.code == CtapError.ERR.NO_CREDENTIALS
@@ -199,7 +199,7 @@ def test_get_assertion_wrong_rp(client, test_name: str):
     with pytest.raises(CtapError) as e:
         client.ctap2.get_assertion(wrong_rp_id, client_data_hash,
                                    allow_list,
-                                   check_screens="full",
+                                   check_screens=True,
                                    compare_args=compare_args,
                                    will_fail=True)
     assert e.value.code == CtapError.ERR.NO_CREDENTIALS
@@ -241,12 +241,10 @@ def test_get_assertion_allow_list_ok(client, test_name: str, transport: Transpor
     client_data_hash = generate_random_bytes(32)
     assertion = client.ctap2.get_assertion(rp["id"], client_data_hash, allow_list,
                                            simple_login=False,
-                                           user_accept=True,
                                            check_users=registered_users,
-                                           check_screens="full",
+                                           check_screens=True,
                                            compare_args=compare_args,
                                            select_user_idx=3)
-
     if transport is TransportType.NFC:
         # in NFC, SK does not allow user selection: the first working credentials is used.
         expected_idx = 0
@@ -282,7 +280,7 @@ def test_get_assertion_rpid_filter(client):
         # Returned error code is ERROR_PROP_RPID_MEDIA_DENIED 0x8E
         with pytest.raises(CtapError) as e:
             client.ctap2.get_assertion(t.args.rp["id"], client_data_hash,
-                                       allow_list, user_accept=None)
+                                       allow_list, navigation=Nav.NONE)
 
         assert e.value.code == CtapError(0x8E).code
     else:
@@ -306,10 +304,8 @@ def test_get_assertion_cancel(client, test_name):
     allow_list = [{"id": t.credential_data.credential_id, "type": "public-key"}]
     with pytest.raises(CtapError) as e:
         client.ctap2.get_assertion(t.args.rp["id"], client_data_hash,
-                                   allow_list, user_accept=None,
+                                   allow_list, navigation=Nav.CLIENT_CANCEL,
                                    check_users=[t.args.user],
-                                   check_screens="full",
-                                   client_cancel=True,
                                    compare_args=compare_args)
     assert e.value.code == CtapError.ERR.KEEPALIVE_CANCEL
 
@@ -323,7 +319,7 @@ def test_get_assertion_bad_allow_list(client):
     allow_list.append(["toto"])
     with pytest.raises(CtapError) as e:
         client.ctap2.get_assertion(t.args.rp["id"], client_data_hash, allow_list,
-                                   user_accept=None, will_fail=True)
+                                   navigation=Nav.NONE, will_fail=True)
     assert e.value.code == CtapError.ERR.INVALID_CBOR
 
     # With an element with missing "type"
@@ -331,7 +327,7 @@ def test_get_assertion_bad_allow_list(client):
     allow_list.append({"id": t.credential_data.credential_id})
     with pytest.raises(CtapError) as e:
         client.ctap2.get_assertion(t.args.rp["id"], client_data_hash, allow_list,
-                                   user_accept=None, will_fail=True)
+                                   navigation=Nav.NONE, will_fail=True)
     assert e.value.code == CtapError.ERR.MISSING_PARAMETER
 
     # With an element with bad type for "type"
@@ -339,7 +335,7 @@ def test_get_assertion_bad_allow_list(client):
     allow_list.append({"id": t.credential_data.credential_id, "type": b"012451"})
     with pytest.raises(CtapError) as e:
         client.ctap2.get_assertion(t.args.rp["id"], client_data_hash, allow_list,
-                                   user_accept=None, will_fail=True)
+                                   navigation=Nav.NONE, will_fail=True)
     assert e.value.code == CtapError.ERR.INVALID_CBOR
 
     # With an element with missing "id"
@@ -347,7 +343,7 @@ def test_get_assertion_bad_allow_list(client):
     allow_list.append({"type": "public-key"})
     with pytest.raises(CtapError) as e:
         client.ctap2.get_assertion(t.args.rp["id"], client_data_hash, allow_list,
-                                   user_accept=None, will_fail=True)
+                                   navigation=Nav.NONE, will_fail=True)
     assert e.value.code == CtapError.ERR.MISSING_PARAMETER
 
     # With an element with bad type for "id"
@@ -355,7 +351,7 @@ def test_get_assertion_bad_allow_list(client):
     allow_list.append({"id": "bad", "type": "public-key"})
     with pytest.raises(CtapError) as e:
         client.ctap2.get_assertion(t.args.rp["id"], client_data_hash, allow_list,
-                                   user_accept=None, will_fail=True)
+                                   navigation=Nav.NONE, will_fail=True)
     assert e.value.code == CtapError.ERR.CBOR_UNEXPECTED_TYPE
 
 
@@ -369,7 +365,7 @@ def test_get_assertion_duplicate_allow_list_entries(client, test_name):
                                            client_data_hash,
                                            allow_list,
                                            check_users=[t.args.user],
-                                           check_screens="full",
+                                           check_screens=True,
                                            compare_args=compare_args)
 
     assertion.verify(client_data_hash, t.credential_data.public_key)
