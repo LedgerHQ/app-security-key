@@ -1,7 +1,18 @@
 import pytest
 from fido2.ctap import CtapError
 
-from ..utils import generate_random_bytes, ctap2_get_assertion
+from ..utils import generate_random_bytes, ctap2_get_assertion, ENABLE_RK_CONFIG_UI_SETTING, Nav
+from ..transport import TransportType
+
+# This tests reflects the difference of flows depending on NFC or not, RKs or not, AllowList or not,
+# when performing GET_(NEXT_)ASSERTION operations and *several IDs are available*
+# - Not NFC -> User can choose the ID on the screen
+#           -> Chosen ID is returned
+#           -> GET_NEXT_ASSERTION *not* enabled
+# - NFC with AllowList -> The first matching ID is returned
+#                      -> GET_NEXT_ASSERTION *not* enabled
+# - NFC without AllowList, meaning the ID(s) *must* be RK(s) -> The first matching ID is returned
+#                                                            -> GET_NEXT_ASSERTION enabled
 
 
 def test_get_next_assertion_no_context(client):
@@ -14,6 +25,7 @@ def test_get_next_assertion_no_context(client):
 
 
 def test_get_next_assertion_two_credentials_allowlist(client):
+    # Only 'passwordless' (no AllowList) + NFC triggers GET_NEXT_ASSERTION
     t1 = ctap2_get_assertion(client)
     rp = t1.args.rp
     t2 = ctap2_get_assertion(client, rp=rp)
@@ -42,3 +54,50 @@ def test_get_next_assertion_two_credentials_allowlist(client):
     with pytest.raises(CtapError) as e:
         client.ctap2.get_next_assertion()
     assert e.value.code == CtapError.ERR.NOT_ALLOWED
+
+
+@pytest.mark.skipif(not ENABLE_RK_CONFIG_UI_SETTING, reason="settings not enable")
+def test_get_next_assertion_two_credentials_rk(client, transport):
+    # Only 'passwordless' (no AllowList) + NFC triggers GET_NEXT_ASSERTION
+    client.enable_rk_option()
+
+    t1 = ctap2_get_assertion(client, rk=True)
+    rp = t1.args.rp
+    t2 = ctap2_get_assertion(client, rp=rp, rk=True)
+    t3 = ctap2_get_assertion(client, rp=rp, rk=True)
+
+    client_data_hash = generate_random_bytes(32)
+
+    if transport is TransportType.NFC:
+        # nothing displayed in this case
+        assertion = client.ctap2.get_assertion(rp["id"], client_data_hash, navigation=Nav.NONE)
+        # GET_NEXT_ASSERTION is enabled!
+        # 3 credentials are available
+        assert assertion.number_of_credentials == 3
+        # they are sorted by age (youngest first)
+        assertion.verify(client_data_hash, t3.credential_data.public_key)
+
+        # then the two other credentials are returned (also sorted)
+        assertion = client.ctap2.get_next_assertion()
+        # only GET_ASSERTION fills the number of credentials
+        assert assertion.number_of_credentials is None
+        assertion.verify(client_data_hash, t2.credential_data.public_key)
+
+        assertion = client.ctap2.get_next_assertion()
+        assert assertion.number_of_credentials is None
+        assertion.verify(client_data_hash, t1.credential_data.public_key)
+
+        # Eventually all credentials are consumed, another call returns an error
+        with pytest.raises(CtapError) as e:
+            client.ctap2.get_next_assertion()
+        assert e.value.code == CtapError.ERR.NOT_ALLOWED
+    else:
+        assertion = client.ctap2.get_assertion(rp["id"], client_data_hash,
+                                               simple_login=False,
+                                               check_users=None)
+        assert assertion.number_of_credentials is None
+        assertion.verify(client_data_hash, t3.credential_data.public_key)
+
+        with pytest.raises(CtapError) as e:
+            client.ctap2.get_next_assertion()
+        assert e.value.code == CtapError.ERR.NOT_ALLOWED

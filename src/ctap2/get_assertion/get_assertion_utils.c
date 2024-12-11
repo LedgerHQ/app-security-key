@@ -418,7 +418,7 @@ static int build_and_encode_getAssertion_response(uint8_t *buffer,
     }
     // If RK: encoding credential info
     if (credData->residentKey) {
-        const bool encode_username = (g.is_getNextAssertion && credData->userStr != NULL);
+        const bool encode_username = (!g.display_status && credData->userStr != NULL);
         cbip_add_int(&encoder, TAG_RESP_USER);
         cbip_add_map_header(&encoder, encode_username ? 3 : 1);
         cbip_add_string(&encoder, KEY_USER_ID, sizeof(KEY_USER_ID) - 1);

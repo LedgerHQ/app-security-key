@@ -285,9 +285,9 @@ void app_nbgl_status(const char *message, bool is_success, nbgl_callback_t on_qu
         // Truncate display buffers for small police (hence `false`) then format them into the
         // display buffer (which is then used in `centeredInfo.text3`)
         truncate_pairs_for_display(false);
-        prepare_display_status(false);
+        prepare_displayed_message(false);
     } else {
-        prepare_display_status(true);
+        prepare_displayed_message(true);
     }
 
     if (is_success == true) {
@@ -300,7 +300,7 @@ void app_nbgl_status(const char *message, bool is_success, nbgl_callback_t on_qu
         .tickerValue = 3000    // 3 seconds
     };
     onQuit = on_quit;
-    PRINTF("Will be displayed: '%s'\n", g.display_status);
+    PRINTF("Will be displayed: '%s'\n", g.displayed_message);
     nbgl_pageInfoDescription_t info = {
         .bottomButtonStyle = NO_BUTTON_STYLE,
         .footerText = NULL,
@@ -311,7 +311,7 @@ void app_nbgl_status(const char *message, bool is_success, nbgl_callback_t on_qu
         .centeredInfo.text1 = message,
         .centeredInfo.text2 = NULL,
         /* .centeredInfo.text3 = NULL, */
-        .centeredInfo.text3 = g.display_status[0] == 0 ? NULL : &g.display_status[0],
+        .centeredInfo.text3 = g.displayed_message[0] == 0 ? NULL : &g.displayed_message[0],
         .tapActionText = NULL,
         .tapActionToken = QUIT_TOKEN,
         .topRightStyle = NO_BUTTON_STYLE,

@@ -81,10 +81,10 @@ int nfc_io_send_prepared_response() {
     }
 
     int ret = io_send_response_pointer(responseBuffer + start, size, sw);
-    if (sw == SW_NO_ERROR && nfc_status != NULL && !g.is_getNextAssertion) {
+    if (sw == SW_NO_ERROR && nfc_status != NULL && g.display_status) {
         app_nbgl_status(nfc_status, true, ui_idle);
     }
-    g.is_getNextAssertion = false;
+    g.display_status = true;
     return ret;
 }
 

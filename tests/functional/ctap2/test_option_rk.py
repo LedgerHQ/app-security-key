@@ -3,8 +3,6 @@ import sys
 
 from fido2.ctap import CtapError
 from fido2.webauthn import AttestedCredentialData
-from ragger.firmware import Firmware
-from ragger.navigator import NavInsID, NavIns
 from typing import Dict, List
 
 from ..client import TESTS_SPECULOS_DIR
@@ -13,8 +11,7 @@ from ..utils import generate_random_bytes, generate_make_credentials_params, \
     ctap2_get_assertion, ENABLE_RK_CONFIG_UI_SETTING, MakeCredentialArguments, Nav
 
 
-@pytest.mark.skipif(not ENABLE_RK_CONFIG_UI_SETTING,
-                    reason="settings not enable")
+@pytest.mark.skipif(not ENABLE_RK_CONFIG_UI_SETTING, reason="settings not enable")
 def test_option_rk_disabled(client):
     info = client.ctap2.info
     assert not info.options["rk"]
@@ -26,63 +23,9 @@ def test_option_rk_disabled(client):
     assert e.value.code == CtapError.ERR.UNSUPPORTED_OPTION
 
 
-def enable_rk_option(client):
-    info = client.ctap2.info
-    if info.options["rk"]:
-        return
-
-    if not ENABLE_RK_CONFIG_UI_SETTING:
-        raise ValueError("rk and setting not enabled")
-
-    if client.firmware.is_nano:
-        instructions = [
-            # Enter in the settings
-            NavInsID.RIGHT_CLICK,
-            NavInsID.RIGHT_CLICK,
-            NavInsID.RIGHT_CLICK,
-            NavInsID.BOTH_CLICK,
-
-            # Enable and skip "Enabling" message
-            NavInsID.BOTH_CLICK
-        ]
-
-        if client.firmware is not Firmware.NANOS:
-            # Screen 0 -> 5
-            instructions += [NavInsID.RIGHT_CLICK] * 5
-        else:
-            # Screen 0 -> 13
-            instructions += [NavInsID.RIGHT_CLICK] * 13
-
-        instructions += [
-            NavInsID.BOTH_CLICK,
-
-            # Leave settings
-            NavInsID.RIGHT_CLICK,
-            NavInsID.BOTH_CLICK
-        ]
-    else:
-        instructions = [
-            # Enter in the settings
-            NavInsID.USE_CASE_HOME_SETTINGS,
-
-            # Enable and skip "Enabling" message
-            NavIns(NavInsID.CHOICE_CHOOSE, (1,)),
-            NavInsID.USE_CASE_CHOICE_CONFIRM,
-            NavInsID.USE_CASE_STATUS_DISMISS,
-
-            # Leave settings
-            NavInsID.USE_CASE_SETTINGS_MULTI_PAGE_EXIT,
-        ]
-
-    client.navigator.navigate(instructions,
-                              screen_change_before_first_instruction=False)
-
-    client.ctap2._info = client.ctap2.get_info()
-
-
 @pytest.mark.skipif(not ENABLE_RK_CONFIG_UI_SETTING, reason="settings not enable")
 def test_option_rk_enabled(client):
-    enable_rk_option(client)
+    client.enable_rk_option()
 
     info = client.ctap2.info
     assert info.options["rk"]
@@ -90,7 +33,7 @@ def test_option_rk_enabled(client):
 
 @pytest.mark.skipif(not ENABLE_RK_CONFIG_UI_SETTING, reason="settings not enable")
 def test_option_rk_make_cred_exclude_refused(client, test_name):
-    enable_rk_option(client)
+    client.enable_rk_option()
 
     compare_args = (TESTS_SPECULOS_DIR, client.transported_path(test_name))
     # Spec says that:
@@ -131,7 +74,7 @@ def test_option_rk_make_cred_exclude_refused(client, test_name):
 @pytest.mark.skipif(not ENABLE_RK_CONFIG_UI_SETTING, reason="settings not enable")
 def test_option_rk_get_assertion(client, test_name, transport: TransportType):
     test_prefix = client.transported_path(test_name)
-    enable_rk_option(client)
+    client.enable_rk_option()
 
     user1 = generate_make_credentials_params(client, ref=1, rk=True)
     user2 = generate_make_credentials_params(client, ref=2, rk=True,
@@ -195,7 +138,7 @@ def test_option_rk_get_assertion(client, test_name, transport: TransportType):
 @pytest.mark.skipif("--fast" in sys.argv, reason="running in fast mode")
 @pytest.mark.skipif(not ENABLE_RK_CONFIG_UI_SETTING, reason="settings not enable")
 def test_option_rk_key_store_full(client, transport: TransportType):
-    enable_rk_option(client)
+    client.enable_rk_option()
 
     # Check that at some point KEY_STORE_FULL error is returned
     with pytest.raises(CtapError) as e:
@@ -219,7 +162,7 @@ def test_option_rk_key_store_full(client, transport: TransportType):
 @pytest.mark.skipif(not ENABLE_RK_CONFIG_UI_SETTING, reason="settings not enable")
 def test_option_rk_overwrite_get_assertion(client, test_name):
     test_prefix = client.transported_path(test_name)
-    enable_rk_option(client)
+    client.enable_rk_option()
 
     # Make a first "user1" credential
     args = generate_make_credentials_params(client, ref=1, rk=True)

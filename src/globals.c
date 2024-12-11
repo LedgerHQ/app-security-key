@@ -68,14 +68,18 @@ void truncate_pairs_for_display(bool large) {
     PRINTF("buffer2_65 after truncation: '%s'\n", g.buffer2_65);
 }
 
-void prepare_display_status(bool clean_buffer) {
+void prepare_displayed_message(bool clean_buffer) {
     if (clean_buffer) {
         PRINTF("NO NFC or cleaning, so no display status for buffer1_65 '%s' and buffer2_65 '%s'\n",
                g.buffer1_65,
                g.buffer2_65);
-        g.display_status[0] = '\0';
+        g.displayed_message[0] = '\0';
         return;
     }
-    snprintf(g.display_status, sizeof(g.display_status), "%s\n%s", g.buffer1_65, g.buffer2_65);
-    PRINTF("NFC so display status is: '%s'\n", g.display_status);
+    snprintf(g.displayed_message,
+             sizeof(g.displayed_message),
+             "%s\n%s",
+             g.buffer1_65,
+             g.buffer2_65);
+    PRINTF("NFC so display status is: '%s'\n", g.displayed_message);
 }

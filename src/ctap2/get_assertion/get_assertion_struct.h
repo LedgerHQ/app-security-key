@@ -36,7 +36,8 @@ typedef struct ctap2_assert_data_s {
     uint8_t *buffer;  // pointer to the CBOR message in the APDU buffer
     char *rpId;
     uint32_t rpIdLen;
-    uint8_t *clientDataHash;  // size of CX_SHA256_SIZE
+    uint8_t clientDataHash[CX_SHA256_SIZE];  // Could be reused over successive GET_ASSERTION /
+                                             // GET_NEXT_ASSERTION calls
     uint8_t *credId;
     uint32_t credIdLen;
     uint8_t *nonce;

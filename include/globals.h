@@ -99,9 +99,10 @@ typedef struct global_s {
     char buffer_20[20];
     char buffer1_65[NAME_BUFFER_SIZE];
     char buffer2_65[NAME_BUFFER_SIZE];
-    char display_status[131];
+    char displayed_message[131];
     bool is_nfc;
-    bool is_getNextAssertion;
+    bool display_status;
+    bool get_next_assertion_enabled;
 } global_t;
 
 extern global_t g;
@@ -164,7 +165,7 @@ void truncate_pairs_for_display(bool large);
  *
  * @param clean_buffer: always insert a '\0' character at the beginning of the buffer
  */
-void prepare_display_status(bool clean_buffer);
+void prepare_displayed_message(bool clean_buffer);
 
 void ctap2_display_copy_username(const char *name, uint8_t nameLength);
 void ctap2_display_copy_rp(const char *name, uint8_t nameLength);

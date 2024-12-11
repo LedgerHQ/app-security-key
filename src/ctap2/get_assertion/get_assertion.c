@@ -62,12 +62,9 @@ static int decode_clientDataHash(cbipDecoder_t *decoder, cbipItem_t *mapItem) {
     ctap2_assert_data_t *ctap2AssertData = globals_get_ctap2_assert_data();
     uint32_t itemLength;
     int status;
+    uint8_t *tmp_ptr;
 
-    status = cbiph_get_map_key_bytes(decoder,
-                                     mapItem,
-                                     TAG_CLIENT_DATA_HASH,
-                                     &ctap2AssertData->clientDataHash,
-                                     &itemLength);
+    status = cbiph_get_map_key_bytes(decoder, mapItem, TAG_CLIENT_DATA_HASH, &tmp_ptr, &itemLength);
     if (status != CBIPH_STATUS_FOUND) {
         PRINTF("Error fetching clientDataHash\n");
         return cbiph_map_cbor_error(status);
@@ -76,6 +73,9 @@ static int decode_clientDataHash(cbipDecoder_t *decoder, cbipItem_t *mapItem) {
         PRINTF("Invalid clientDataHash length\n");
         return ERROR_INVALID_CBOR;
     }
+    // The clientDataHash can be reused on successive calls (GET_ASSERTION / GET_NEXT_ASSERTION),
+    // thus it must be stored in static memory so its content  won't change across several calls
+    memcpy(ctap2AssertData->clientDataHash, tmp_ptr, CX_SHA256_SIZE);
     return 0;
 }
 
@@ -263,7 +263,10 @@ static void nfc_handle_get_assertion() {
         if (ctap2AssertData->availableCredentials > 1) {
             // This settings will disable the app_nbgl_status call (nothing displayed on SK)
             // Else, this would lead the app to respond too slowly, and the client to bug out
-            g.is_getNextAssertion = true;
+            g.display_status = false;
+            // This settings will allow the client to get info from possibly
+            // following GET_NEXT_ASSERTION calls
+            g.get_next_assertion_enabled = true;
         }
         if (ctap2AssertData->availableCredentials == 0) {
             send_cbor_error(&G_io_u2f, ERROR_NO_CREDENTIALS);
@@ -290,6 +293,8 @@ void ctap2_get_assertion_handle(u2f_service_t *service, uint8_t *buffer, uint16_
 
     PRINTF("CTAP2 get_assertion_handle\n");
 
+    // GET_NEXT_ASSERTION flow is disabled by default.
+    g.get_next_assertion_enabled = false;
     memset(ctap2AssertData, 0, sizeof(ctap2_assert_data_t));
     ctap2AssertData->buffer = buffer;
 

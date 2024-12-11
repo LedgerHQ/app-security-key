@@ -28,8 +28,8 @@ void ctap2_get_next_assertion_handle(u2f_service_t *service, uint8_t *buffer, ui
     UNUSED(length);
     ctap2_assert_data_t *ctap2AssertData = globals_get_ctap2_assert_data();
 
-    if (ctap2AssertData->allowListPresent) {
-        PRINTF("GET_NEXT_ASSERTION not implemented for non-RK credentials.\n");
+    if (!g.get_next_assertion_enabled) {
+        PRINTF("GET_NEXT_ASSERTION only implemented for RK credentials over NFC.\n");
         send_cbor_error(service, ERROR_NOT_ALLOWED);
         return;
     } else {
@@ -45,7 +45,7 @@ void ctap2_get_next_assertion_handle(u2f_service_t *service, uint8_t *buffer, ui
             send_cbor_error(service, ERROR_NOT_ALLOWED);
             return;
         }
-        g.is_getNextAssertion = true;
+        g.display_status = false;
         get_assertion_send();
     }
 }

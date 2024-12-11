@@ -159,3 +159,44 @@ class TestClient:
 
         self.navigator.navigate(instructions,
                                 screen_change_before_first_instruction=False)
+
+    def enable_rk_option(self):
+        if self.ctap2.info.options["rk"]:
+            return
+
+        if self.firmware.is_nano:
+            instructions = [
+                # Enter in the settings
+                NavInsID.RIGHT_CLICK,
+                NavInsID.RIGHT_CLICK,
+                NavInsID.RIGHT_CLICK,
+                NavInsID.BOTH_CLICK,
+                # Enable and skip "Enabling" message
+                NavInsID.BOTH_CLICK
+            ]
+            if self.firmware is not Firmware.NANOS:
+                # Screen 0 -> 5
+                instructions += [NavInsID.RIGHT_CLICK] * 5
+            else:
+                # Screen 0 -> 13
+                instructions += [NavInsID.RIGHT_CLICK] * 13
+            instructions += [
+                NavInsID.BOTH_CLICK,
+                # Leave settings
+                NavInsID.RIGHT_CLICK,
+                NavInsID.BOTH_CLICK
+            ]
+        else:
+            instructions = [
+                # Enter in the settings
+                NavInsID.USE_CASE_HOME_SETTINGS,
+                # Enable and skip "Enabling" message
+                NavIns(NavInsID.CHOICE_CHOOSE, (1,)),
+                NavInsID.USE_CASE_CHOICE_CONFIRM,
+                NavInsID.USE_CASE_STATUS_DISMISS,
+                # Leave settings
+                NavInsID.USE_CASE_SETTINGS_MULTI_PAGE_EXIT,
+            ]
+
+        self.navigator.navigate(instructions, screen_change_before_first_instruction=False)
+        self.ctap2._info = self.ctap2.get_info()
