@@ -228,7 +228,7 @@ static int u2f_handle_apdu_enroll(const uint8_t *rx, uint32_t data_length, const
 
         nfc_io_set_response_ready(sw, length, "Registration details\nsent");
 
-        return nfc_io_send_prepared_response(false);
+        return nfc_io_send_prepared_response();
     } else if (CMD_IS_OVER_U2F_USB) {
         u2f_message_set_autoreply_wait_user_presence(&G_io_u2f, true);
     }
@@ -335,6 +335,7 @@ static int u2f_handle_apdu_get_version(const uint8_t *rx,
 }
 
 static int u2f_handle_apdu_ctap2_proxy(uint8_t *rx, int data_length, uint8_t *data) {
+    PRINTF("ctap2_proxy\n");
     if ((rx[OFFSET_P1] != 0) || (rx[OFFSET_P2] != 0)) {
         return io_send_sw(SW_INCORRECT_P1P2);
     }
@@ -393,7 +394,6 @@ int u2f_handle_apdu(uint8_t *rx, int rx_length) {
                 return u2f_handle_apdu_get_version(rx, data_length, data);
 
             case FIDO_INS_CTAP2_PROXY:
-                PRINTF("ctap2_proxy\n");
                 return u2f_handle_apdu_ctap2_proxy(rx, data_length, data);
 
             case FIDO_INS_APPLET_SELECT:
@@ -405,31 +405,30 @@ int u2f_handle_apdu(uint8_t *rx, int rx_length) {
                 if (!CMD_IS_OVER_U2F_NFC) {
                     return io_send_sw(SW_INS_NOT_SUPPORTED);
                 }
-                return nfc_io_send_prepared_response(false);
+                return nfc_io_send_prepared_response();
 
             default:
-                PRINTF("unsupported\n");
+                PRINTF("FIDO default unsupported\n");
                 return io_send_sw(SW_INS_NOT_SUPPORTED);
         }
     } else if (CMD_IS_OVER_U2F_NFC && (rx[OFFSET_CLA] == FIDO2_NFC_CLA)) {
         switch (rx[OFFSET_INS]) {
             case FIDO2_NFC_INS_CTAP2_PROXY:
-                PRINTF("ctap2_proxy\n");
                 return u2f_handle_apdu_ctap2_proxy(rx, data_length, data);
 
             case 0x11:
                 PRINTF("NFCCTAP_GETRESPONSE\n");
-                return nfc_io_send_prepared_response(false);
+                return nfc_io_send_prepared_response();
 
             case FIDO2_NFC_INS_APPLET_DESELECT:
-                PRINTF("unsupported\n");
+                PRINTF("NFC APPLET unsupported\n");
                 return io_send_sw(SW_INS_NOT_SUPPORTED);
 
             case 0xc0:
-                return nfc_io_send_prepared_response(false);
+                return nfc_io_send_prepared_response();
 
             default:
-                PRINTF("unsupported\n");
+                PRINTF("NFC default unsupported\n");
                 return io_send_sw(SW_INS_NOT_SUPPORTED);
         }
     } else if (CMD_IS_OVER_U2F_NFC && (rx[OFFSET_CLA] == FIDO2_NFC_CHAINING_CLA)) {
@@ -441,7 +440,7 @@ int u2f_handle_apdu(uint8_t *rx, int rx_length) {
                 return io_send_sw(0x9000);
 
             default:
-                PRINTF("unsupported\n");
+                PRINTF("Default unsupported\n");
                 return io_send_sw(SW_INS_NOT_SUPPORTED);
         }
     } else {

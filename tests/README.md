@@ -8,10 +8,10 @@ A great one is https://webauthn.me/. And especially its [debugger](https://webau
 
 ## Speculos functional test
 
-Some functional tests are located in `tests/speculos/` directory.
+The functional tests are located in the `tests/functional/` directory.
 They are using the Python client of [Speculos](https://github.com/LedgerHQ/speculos) to run the tests directly on the Speculos emulator.
 
-See dedicated `README.md` in `tests/speculos` directory for how to launch them.
+See dedicated `README.md` in `tests/functional/` directory for how to launch them.
 
 
 ## Unit test

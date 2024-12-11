@@ -162,7 +162,7 @@ ENABLE_NFC = 1
 ##############
 
 # Application source files
-APP_SOURCE_PATH  += src src-cbor
+APP_SOURCE_PATH  += src cbor-src
 SDK_SOURCE_PATH  += lib_u2f
 
 ifeq ($(API_LEVEL),)

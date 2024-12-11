@@ -20,16 +20,18 @@
 #define __CTAP2_H__
 
 #ifndef UNIT_TESTS
-#include "cx.h"
+#include <cx.h>
+#include <os_io_seproxyhal.h>
 
-#include "u2f_service.h"
-#include "u2f_transport.h"
+#include <u2f_service.h>
+#include <u2f_transport.h>
 #else
 #include "unit_test.h"
 #endif
 
 #include "cbip_decode.h"
 #include "extension_hmac_secret.h"
+#include "ctap2_utils.h"
 
 #define RP_ID_HASH_SIZE             CX_SHA256_SIZE
 #define CRED_RANDOM_SIZE            32
@@ -87,101 +89,7 @@
 
 #define FLAG_EXTENSION_HMAC_SECRET 0x01
 
-// Helper to detect if CTAP2_CBOR_CMD command is proxyied over U2F_CMD
-// - CTAP2 calls that are CTAP2_CMD_CBOR commands:
-//   There is a direct call from lib_stusb_impl/u2f_impl.c:u2f_message_complete()
-//   to ctap2_handle_cmd_cbor(), hence G_io_app.apdu_state = APDU_IDLE
-// - CTAP2 calls that are encapsulated on an APDU over U2F_CMD_MSG command
-//   This calls goes through:
-//   - lib_stusb_impl/u2f_impl.c:u2f_message_complete()
-//   - lib_stusb_impl/u2f_impl.c:u2f_handle_cmd_msg()
-//   - ....
-//   - src/main.c:sample_main()
-//   - src/u2f_processing.c:handleApdu()
-//   In this case G_io_app.apdu_state is set to APDU_U2F in
-//   lib_stusb_impl/u2f_impl.c:u2f_handle_cmd_msg()
-#define CMD_IS_OVER_U2F_CMD        (G_io_app.apdu_state != APDU_IDLE)
-#define CMD_IS_OVER_CTAP2_CBOR_CMD (G_io_app.apdu_state == APDU_IDLE)
-
-#define CMD_IS_OVER_U2F_USB (G_io_u2f.media == U2F_MEDIA_USB)
-
-#ifdef HAVE_NFC
-#define CMD_IS_OVER_U2F_NFC (G_io_app.apdu_media == IO_APDU_MEDIA_NFC)
-void nfc_idle_work2(void);
-#else
-#define CMD_IS_OVER_U2F_NFC false
-#endif
-
 extern const uint8_t AAGUID[16];
-
-typedef struct ctap2_register_data_s {
-    uint8_t rpIdHash[CX_SHA256_SIZE];
-    uint8_t *buffer;  // pointer to the CBOR message in the APDU buffer
-    char *rpId;
-    uint32_t rpIdLen;
-    uint8_t *clientDataHash;
-    uint8_t *userId;
-    uint32_t userIdLen;
-    char *userStr;
-    uint32_t userStrLen;
-    int coseAlgorithm;     // algorithm chosen following the request message
-    uint8_t pinRequired;   // set if uv is set
-    uint8_t pinPresented;  // set if the PIN request was acknowledged by the user
-    uint8_t
-        clientPinAuthenticated;  // set if a standard FIDO client PIN authentication was performed
-    uint8_t residentKey;         // set if the credential shall be created as a resident key
-    uint8_t extensions;          // extensions flags as a bitmask
-} ctap2_register_data_t;
-
-typedef union ctap2_assert_multiple_flow_data_s {
-    struct {
-        cbipItem_t credentialItem;
-        uint32_t currentCredential;
-    } allowList;
-    struct {
-        uint16_t minAge;
-    } rk;
-} ctap2_assert_multiple_flow_data_t;
-
-typedef struct ctap2_assert_data_s {
-    uint8_t rpIdHash[CX_SHA256_SIZE];
-    uint8_t *buffer;  // pointer to the CBOR message in the APDU buffer
-    char *rpId;
-    uint32_t rpIdLen;
-    uint8_t *clientDataHash;
-    uint8_t *credId;
-    uint32_t credIdLen;
-    uint8_t *nonce;
-    uint8_t *credential;
-    uint32_t credentialLen;
-    uint8_t pinRequired;   // set if uv is set
-    uint8_t pinPresented;  // set if the PIN request was acknowledged by the user
-    uint8_t
-        clientPinAuthenticated;    // set if a standard FIDO client PIN authentication was performed
-    uint8_t userPresenceRequired;  // set if up is set
-    uint8_t extensions;            // extensions flags as a bitmask
-
-    uint8_t allowListPresent;
-    uint16_t availableCredentials;
-
-    // Multiple flow data
-    uint16_t currentCredentialIndex;
-    ctap2_assert_multiple_flow_data_t multipleFlowData;
-} ctap2_assert_data_t;
-
-typedef enum ctap2_ux_state_e {
-    CTAP2_UX_STATE_NONE = 0,
-    CTAP2_UX_STATE_MAKE_CRED,
-    CTAP2_UX_STATE_GET_ASSERTION,
-    CTAP2_UX_STATE_MULTIPLE_ASSERTION,
-    CTAP2_UX_STATE_NO_ASSERTION,
-    CTAP2_UX_STATE_RESET,
-} ctap2_ux_state_t;
-
-bool ctap2_check_rpid_filter(const char *rpId, uint32_t rpIdLen);
-void send_cbor_error(u2f_service_t *service, uint8_t error);
-void send_cbor_response(u2f_service_t *service, uint32_t length);
-void ctap2_send_keepalive_processing(void);
 
 // Correspond to FIDO2.1 spec performBuiltInUv() operation
 void performBuiltInUv(void);
@@ -192,19 +100,6 @@ void ctap2_get_next_assertion_handle(u2f_service_t *service, uint8_t *buffer, ui
 void ctap2_get_info_handle(u2f_service_t *service, uint8_t *buffer, uint16_t length);
 void ctap2_client_pin_handle(u2f_service_t *service, uint8_t *buffer, uint16_t length);
 void ctap2_reset_handle(u2f_service_t *service, uint8_t *buffer, uint16_t length);
-
-void ctap2_make_credential_ux(void);
-void ctap2_make_credential_confirm(void);
-void ctap2_make_credential_user_cancel(void);
-
-void ctap2_get_assertion_ux(ctap2_ux_state_t state);
-void ctap2_get_assertion_credential_idx(uint16_t idx);
-void ctap2_get_assertion_confirm(uint16_t idx);
-void ctap2_get_assertion_user_cancel(void);
-
-void ctap2_reset_ux(void);
-void ctap2_reset_confirm(void);
-void ctap2_reset_cancel(void);
 
 void ctap2_client_pin_reset_ctx(void);
 
