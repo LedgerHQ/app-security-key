@@ -24,6 +24,7 @@
 #include "globals.h"
 #include "config.h"
 #include "u2f_process.h"
+#include "u2f_processing.h"
 #include "ui_shared.h"
 #include "ctap2.h"
 #include "rk_storage.h"

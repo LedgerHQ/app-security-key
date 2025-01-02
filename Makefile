@@ -153,6 +153,8 @@ else
 DEFINES += RK_SIZE=6144
 endif
 
+DISABLE_OS_IO_STACK_USE = 1
+
 ifneq ($(DEBUG), 0)
     DEFINES += DEBUG_UI
 endif

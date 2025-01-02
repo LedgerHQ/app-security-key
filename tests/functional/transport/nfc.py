@@ -1,3 +1,4 @@
+import time
 from fido2.ctap import CtapDevice, CtapError
 from fido2.hid import CAPABILITY, CTAPHID
 
@@ -19,6 +20,7 @@ class LedgerCtapNFCDevice(CtapDevice):
     transport = TransportType.NFC
 
     def __init__(self, backend: BackendInterface, debug: bool = False):
+        time.sleep(1)
         self.debug = debug
         self._backend = backend
 
