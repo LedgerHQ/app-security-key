@@ -17,7 +17,7 @@
 ********************************************************************************/
 
 #include <lib_standard_app/io.h>
-#include <lib_u2f/include/u2f_processing.h>
+#include "u2f_processing.h"
 
 #include "ctap2.h"
 #include "ctap2_utils.h"
@@ -58,7 +58,9 @@ void send_cbor_response(u2f_service_t *service, uint32_t length, const char *sta
 void ctap2_send_keepalive_processing() {
     if (CMD_IS_OVER_CTAP2_CBOR_CMD) {
         u2f_transport_ctap2_send_keepalive(&G_io_u2f, KEEPALIVE_REASON_PROCESSING);
+#ifndef REVAMPED_IO
         io_seproxyhal_io_heartbeat();
+#endif  // !REVAMPED_IO
     }
 }
 

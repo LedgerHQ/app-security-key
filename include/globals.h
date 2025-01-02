@@ -83,8 +83,15 @@ static const uint8_t FIDO_AID[FIDO_AID_SIZE] = {0xA0, 0x00, 0x00, 0x06, 0x47, 0x
 //   - src/u2f_processing.c:handleApdu()
 //   In this case G_io_app.apdu_state is set to APDU_U2F in
 //   lib_stusb_impl/u2f_impl.c:u2f_handle_cmd_msg()
+#ifdef REVAMPED_IO
+#define CMD_IS_OVER_U2F_CMD \
+    ((G_io_app.apdu_state == APDU_U2F) || (G_io_app.apdu_state == APDU_USB_HID))
+#define CMD_IS_OVER_CTAP2_CBOR_CMD   (G_io_app.apdu_state == APDU_U2F_CBOR)
+#define CMD_IS_OVER_CTAP2_CANCEL_CMD (G_io_app.apdu_state == APDU_U2F_CANCEL)
+#else  // !REVAMPED_IO
 #define CMD_IS_OVER_U2F_CMD        (G_io_app.apdu_state != APDU_IDLE)
 #define CMD_IS_OVER_CTAP2_CBOR_CMD (G_io_app.apdu_state == APDU_IDLE)
+#endif  // !REVAMPED_IO
 
 #define CMD_IS_OVER_U2F_USB (G_io_u2f.media == U2F_MEDIA_USB)
 

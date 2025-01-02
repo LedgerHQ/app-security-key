@@ -368,9 +368,19 @@ int u2f_handle_apdu(uint8_t *rx, int rx_length) {
     // PRINTF("Media handleApdu %d\n", G_io_app.apdu_state);
 
     // Make sure cmd is detected as over U2F_CMD and not as CMD_IS_OVER_CTAP2_CBOR_CMD
+#ifdef REVAMPED_IO
+    if (CMD_IS_OVER_CTAP2_CBOR_CMD) {
+        ctap2_handle_cmd_cbor(&G_io_u2f, rx, rx_length);
+        return 0;
+    } else if (CMD_IS_OVER_CTAP2_CANCEL_CMD) {
+        ctap2_handle_cmd_cancel(&G_io_u2f, rx, rx_length);
+        return 0;
+    }
+#else   //  !REVAMPED_IO
     if (!CMD_IS_OVER_U2F_CMD) {
         return io_send_sw(SW_CONDITIONS_NOT_SATISFIED);
     }
+#endif  // REVAMPED_IO
 
     int data_length = u2f_get_cmd_msg_data(rx, rx_length, &data, &le);
     if (data_length < 0) {
