@@ -321,7 +321,7 @@ void ctap2_make_credential_confirm() {
 
 exit:
     if (status == 0) {
-        send_cbor_response(&G_io_u2f, 1 + dataLen, CTAP2_REGISTRATION, false);
+        send_cbor_response(&G_io_u2f, 1 + dataLen, CTAP2_REGISTRATION);
     } else {
         send_cbor_error(&G_io_u2f, status);
     }

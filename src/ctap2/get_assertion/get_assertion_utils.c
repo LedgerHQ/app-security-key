@@ -199,8 +199,11 @@ static int build_authData(uint8_t *buffer, uint32_t bufferLength, uint32_t *auth
     cbipEncoder_t encoder;
     int status;
 
+    // rpIdHash
     memmove(buffer, ctap2AssertData->rpIdHash, CX_SHA256_SIZE);
     offset += CX_SHA256_SIZE;
+
+    // flags
     buffer[offset] = 0;
     if (ctap2AssertData->pinRequired || ctap2AssertData->clientPinAuthenticated) {
         buffer[offset] |= AUTHDATA_FLAG_USER_VERIFIED;
@@ -212,8 +215,14 @@ static int build_authData(uint8_t *buffer, uint32_t bufferLength, uint32_t *auth
         buffer[offset] |= AUTHDATA_FLAG_EXTENSION_DATA_PRESENT;
     }
     offset++;
+
+    // signCount
     config_increase_and_get_authentification_counter(buffer + offset);
     offset += 4;
+
+    // attestedCredentialData - not managed
+
+    // extensions
     if (ctap2AssertData->extensions != 0) {
         uint8_t extensionsSize = 0;
         if ((ctap2AssertData->extensions & FLAG_EXTENSION_HMAC_SECRET) != 0) {
@@ -258,12 +267,12 @@ static int build_authData(uint8_t *buffer, uint32_t bufferLength, uint32_t *auth
 
 #define WRAPPED_CREDENTIAL_OFFSET 200
 
-static int sign_and_encode_authData(cbipEncoder_t *encoder,
-                                    uint8_t *authData,
-                                    uint32_t authDataLen,
-                                    uint8_t *buffer,
-                                    uint32_t bufferLen,
-                                    credential_data_t *credData) {
+static int sign_and_encode_credential_authData_signature(cbipEncoder_t *encoder,
+                                                         uint8_t *authData,
+                                                         uint32_t authDataLen,
+                                                         uint8_t *buffer,
+                                                         uint32_t bufferLen,
+                                                         credential_data_t *credData) {
     ctap2_assert_data_t *ctap2AssertData = globals_get_ctap2_assert_data();
     uint8_t attestationSignature[72];
     uint32_t signatureLength;
@@ -379,12 +388,18 @@ static int sign_and_encode_authData(cbipEncoder_t *encoder,
     return encoder->offset;
 }
 
+/*
+ * Builds and prepares the `authData`, `signature`, and *if RK* `user` and `numberOfCredentials`
+ * fields of the answer to the GET_ASSERTION or GET_NEXT_ASSERTION requests.
+ *
+ */
 static int build_and_encode_getAssertion_response(uint8_t *buffer,
                                                   uint32_t bufferLen,
                                                   credential_data_t *credData,
                                                   uint32_t *resultLen) {
     ctap2_assert_data_t *ctap2AssertData = globals_get_ctap2_assert_data();
     cbipEncoder_t encoder;
+    // credential + auth data + signature // + user selected
     uint8_t mapSize = 3;
     uint32_t dataLen;
     // Build authenticator data
@@ -411,12 +426,12 @@ static int build_and_encode_getAssertion_response(uint8_t *buffer,
     ctap2_send_keepalive_processing();
 
     // Encoding authData and its signature
-    status = sign_and_encode_authData(&encoder,
-                                      shared_ctx.sharedBuffer,
-                                      dataLen,
-                                      buffer,
-                                      bufferLen,
-                                      credData);
+    status = sign_and_encode_credential_authData_signature(&encoder,
+                                                           shared_ctx.sharedBuffer,
+                                                           dataLen,
+                                                           buffer,
+                                                           bufferLen,
+                                                           credData);
     if (status < 0) {
         return status;
     }
@@ -633,7 +648,7 @@ void get_assertion_send(void) {
 exit:
     if (status == 0) {
         // 1 + dataLen: 210
-        send_cbor_response(&G_io_u2f, 1 + dataLen, CTAP2_LOGIN, true);
+        send_cbor_response(&G_io_u2f, 1 + dataLen, CTAP2_LOGIN);
     } else {
         PRINTF("GET_ASSERTION build / encoding failed '%d'\n", status);
         send_cbor_error(&G_io_u2f, status);

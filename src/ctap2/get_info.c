@@ -35,9 +35,13 @@
 #define TAG_PIN_PROTOCOLS                0x06
 #define TAG_MAX_CREDENTIAL_COUNT_IN_LIST 0x07
 #define TAG_MAX_CREDENTIAL_ID_LENGTH     0x08
+#define TAG_TRANSPORTS                   0x09
 
 #define VERSION_U2F   "U2F_V2"
 #define VERSION_FIDO2 "FIDO_2_0"
+
+#define TRANSPORT_USB "usb"
+#define TRANSPORT_NFC "nfc"
 
 void ctap2_get_info_handle(u2f_service_t *service, uint8_t *buffer, uint16_t length) {
     UNUSED(buffer);
@@ -49,7 +53,7 @@ void ctap2_get_info_handle(u2f_service_t *service, uint8_t *buffer, uint16_t len
 
     cbip_encoder_init(&encoder, responseBuffer + 1, CUSTOM_IO_APDU_BUFFER_SIZE - 1);
 
-    cbip_add_map_header(&encoder, 6);
+    cbip_add_map_header(&encoder, 7);
 
     // versions (0x01)
 
@@ -96,6 +100,13 @@ void ctap2_get_info_handle(u2f_service_t *service, uint8_t *buffer, uint16_t len
     cbip_add_int(&encoder, TAG_PIN_PROTOCOLS);
     cbip_add_array_header(&encoder, 1);
     cbip_add_int(&encoder, PIN_PROTOCOL_VERSION_V1);
+
+    // transports (0x09)
+
+    cbip_add_int(&encoder, TAG_TRANSPORTS);
+    cbip_add_array_header(&encoder, 2);
+    cbip_add_string(&encoder, TRANSPORT_USB, sizeof(TRANSPORT_USB) - 1);
+    cbip_add_string(&encoder, TRANSPORT_NFC, sizeof(TRANSPORT_NFC) - 1);
 
     responseBuffer[0] = ERROR_NONE;
     send_cbor_response(service, 1 + encoder.offset, NULL);

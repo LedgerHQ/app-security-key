@@ -172,7 +172,9 @@ static int decode_options(cbipDecoder_t *decoder, cbipItem_t *mapItem) {
     int status = CBIPH_STATUS_NOT_FOUND;
     bool boolValue;
 
+    // UP true by default, UV false by default
     ctap2AssertData->userPresenceRequired = true;
+    ctap2AssertData->pinRequired = false;
     CHECK_MAP_KEY_ITEM_IS_VALID(decoder, mapItem, TAG_OPTIONS, optionsItem, cbipMap);
     if (status == CBIPH_STATUS_FOUND) {
         // Forbidden option
@@ -238,7 +240,9 @@ static int decode_pin(cbipDecoder_t *decoder, cbipItem_t *mapItem) {
         if (status != ERROR_NONE) {
             return ERROR_PIN_AUTH_INVALID;
         }
-
+        // from spec: """pinUvAuthParam and the "uv" option are processed as mutually exclusive
+        //               with pinUvAuthParam taking precedence."""
+        ctap2AssertData->pinRequired = false;
         ctap2AssertData->clientPinAuthenticated = 1;
         PRINTF("Client PIN authenticated\n");
     }
