@@ -166,8 +166,12 @@ class LedgerCtap2(Ctap2, LedgerCTAP):
 
         return AttestationResponse.from_dict(self.parse_response(response))
 
-    def get_assertion(self, rp_id, client_data_hash, allow_list=None,
-                      extensions=None, options=None, pin_uv_param=None,
+    def get_assertion(self, rp_id,
+                      client_data_hash,
+                      allow_list=None,
+                      extensions=None,
+                      options=None,
+                      pin_uv_param=None,
                       pin_uv_protocol=None, *,
                       event=None,
                       on_keepalive=None,
