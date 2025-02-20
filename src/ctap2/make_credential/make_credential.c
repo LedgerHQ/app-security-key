@@ -1,7 +1,7 @@
 /*
 *******************************************************************************
 *   Ledger App Security Key
-*   (c) 2022 Ledger
+*   (c) 2022-2025 Ledger
 *
 *  Licensed under the Apache License, Version 2.0 (the "License");
 *  you may not use this file except in compliance with the License.
@@ -19,6 +19,7 @@
 #include <string.h>
 #include <lib_standard_app/format.h>
 
+#include "app_storage_data.h"
 #include "ctap2.h"
 #include "cbip_helper.h"
 #include "ui_shared.h"
@@ -365,7 +366,7 @@ static int process_makeCred_authnr_pin(cbipDecoder_t *decoder, cbipItem_t *mapIt
 
     status = cbiph_get_map_key_bytes(decoder, mapItem, TAG_PIN_AUTH, &pinAuth, &pinAuthLen);
     if (status == CBIPH_STATUS_FOUND) {
-        if (!N_u2f.pinSet) {
+        if (!config.pinSet) {
             PRINTF("PIN not set\n");
             return ERROR_PIN_NOT_SET;
         }
@@ -390,7 +391,7 @@ static int process_makeCred_authnr_pin(cbipDecoder_t *decoder, cbipItem_t *mapIt
         ctap2RegisterData->clientPinAuthenticated = 1;
         PRINTF("Client PIN authenticated\n");
     } else {
-        if (N_u2f.pinSet) {
+        if (config.pinSet) {
             PRINTF("PIN set and no PIN authentication provided\n");
             return ERROR_PIN_REQUIRED;
         }

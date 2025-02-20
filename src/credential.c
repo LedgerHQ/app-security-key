@@ -1,7 +1,7 @@
 /*
 *******************************************************************************
 *   Ledger App Security Key
-*   (c) 2022 Ledger
+*   (c) 2022-2025 Ledger
 *
 *  Licensed under the Apache License, Version 2.0 (the "License");
 *  you may not use this file except in compliance with the License.
@@ -22,6 +22,7 @@
 #include "cx.h"
 #include "lcx_aes_siv.h"
 
+#include "app_storage_data.h"
 #include "ctap2.h"
 #include "credential.h"
 #include "crypto.h"
@@ -187,9 +188,9 @@ static int credential_handle_ciphering(bool is_encrypt,
     cipher_key_t cipher_key;
 
     if (isCtap2) {
-        key = (uint8_t *) N_u2f.wrappingKeyCTAP2;
+        key = config.wrappingKeyCTAP2;
     } else {
-        key = (uint8_t *) N_u2f.wrappingKeyU2F;
+        key = config.wrappingKeyU2F;
     }
 
     siv_ctx.cipher_ctx = &cipher;

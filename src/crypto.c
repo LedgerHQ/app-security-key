@@ -1,7 +1,7 @@
 /*
 *******************************************************************************
 *   Ledger App Security Key
-*   (c) 2022 Ledger
+*   (c) 2022-2025 Ledger
 *
 *  Licensed under the Apache License, Version 2.0 (the "License");
 *  you may not use this file except in compliance with the License.
@@ -22,6 +22,7 @@
 #include "cx.h"
 #include "ledger_assert.h"
 
+#include "app_storage_data.h"
 #include "config.h"
 #include "crypto_data.h"
 #include "credential.h"
@@ -86,8 +87,8 @@ int crypto_generate_private_key(const uint8_t *nonce,
     memcpy(extended_nonce + 16, nonce, CREDENTIAL_NONCE_SIZE);
     crypto_compute_sha256(extended_nonce,
                           sizeof(extended_nonce),
-                          (const uint8_t *) N_u2f.privateKeySeed,
-                          sizeof(N_u2f.privateKeySeed),
+                          (const uint8_t *) &config.privateKeySeed,
+                          sizeof(config.privateKeySeed),
                           private_key_data);
 
     if (cx_ecfp_init_private_key_no_throw(curve,
@@ -131,8 +132,8 @@ void crypto_generate_credRandom_key(const uint8_t *nonce, uint8_t *credRandom, b
     memcpy(extended_nonce + 16, nonce, CREDENTIAL_NONCE_SIZE);
     crypto_compute_sha256(extended_nonce,
                           sizeof(extended_nonce),
-                          (const uint8_t *) N_u2f.privateKeySeed,
-                          sizeof(N_u2f.privateKeySeed),
+                          (const uint8_t *) &config.privateKeySeed,
+                          sizeof(config.privateKeySeed),
                           credRandom);
 }
 

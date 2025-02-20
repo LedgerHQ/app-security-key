@@ -1,6 +1,6 @@
 #******************************************************************************
 #   Ledger App Security Key
-#   (c) 2022 Ledger
+#   (c) 2022-2025 Ledger
 #
 #  Licensed under the Apache License, Version 2.0 (the "License");
 #  you may not use this file except in compliance with the License.
@@ -124,6 +124,14 @@ ENABLE_NOCRC_APP_LOAD_PARAMS = 1
 # to an app update, a firmware update, or just a user triggered uninstall
 # then reinstall flow), and this reset was causing even more issues
 DEFINES += HAVE_NO_RESET_GENERATION_INCREMENT
+
+# Enabling app storage feature
+ENABLE_APP_STORAGE = 1
+# Setting its maximal size
+APP_STORAGE_SIZE  = 6656
+# and its properties
+ENABLE_APP_STORAGE_PROP_SETTINGS = 1
+ENABLE_APP_STORAGE_PROP_DATA = 1
 
 # These 2 flags allow to enable/disable the RK feature and expose an app setting for it.
 # This has been implemented to protect user from the NVRAM wipe mostly happening during

@@ -1,7 +1,7 @@
 /*
 *******************************************************************************
 *   Ledger App Security Key
-*   (c) 2022 Ledger
+*   (c) 2022-2025 Ledger
 *
 *  Licensed under the Apache License, Version 2.0 (the "License");
 *  you may not use this file except in compliance with the License.
@@ -21,6 +21,7 @@
 #include "ux.h"
 #include "io.h"
 
+#include "app_storage_data.h"
 #include "globals.h"
 #include "config.h"
 #include "u2f_process.h"
@@ -90,6 +91,32 @@ uint8_t io_event(uint8_t channel) {
     return 1;
 }
 
+static bool init_persistent_storage(void) {
+    bool need_reinit = true;
+    uint32_t version = 0;
+
+    if (app_storage_get_size() > 0) {
+        APP_STORAGE_READ_F(version, &version);
+        if (version == APP_STORAGE_DATA_STRUCT_CURRENT_VERSION) {
+            need_reinit = false;
+        }
+    }
+
+    if (need_reinit) {
+        PRINTF("Not initialized yet!\n");
+        version = APP_STORAGE_DATA_STRUCT_CURRENT_VERSION;
+        APP_STORAGE_WRITE_F(version, &version);
+        if (config_init() != 0) {
+            PRINTF("=> config_init failure\n");
+            return false;
+        }
+
+    } else {
+        PRINTF("Initialized with data version: %d\n", app_storage_get_data_version());
+    }
+    return true;
+}
+
 /**
  * Handle APDU command received and send back APDU response using handlers.
  */
@@ -99,8 +126,8 @@ void app_main() {
 
     io_init();
 
-    if (config_init() != 0) {
-        PRINTF("=> config_init failure\n");
+    if (!init_persistent_storage()) {
+        PRINTF("Error while configuring the storage - aborting\n");
         return;
     }
     rk_storage_init();
