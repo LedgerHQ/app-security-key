@@ -275,8 +275,8 @@ static void nfc_handle_get_assertion() {
         }
         PRINTF("Matching credentials: %d\n", ctap2AssertData->availableCredentials);
         rk_next_credential_from_RKList(&slotIdx,
-                                       &ctap2AssertData->nonce,
-                                       &ctap2AssertData->credential,
+                                       ctap2AssertData->nonce,
+                                       ctap2AssertData->credential,
                                        &ctap2AssertData->credentialLen);
         PRINTF("Go for index %d - %.*H\n",
                slotIdx,
@@ -371,8 +371,8 @@ void ctap2_get_assertion_handle(u2f_service_t *service, uint8_t *buffer, uint16_
                 // Single resident credential load it to go through the usual flow
                 PRINTF("Single resident credential\n");
                 status = rk_next_credential_from_RKList(NULL,
-                                                        &ctap2AssertData->nonce,
-                                                        &ctap2AssertData->credential,
+                                                        ctap2AssertData->nonce,
+                                                        ctap2AssertData->credential,
                                                         &ctap2AssertData->credentialLen);
                 if (status == RK_NOT_FOUND) {
                     // This can theoretically never happen.

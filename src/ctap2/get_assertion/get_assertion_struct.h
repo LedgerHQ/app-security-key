@@ -20,6 +20,7 @@
 
 #include <lcx_sha256.h>
 #include "cbip_decode.h"
+#include "rk_storage.h"
 
 typedef union ctap2_assert_multiple_flow_data_s {
     struct {
@@ -40,8 +41,8 @@ typedef struct ctap2_assert_data_s {
                                              // GET_NEXT_ASSERTION calls
     uint8_t *credId;
     uint32_t credIdLen;
-    uint8_t *nonce;
-    uint8_t *credential;
+    uint8_t nonce[CREDENTIAL_NONCE_SIZE];
+    uint8_t credential[CREDENTIAL_MAX_SIZE];
     uint32_t credentialLen;
     uint8_t pinRequired;   // set if uv is set
     uint8_t pinPresented;  // set if the PIN request was acknowledged by the user

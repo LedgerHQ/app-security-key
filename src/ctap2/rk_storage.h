@@ -28,7 +28,6 @@ typedef struct __attribute__((__packed__)) rk_header_s {
     uint8_t rpIdHash[RP_ID_HASH_SIZE];
     uint8_t nonce[CREDENTIAL_NONCE_SIZE];
     uint8_t credentialLen;
-    uint8_t unused;
     uint16_t idx;  // used as "age" (increases only)
 } rk_header_t;
 
@@ -84,8 +83,8 @@ int rk_storage_count(const uint8_t *rpIdHash);
  */
 int rk_storage_find_youngest(const uint8_t *rpIdHash,
                              uint16_t *minAge,
-                             uint8_t **nonce,
-                             uint8_t **credential,
+                             uint8_t *nonce,
+                             uint8_t *credential,
                              uint32_t *credentialLen);
 
 /**
@@ -93,7 +92,7 @@ int rk_storage_find_youngest(const uint8_t *rpIdHash,
  */
 int rk_storage_find_account(const uint8_t *rpIdHash,
                             const uint8_t *nonce,
-                            uint8_t **credential,
+                            uint8_t *credential,
                             uint32_t *credentialLen);
 
 /**
@@ -113,6 +112,6 @@ uint8_t rk_build_RKList_from_rpID(const uint8_t *rpIdHash);
  * into the given arguments, then removes it from the list.
  */
 int rk_next_credential_from_RKList(uint16_t *idx,
-                                   uint8_t **nonce,
-                                   uint8_t **credential,
+                                   uint8_t *nonce,
+                                   uint8_t *credential,
                                    uint32_t *credentialLen);

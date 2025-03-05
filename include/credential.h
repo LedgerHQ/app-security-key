@@ -129,8 +129,8 @@ int credential_wrap(const uint8_t *rpIdHash,
 int credential_unwrap(const uint8_t *rpIdHash,
                       uint8_t *credId,
                       uint32_t credIdLen,
-                      uint8_t **nonce,
-                      uint8_t **encodedCredential,
+                      uint8_t *nonce,
+                      uint8_t *encodedCredential,
                       uint32_t *encodedCredentialLen);
 
 /**
@@ -151,8 +151,8 @@ int credential_unwrap(const uint8_t *rpIdHash,
 int credential_extract(const uint8_t *rpIdHash,
                        const uint8_t *credId,
                        uint32_t credIdLen,
-                       uint8_t **nonce,
-                       uint8_t **encodedCredential,
+                       uint8_t *nonce,
+                       uint8_t *encodedCredential,
                        uint32_t *encodedCredentialLen);
 
 /**

@@ -32,7 +32,22 @@ static bool get_slot_addr(uint8_t rkSlotIdx, rk_slot_t *slot) {
     if (rkSlotIdx >= CREDENTIAL_MAX_NUMBER) {
         return false;
     }
-    APP_STORAGE_READ_F(rk.slot[rkSlotIdx], slot);
+    int res = APP_STORAGE_READ_F(rk.slot[rkSlotIdx].header, (void *) &slot->header);
+
+    if (res  < 0) {
+        if (res == APP_STORAGE_EADDRNOTAVAIL) {
+            memset(slot, 0, sizeof(rk_slot_t));
+            slot->header.idx = UNUSED_IDX_VALUE;
+        }
+        else {
+            return false;
+        }
+    }
+    else {
+        APP_STORAGE_READ_F_WITH_SIZE(rk.slot[rkSlotIdx].credential,
+                                     (void *) &slot->credential,
+                                     slot->header.credentialLen);
+    }
     return true;
 }
 
@@ -112,12 +127,11 @@ int rk_storage_store(const uint8_t *rpIdHash,
     memmove(header.rpIdHash, rpIdHash, sizeof(header.rpIdHash));
     memmove(header.nonce, nonce, sizeof(header.nonce));
     header.credentialLen = credentialLen;
-    header.unused = 0;
     header.idx = nextIdx;
     nextIdx += 1;
     APP_STORAGE_WRITE_F(rk.slot[rkSlotIdx].header, (void *) &header);
     APP_STORAGE_WRITE_F_WITH_SIZE(rk.slot[rkSlotIdx].credential,
-                                  (void *) &credential,
+                                  (void *) credential,
                                   credentialLen);
     app_storage_increment_data_version();
     PRINTF("rk_storage_store idx %d size %d\n", header.idx, credentialLen);
@@ -148,8 +162,8 @@ int rk_storage_count(const uint8_t *rpIdHash) {
 
 int rk_storage_find_youngest(const uint8_t *rpIdHash,
                              uint16_t *requestMinAge,
-                             uint8_t **nonce,
-                             uint8_t **credential,
+                             uint8_t *nonce,
+                             uint8_t *credential,
                              uint32_t *credentialLen) {
     rk_slot_t slot;
     uint16_t slotAge;
@@ -174,10 +188,10 @@ int rk_storage_find_youngest(const uint8_t *rpIdHash,
             found = true;
             foundMinAge = slotAge;
             if (nonce != NULL) {
-                *nonce = slot.header.nonce;
+                memcpy(nonce, slot.header.nonce, CREDENTIAL_NONCE_SIZE);
             }
             if (credential != NULL) {
-                *credential = slot.credential;
+                memcpy(credential, slot.credential, slot.header.credentialLen);
             }
             if (credentialLen != NULL) {
                 *credentialLen = slot.header.credentialLen;
@@ -198,7 +212,7 @@ int rk_storage_find_youngest(const uint8_t *rpIdHash,
 
 int rk_storage_find_account(const uint8_t *rpIdHash,
                             const uint8_t *nonce,
-                            uint8_t **credential,
+                            uint8_t *credential,
                             uint32_t *credentialLen) {
     rk_slot_t slot;
 
@@ -213,7 +227,7 @@ int rk_storage_find_account(const uint8_t *rpIdHash,
 
         if (crypto_compare(slot.header.nonce, nonce, CREDENTIAL_NONCE_SIZE)) {
             if (credential != NULL) {
-                *credential = slot.credential;
+                memcpy(credential, slot.credential, slot.header.credentialLen);
             }
             if (credentialLen != NULL) {
                 *credentialLen = slot.header.credentialLen;
@@ -304,8 +318,8 @@ uint8_t rk_build_RKList_from_rpID(const uint8_t *rpIdHash) {
 }
 
 int rk_next_credential_from_RKList(uint16_t *idx,
-                                   uint8_t **nonce,
-                                   uint8_t **credential,
+                                   uint8_t *nonce,
+                                   uint8_t *credential,
                                    uint32_t *credentialLen) {
     rk_slot_t slot;
     if (count_RKList() == 0) {
@@ -320,10 +334,10 @@ int rk_next_credential_from_RKList(uint16_t *idx,
         *idx = slot.header.idx;
     }
     if (nonce != NULL) {
-        *nonce = slot.header.nonce;
+        memcpy(nonce, slot.header.nonce, CREDENTIAL_NONCE_SIZE);
     }
     if (credential != NULL) {
-        *credential = slot.credential;
+        memcpy(credential, slot.credential, slot.header.credentialLen);
     }
     if (credentialLen != NULL) {
         *credentialLen = slot.header.credentialLen;

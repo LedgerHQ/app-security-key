@@ -330,8 +330,8 @@ int credential_wrap(const uint8_t *rpIdHash,
 static int credential_parse(const uint8_t *rpIdHash,
                             uint8_t *credId,
                             uint32_t credIdLen,
-                            uint8_t **noncePtr,
-                            uint8_t **encodedCredential,
+                            uint8_t *noncePtr,
+                            uint8_t *encodedCredential,
                             uint32_t *encodedCredentialLen,
                             bool unwrap) {
     int status;
@@ -396,7 +396,7 @@ static int credential_parse(const uint8_t *rpIdHash,
     // Parse nonce field
     nonce = credId + offset;
     if (noncePtr != NULL) {
-        *noncePtr = nonce;
+        memcpy(noncePtr, nonce, CREDENTIAL_NONCE_SIZE);
     }
 
     offset += CREDENTIAL_NONCE_SIZE;
@@ -423,16 +423,13 @@ static int credential_parse(const uint8_t *rpIdHash,
             return STATUS_RK_CREDENTIAL;
         } else {
             if (encodedCredential != NULL) {
-                *encodedCredential = credId + offset;
+                memcpy(encodedCredential, credId + offset, credIdLen - offset);
             }
             if (encodedCredentialLen != NULL) {
                 *encodedCredentialLen = credIdLen - offset;
             }
         }
     } else {
-        if (encodedCredential != NULL) {
-            *encodedCredential = NULL;
-        }
         if (encodedCredentialLen != NULL) {
             *encodedCredentialLen = 0;
         }
@@ -444,8 +441,8 @@ static int credential_parse(const uint8_t *rpIdHash,
 int credential_unwrap(const uint8_t *rpIdHash,
                       uint8_t *credId,
                       uint32_t credIdLen,
-                      uint8_t **nonce,
-                      uint8_t **encodedCredential,
+                      uint8_t *nonce,
+                      uint8_t *encodedCredential,
                       uint32_t *encodedCredentialLen) {
     return credential_parse(rpIdHash,
                             credId,
@@ -459,8 +456,8 @@ int credential_unwrap(const uint8_t *rpIdHash,
 int credential_extract(const uint8_t *rpIdHash,
                        const uint8_t *credId,
                        uint32_t credIdLen,
-                       uint8_t **nonce,
-                       uint8_t **encodedCredential,
+                       uint8_t *nonce,
+                       uint8_t *encodedCredential,
                        uint32_t *encodedCredentialLen) {
     return credential_parse(rpIdHash,
                             (uint8_t *) credId,
