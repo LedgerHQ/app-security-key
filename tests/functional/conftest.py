@@ -23,6 +23,8 @@ def pytest_addoption(parser):
     parser.addoption("--okta-token", type=str, default=None)
     parser.addoption("--okta-url", type=str, default=None)
     parser.addoption("--okta-email", type=str, default=None)
+    parser.addoption("--rk-config-ui", action="store_true", default=False,
+                     help="Enable RK UI configuration")
 
 
 @pytest.fixture(scope="session")

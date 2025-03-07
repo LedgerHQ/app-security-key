@@ -6,7 +6,6 @@ from ragger.navigator import NavInsID
 
 from ..client import TESTS_SPECULOS_DIR
 from ..utils import generate_random_bytes, fido_known_appid
-from ..utils import ENABLE_RK_CONFIG_UI_SETTING
 
 
 @pytest.mark.skip_endpoint("NFC", reason="CTAP1 is not available on NFC - 0x6D00")
@@ -24,7 +23,7 @@ def test_u2f_screens_idle(client, test_name, firmware):
         # Screen 2 -> 3
         instructions.append(NavInsID.RIGHT_CLICK)
 
-        if ENABLE_RK_CONFIG_UI_SETTING:
+        if "--rk-config-ui" in sys.argv:
             # Screen 3 -> 4
             instructions.append(NavInsID.RIGHT_CLICK)
     else:
@@ -32,6 +31,9 @@ def test_u2f_screens_idle(client, test_name, firmware):
             NavInsID.USE_CASE_HOME_SETTINGS,
             NavInsID.USE_CASE_SETTINGS_MULTI_PAGE_EXIT
         ]
+
+    if "--rk-config-ui" in sys.argv:
+        test_name += "_rk_conig_ui"
 
     client.navigator.navigate_and_compare(TESTS_SPECULOS_DIR, test_name, instructions,
                                           screen_change_before_first_instruction=False)
