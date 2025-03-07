@@ -125,14 +125,6 @@ ENABLE_NOCRC_APP_LOAD_PARAMS = 1
 # then reinstall flow), and this reset was causing even more issues
 DEFINES += HAVE_NO_RESET_GENERATION_INCREMENT
 
-# Enabling app storage feature
-ENABLE_APP_STORAGE = 1
-# Setting its maximal size
-APP_STORAGE_SIZE  = 6656
-# and its properties
-ENABLE_APP_STORAGE_PROP_SETTINGS = 1
-ENABLE_APP_STORAGE_PROP_DATA = 1
-
 # These 2 flags allow to enable/disable the RK feature and expose an app setting for it.
 # This has been implemented to protect user from the NVRAM wipe mostly happening during
 # an app update which will erase their RK credentials with no possibility  to restore them.
@@ -156,10 +148,23 @@ endif
 DEFINES += HAVE_FIDO2_RPID_FILTER
 
 ifeq ($(TARGET_NAME),TARGET_NANOS)
-DEFINES += RK_SIZE=2048
+RK_SIZE=2048
 else
-DEFINES += RK_SIZE=6144
+RK_SIZE=6144
 endif
+DEFINES += RK_SIZE=$(RK_SIZE)
+
+# Enabling app storage feature
+ENABLE_APP_STORAGE = 1
+# Setting its maximum size
+# The storage consists of slots (with RK_SIZE as the total size),
+# config part (~156 bytes now) and version field
+# Let's anticipate big enough maximum storage
+APP_STORAGE_SIZE = $(shell echo $$(( $(RK_SIZE) + 512 )))
+
+# and its properties
+ENABLE_APP_STORAGE_PROP_SETTINGS = 1
+ENABLE_APP_STORAGE_PROP_DATA = 1
 
 #DEFINES += HAVE_DEBUG_THROWS
 #DEFINES  += HAVE_CBOR_DEBUG

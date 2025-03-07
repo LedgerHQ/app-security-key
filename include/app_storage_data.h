@@ -1,8 +1,6 @@
 #pragma once
 
 #include <app_storage.h>
-// #include <stdint.h>
-// #include <stdbool.h>
 
 #include "config.h"
 #include "rk_storage.h"

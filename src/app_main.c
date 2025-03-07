@@ -100,12 +100,18 @@ static bool init_persistent_storage(void) {
         if (version == APP_STORAGE_DATA_STRUCT_CURRENT_VERSION) {
             need_reinit = false;
         }
+        else {
+            /* As any other previous versions are not supported let's reset all
+             * app persistent storage to avoid any garbage */
+            app_storage_reset();
+        }
     }
 
     if (need_reinit) {
         PRINTF("Not initialized yet!\n");
         version = APP_STORAGE_DATA_STRUCT_CURRENT_VERSION;
         APP_STORAGE_WRITE_F(version, &version);
+        /* config_init() increments the app storage version */
         if (config_init() != 0) {
             PRINTF("=> config_init failure\n");
             return false;
