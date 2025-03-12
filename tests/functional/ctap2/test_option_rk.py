@@ -4,8 +4,11 @@ import sys
 from fido2.ctap import CtapError
 from fido2.webauthn import AttestedCredentialData
 from typing import Dict, List
+from ragger.backend import SpeculosBackend
+from ragger.firmware import Firmware
+from ragger.navigator import NanoNavigator, TouchNavigator
 
-from ..client import TESTS_SPECULOS_DIR
+from ..client import TESTS_SPECULOS_DIR, TestClient
 from ..transport import TransportType
 from ..utils import generate_random_bytes, generate_make_credentials_params, \
     ctap2_get_assertion, MakeCredentialArguments, Nav
@@ -133,6 +136,103 @@ def test_option_rk_get_assertion(client, test_name, transport: TransportType):
         with pytest.raises(CtapError) as e:
             client.ctap2.get_assertion(user1.rp["id"], client_data_hash, will_fail=True)
         assert e.value.code == CtapError.ERR.NO_CREDENTIALS
+
+
+def start_client(
+        backend: SpeculosBackend,
+        firmware: Firmware,
+        transport: TransportType,
+        ctap2_u2f_proxy: bool,
+        golden_run: bool):
+    NavigatorType = TouchNavigator if backend.firmware == Firmware.STAX else NanoNavigator
+    navigator = NavigatorType(backend, backend.firmware, golden_run)
+    client = TestClient(firmware, backend, navigator, transport, ctap2_u2f_proxy)
+    client.start()
+    client.enable_rk_option()
+    return client
+
+
+@pytest.mark.skip_if_not_rk_config_ui
+def test_option_rk_with_persistance_get_assertion(
+        get_2_backends,
+        firmware: Firmware,
+        test_name,
+        transport: TransportType,
+        ctap2_u2f_proxy: bool,
+        golden_run: bool):
+
+    backend_setup, backend_with_load_nvram = get_2_backends
+
+    # Preparation
+    attestation = []
+    users: list[MakeCredentialArguments] = []
+
+    with backend_setup:
+        client = start_client(backend_setup, firmware, transport,
+                              ctap2_u2f_proxy, golden_run)
+
+        user1 = generate_make_credentials_params(client, ref=1, rk=True)
+        user2 = generate_make_credentials_params(client, ref=2, rk=True)
+        user3 = generate_make_credentials_params(client, ref=3, rk=True)
+
+        for idx, user in enumerate([user1, user2, user3]):
+            if idx == 2 and "--fast" in sys.argv:
+                # Skip additional step on fast mode
+                continue
+
+            test_prefix = client.transported_path(test_name)
+            compare_args = (TESTS_SPECULOS_DIR, test_prefix + f"/{idx}/make")
+            attestation.append(client.ctap2.make_credential(user,
+                                                            check_screens=True,
+                                                            compare_args=compare_args))
+
+            # Users are then shown in the order with the last created presented first
+            users = [user] + users
+
+    with backend_with_load_nvram:
+
+        client = start_client(backend_with_load_nvram, firmware, transport,
+                              ctap2_u2f_proxy, golden_run)
+
+        for idx, user in enumerate([user1, user2, user3]):
+            if idx == 2 and "--fast" in sys.argv:
+                # Skip additional step on fast mode
+                continue
+            client_data_hash = generate_random_bytes(32)
+
+            test_prefix = client.transported_path(test_name)
+            compare_args = (TESTS_SPECULOS_DIR, test_prefix + f"/{idx}/get_rk")
+
+            simple_login = len(users) == 1
+            assertion = client.ctap2.get_assertion(user.rp["id"], client_data_hash,
+                                                   check_users=users, check_screens=True,
+                                                   simple_login=simple_login,
+                                                   compare_args=compare_args)
+            credential_data = AttestedCredentialData(attestation[idx].auth_data.credential_data)
+            assertion.verify(client_data_hash, credential_data.public_key)
+
+            # Check with allowList
+            allow_list: List[Dict] = []
+            allow_list = [{"id": credential_data.credential_id, "type": "public-key"}] + allow_list
+
+            client_data_hash = generate_random_bytes(32)
+            compare_args = (TESTS_SPECULOS_DIR, test_prefix + f"/{idx}/get_allow_list")
+            assertion = client.ctap2.get_assertion(user.rp["id"], client_data_hash,
+                                                   allow_list=allow_list,
+                                                   check_users=[u.user for u in users],
+                                                   check_screens=True,
+                                                   simple_login=simple_login,
+                                                   compare_args=compare_args)
+            assertion.verify(client_data_hash, credential_data.public_key)
+
+        # CTAP2 reset is not available on NFC
+        if transport is not TransportType.NFC:
+            # Check that nothing remains after a reset
+            client.ctap2.reset()
+            client_data_hash = generate_random_bytes(32)
+            with pytest.raises(CtapError) as e:
+                client.ctap2.get_assertion(user1.rp["id"], client_data_hash, will_fail=True)
+            assert e.value.code == CtapError.ERR.NO_CREDENTIALS
 
 
 @pytest.mark.skipif("--fast" in sys.argv, reason="running in fast mode")

@@ -2,9 +2,9 @@ import pytest
 from okta.client import Client as OktaClient
 from pathlib import Path
 from ragger.backend import SpeculosBackend, RaisePolicy
+from ragger.conftest.base_conftest import prepare_speculos_args
 from ragger.firmware import Firmware
-from ragger.utils import find_project_root_dir
-from typing import Iterable, Optional
+from typing import Iterable, Optional, List
 
 from .client import TestClient
 from .transport import TransportType
@@ -66,47 +66,42 @@ def rk_config_ui(pytestconfig):
     return pytestconfig.getoption("rk_config_ui")
 
 
-def prepare_speculos_args(root_pytest_dir: Path,
-                          firmware: Firmware,
-                          display: bool,
-                          transport: TransportType):
-    speculos_args = ["--transport", transport.name]
-    if display:
-        speculos_args += ["--display", "qt"]
+def create_speculos_backend(root_pytest_dir: Path,
+                            firmware: Firmware,
+                            display: bool,
+                            transport: TransportType,
+                            cli_user_seed: str,
+                            additional_speculos_arguments: List[str]):
 
-    device = firmware.name
-    if device == "nanosp":
-        device = "nanos2"
+    additional_speculos_arguments += ["--transport", transport.name]
 
-    # Find the compiled application for the requested device
-    project_root_dir = find_project_root_dir(root_pytest_dir)
+    app_path, speculos_args = prepare_speculos_args(root_pytest_dir, firmware,
+                                                    display, cli_user_seed,
+                                                    additional_speculos_arguments)
+    backend = SpeculosBackend(app_path,
+                              firmware=firmware,
+                              **speculos_args)
+    if transport is TransportType.NFC:
+        # In NFC, chunked RAPDUs are managed with 0x61XX status code
+        backend.raise_policy = RaisePolicy.RAISE_CUSTOM
+        backend.whitelisted_status = [0x9000] + \
+            [s for s in range(STATUS_MORE_DATA, STATUS_MORE_DATA + 0x0100)]
 
-    app_path = Path(project_root_dir / "build" / device / "bin" / "app.elf").resolve()
-    if not app_path.is_file():
-        raise ValueError(f"File '{app_path}' missing. Did you compile for this target?")
-
-    return (app_path, {"args": speculos_args})
+    return backend
 
 
 # Depending on the "--backend" option value, a different backend is
 # instantiated, and the tests will either run on Speculos or on a physical
 # device depending on the backend
 def create_backend(root_pytest_dir: Path, backend_name: str,
-                   firmware: Firmware, display: bool, transport: TransportType):
-    if backend_name.lower() == "speculos":
-        app_path, speculos_args = prepare_speculos_args(root_pytest_dir, firmware,
-                                                        display, transport)
-        backend = SpeculosBackend(app_path,
-                                  firmware=firmware,
-                                  **speculos_args)
-        if transport is TransportType.NFC:
-            # In NFC, chunked RAPDUs are managed with 0x61XX status code
-            backend.raise_policy = RaisePolicy.RAISE_CUSTOM
-            backend.whitelisted_status = [0x9000] + \
-                [s for s in range(STATUS_MORE_DATA, STATUS_MORE_DATA + 0x0100)]
-        return backend
-    else:
+                   firmware: Firmware, display: bool, transport: TransportType,
+                   cli_user_seed: str,
+                   additional_speculos_arguments: List[str]):
+    if backend_name.lower() != "speculos":
         raise ValueError(f"Backend '{backend_name}' is unknown. Valid backends are: {BACKENDS}")
+
+    return create_speculos_backend(root_pytest_dir, firmware, display, transport,
+                                   cli_user_seed, additional_speculos_arguments)
 
 
 @pytest.fixture(scope="session")
@@ -117,10 +112,13 @@ def okta_client(okta_url, okta_token) -> OktaClient:
 
 @pytest.fixture(scope="class")
 def backend(root_pytest_dir: Path, backend_name: str, firmware: Firmware, display: bool,
-            transport: TransportType):
+            transport: TransportType,
+            cli_user_seed: str,
+            additional_speculos_arguments: List[str]):
     if firmware.is_nano and transport is TransportType.NFC:
         pytest.skip(f"No NFC available on {firmware.name.upper()}")
-    with create_backend(root_pytest_dir, backend_name, firmware, display, transport) as b:
+    with create_backend(root_pytest_dir, backend_name, firmware, display, transport,
+                        cli_user_seed, additional_speculos_arguments) as b:
         yield b
 
 
@@ -130,6 +128,32 @@ def client(firmware: Firmware, backend, navigator, transport: TransportType,
     client = TestClient(firmware, backend, navigator, transport, ctap2_u2f_proxy)
     client.start()
     return client
+
+
+@pytest.fixture(scope="class")
+def get_2_backends(
+        root_pytest_dir: Path,
+        backend_name: str,
+        firmware: Firmware,
+        display: bool,
+        transport: TransportType,
+        log_apdu_file: Optional[Path],
+        cli_user_seed: str,
+        additional_speculos_arguments: List[str]):
+
+    if backend_name.lower() != "speculos":
+        raise ValueError(f"Backend '{backend_name}' is unknown. Valid backends are: {BACKENDS}")
+
+    b = []
+    additional_speculos_arguments_loc = \
+        [additional_speculos_arguments, additional_speculos_arguments + ["--load-nvram"]]
+
+    for i in range(2):
+        backend = create_speculos_backend(root_pytest_dir, firmware, display, transport,
+                                          cli_user_seed, additional_speculos_arguments_loc[i])
+        b.append(backend)
+
+    yield b[0], b[1]
 
 
 @pytest.fixture(autouse=True)
