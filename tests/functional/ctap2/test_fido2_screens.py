@@ -5,11 +5,10 @@ from ragger.firmware import Firmware
 from ragger.navigator import NavInsID, NavIns
 
 from ..client import TESTS_SPECULOS_DIR
-from ..utils import generate_random_bytes, generate_make_credentials_params, \
-    ENABLE_RK_CONFIG_UI_SETTING
+from ..utils import generate_random_bytes, generate_make_credentials_params
 
 
-@pytest.mark.skipif(not ENABLE_RK_CONFIG_UI_SETTING, reason="settings not enable")
+@pytest.mark.skip_if_not_rk_config_ui
 def test_fido_screens_settings(client, test_name):
 
     if client.firmware.is_nano:

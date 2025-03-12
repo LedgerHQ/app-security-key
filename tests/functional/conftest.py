@@ -23,6 +23,8 @@ def pytest_addoption(parser):
     parser.addoption("--okta-token", type=str, default=None)
     parser.addoption("--okta-url", type=str, default=None)
     parser.addoption("--okta-email", type=str, default=None)
+    parser.addoption("--rk-config-ui", action="store_true", default=False,
+                     help="Enable RK UI configuration")
 
 
 @pytest.fixture(scope="session")
@@ -57,6 +59,11 @@ def transport(pytestconfig) -> TransportType:
 @pytest.fixture(scope="session")
 def ctap2_u2f_proxy(pytestconfig):
     return pytestconfig.getoption("ctap2_u2f_proxy")
+
+
+@pytest.fixture(scope="session")
+def rk_config_ui(pytestconfig):
+    return pytestconfig.getoption("rk_config_ui")
 
 
 def prepare_speculos_args(root_pytest_dir: Path,
@@ -151,11 +158,19 @@ def skip_by_devices(request, firmware):
             pytest.skip('skipped on this device: {}'.format(firmware.device))
 
 
+@pytest.fixture(autouse=True)
+def skip_by_rk_config_ui(request, rk_config_ui):
+    if request.node.get_closest_marker('skip_if_not_rk_config_ui'):
+        if not rk_config_ui:
+            pytest.skip('RK UI setting is not activated')
+
+
 def pytest_configure(config):
     custom_decorator = [
         "skip_endpoint(endpoint): skip test depending on endpoint (HID, U2F or NFC)",
         "skip_devices(devices): skip test depending on current device",
         "okta: run only the Okta tests",
+        "skip_if_not_rk_config_ui: run test with RK UI enabled",
     ]
     for cd in custom_decorator:
         config.addinivalue_line("markers", cd)
