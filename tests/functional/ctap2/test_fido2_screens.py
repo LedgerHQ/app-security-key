@@ -8,7 +8,7 @@ from ..client import TESTS_SPECULOS_DIR
 from ..utils import generate_random_bytes, generate_make_credentials_params
 
 
-@pytest.mark.skipif("--rk-config-ui" not in sys.argv, reason="settings not enable")
+@pytest.mark.skip_if_not_rk_config_ui
 def test_fido_screens_settings(client, test_name):
 
     if client.firmware.is_nano:

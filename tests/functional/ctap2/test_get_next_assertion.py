@@ -1,5 +1,4 @@
 import pytest
-import sys
 from fido2.ctap import CtapError
 
 from ..utils import generate_random_bytes, ctap2_get_assertion, Nav
@@ -57,7 +56,7 @@ def test_get_next_assertion_two_credentials_allowlist(client):
     assert e.value.code == CtapError.ERR.NOT_ALLOWED
 
 
-@pytest.mark.skipif("--rk-config-ui" not in sys.argv, reason="settings not enable")
+@pytest.mark.skip_if_not_rk_config_ui
 def test_get_next_assertion_two_credentials_rk(client, transport):
     # Only 'passwordless' (no AllowList) + NFC triggers GET_NEXT_ASSERTION
     client.enable_rk_option()

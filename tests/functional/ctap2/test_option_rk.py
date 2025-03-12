@@ -11,7 +11,7 @@ from ..utils import generate_random_bytes, generate_make_credentials_params, \
     ctap2_get_assertion, MakeCredentialArguments, Nav
 
 
-@pytest.mark.skipif("--rk-config-ui" not in sys.argv, reason="settings not enable")
+@pytest.mark.skip_if_not_rk_config_ui
 def test_option_rk_disabled(client):
     info = client.ctap2.info
     assert not info.options["rk"]
@@ -23,7 +23,7 @@ def test_option_rk_disabled(client):
     assert e.value.code == CtapError.ERR.UNSUPPORTED_OPTION
 
 
-@pytest.mark.skipif("--rk-config-ui" not in sys.argv, reason="settings not enable")
+@pytest.mark.skip_if_not_rk_config_ui
 def test_option_rk_enabled(client):
     client.enable_rk_option()
 
@@ -31,7 +31,7 @@ def test_option_rk_enabled(client):
     assert info.options["rk"]
 
 
-@pytest.mark.skipif("--rk-config-ui" not in sys.argv, reason="settings not enable")
+@pytest.mark.skip_if_not_rk_config_ui
 def test_option_rk_make_cred_exclude_refused(client, test_name):
     client.enable_rk_option()
 
@@ -71,7 +71,7 @@ def test_option_rk_make_cred_exclude_refused(client, test_name):
     client.ctap2.make_credential(args, check_screens=True, compare_args=compare_args)
 
 
-@pytest.mark.skipif("--rk-config-ui" not in sys.argv, reason="settings not enable")
+@pytest.mark.skip_if_not_rk_config_ui
 def test_option_rk_get_assertion(client, test_name, transport: TransportType):
     test_prefix = client.transported_path(test_name)
     client.enable_rk_option()
@@ -136,7 +136,7 @@ def test_option_rk_get_assertion(client, test_name, transport: TransportType):
 
 
 @pytest.mark.skipif("--fast" in sys.argv, reason="running in fast mode")
-@pytest.mark.skipif("--rk-config-ui" not in sys.argv, reason="settings not enable")
+@pytest.mark.skip_if_not_rk_config_ui
 def test_option_rk_key_store_full(client, transport: TransportType):
     client.enable_rk_option()
 
@@ -159,7 +159,7 @@ def test_option_rk_key_store_full(client, transport: TransportType):
 
 
 @pytest.mark.skipif("--fast" in sys.argv, reason="running in fast mode")
-@pytest.mark.skipif("--rk-config-ui" not in sys.argv, reason="settings not enable")
+@pytest.mark.skip_if_not_rk_config_ui
 def test_option_rk_overwrite_get_assertion(client, test_name):
     test_prefix = client.transported_path(test_name)
     client.enable_rk_option()

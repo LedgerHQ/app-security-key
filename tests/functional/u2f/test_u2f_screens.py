@@ -9,7 +9,7 @@ from ..utils import generate_random_bytes, fido_known_appid
 
 
 @pytest.mark.skip_endpoint("NFC", reason="CTAP1 is not available on NFC - 0x6D00")
-def test_u2f_screens_idle(client, test_name, firmware):
+def test_u2f_screens_idle(client, test_name, firmware, rk_config_ui):
     # Refresh navigator screen content reference
     time.sleep(0.1)
     client.navigator._backend.get_current_screen_content()
@@ -23,7 +23,7 @@ def test_u2f_screens_idle(client, test_name, firmware):
         # Screen 2 -> 3
         instructions.append(NavInsID.RIGHT_CLICK)
 
-        if "--rk-config-ui" in sys.argv:
+        if rk_config_ui:
             # Screen 3 -> 4
             instructions.append(NavInsID.RIGHT_CLICK)
     else:
@@ -32,8 +32,8 @@ def test_u2f_screens_idle(client, test_name, firmware):
             NavInsID.USE_CASE_SETTINGS_MULTI_PAGE_EXIT
         ]
 
-    if "--rk-config-ui" in sys.argv:
-        test_name += "_rk_conig_ui"
+    if rk_config_ui:
+        test_name += "_rk_config_ui"
 
     client.navigator.navigate_and_compare(TESTS_SPECULOS_DIR, test_name, instructions,
                                           screen_change_before_first_instruction=False)
