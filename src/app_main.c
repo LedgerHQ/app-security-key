@@ -99,8 +99,7 @@ static bool init_persistent_storage(void) {
         APP_STORAGE_READ_F(version, &version);
         if (version == APP_STORAGE_DATA_STRUCT_CURRENT_VERSION) {
             need_reinit = false;
-        }
-        else {
+        } else {
             /* As any other previous versions are not supported let's reset all
              * app persistent storage to avoid any garbage */
             app_storage_reset();
@@ -111,14 +110,14 @@ static bool init_persistent_storage(void) {
         PRINTF("Not initialized yet!\n");
         version = APP_STORAGE_DATA_STRUCT_CURRENT_VERSION;
         APP_STORAGE_WRITE_F(version, &version);
-        /* config_init() increments the app storage version */
-        if (config_init() != 0) {
-            PRINTF("=> config_init failure\n");
-            return false;
-        }
-
     } else {
         PRINTF("Initialized with data version: %d\n", app_storage_get_data_version());
+    }
+
+    /* Loading config, config_init() increments the app storage version */
+    if (config_init() != 0) {
+        PRINTF("=> config_init failure\n");
+        return false;
     }
     return true;
 }
