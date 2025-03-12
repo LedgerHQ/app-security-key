@@ -39,7 +39,5 @@ extern config_t config;
                       sizeof(((app_storage_data_t *) 0)->field), \
                       offsetof(app_storage_data_t, field))
 
-#define APP_STORAGE_READ_F_WITH_SIZE(field, dst_buf, size)       \
-    app_storage_pread(dst_buf,                                   \
-                      size,                                      \
-                      offsetof(app_storage_data_t, field))
+#define APP_STORAGE_READ_F_WITH_SIZE(field, dst_buf, size) \
+    app_storage_pread(dst_buf, size, offsetof(app_storage_data_t, field))
