@@ -146,7 +146,8 @@ def get_2_backends(
 
     b = []
     additional_speculos_arguments_loc = \
-        [additional_speculos_arguments, additional_speculos_arguments + ["--load-nvram"]]
+        [additional_speculos_arguments + ["--save-nvram"], \
+        additional_speculos_arguments + ["--load-nvram"]]
 
     for i in range(2):
         backend = create_speculos_backend(root_pytest_dir, firmware, display, transport,
