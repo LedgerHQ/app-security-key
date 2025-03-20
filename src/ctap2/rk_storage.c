@@ -35,7 +35,7 @@ static bool get_slot_addr(uint8_t rkSlotIdx, rk_slot_t *slot) {
     int res = APP_STORAGE_READ_F(rk.slot[rkSlotIdx].header, (void *) &slot->header);
 
     if (res < 0) {
-        if (res == APP_STORAGE_EADDRNOTAVAIL) {
+        if (res == APP_STORAGE_ERR_NO_DATA_AVAILABLE) {
             memset(slot, 0, sizeof(rk_slot_t));
             slot->header.idx = UNUSED_IDX_VALUE;
         } else {

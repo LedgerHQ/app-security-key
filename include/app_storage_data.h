@@ -22,22 +22,22 @@ CCASSERT("The application storage size requested in Makefile is not sufficient",
 /* RAM representation of the config part of the app data storage */
 extern config_t config;
 
-#define APP_STORAGE_WRITE_ALL(src_buf) app_storage_pwrite(src_buf, sizeof(app_storage_data_t), 0)
+#define APP_STORAGE_WRITE_ALL(src_buf) app_storage_write(src_buf, sizeof(app_storage_data_t), 0)
 
-#define APP_STORAGE_WRITE_F(field, src_buf)                       \
-    app_storage_pwrite(src_buf,                                   \
-                       sizeof(((app_storage_data_t *) 0)->field), \
-                       offsetof(app_storage_data_t, field))
-
-#define APP_STORAGE_WRITE_F_WITH_SIZE(field, src_buf, size) \
-    app_storage_pwrite(src_buf, size, offsetof(app_storage_data_t, field))
-
-#define APP_STORAGE_READ_ALL(dst_buf) app_storage_pread(dst_buf, sizeof(app_storage_data_t), 0)
-
-#define APP_STORAGE_READ_F(field, dst_buf)                       \
-    app_storage_pread(dst_buf,                                   \
+#define APP_STORAGE_WRITE_F(field, src_buf)                      \
+    app_storage_write(src_buf,                                   \
                       sizeof(((app_storage_data_t *) 0)->field), \
                       offsetof(app_storage_data_t, field))
 
+#define APP_STORAGE_WRITE_F_WITH_SIZE(field, src_buf, size) \
+    app_storage_write(src_buf, size, offsetof(app_storage_data_t, field))
+
+#define APP_STORAGE_READ_ALL(dst_buf) app_storage_read(dst_buf, sizeof(app_storage_data_t), 0)
+
+#define APP_STORAGE_READ_F(field, dst_buf)                      \
+    app_storage_read(dst_buf,                                   \
+                     sizeof(((app_storage_data_t *) 0)->field), \
+                     offsetof(app_storage_data_t, field))
+
 #define APP_STORAGE_READ_F_WITH_SIZE(field, dst_buf, size) \
-    app_storage_pread(dst_buf, size, offsetof(app_storage_data_t, field))
+    app_storage_read(dst_buf, size, offsetof(app_storage_data_t, field))
