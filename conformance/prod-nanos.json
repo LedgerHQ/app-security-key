@@ -3,7 +3,7 @@
   "description": "Ledger Nano S FIDO2 Authenticator",
   "aaguid": "341e4da9-3c2e-8103-5a9f-aad887135200",
   "alternativeDescriptions": {},
-  "authenticatorVersion": 1,
+  "authenticatorVersion": 10605,
   "protocolFamily": "fido2",
   "schema": 3,
   "upv": [{
@@ -76,7 +76,7 @@
     "extensions": ["hmac-secret"],
     "aaguid": "341e4da93c2e81035a9faad887135200",
     "options": {
-      "rk": true,
+      "rk": false,
       "up": true,
       "uv": true,
       "clientPin": true

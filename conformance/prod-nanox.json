@@ -1,9 +1,9 @@
 {
   "legalHeader": "Submission of this statement and retrieval and use of this statement indicates acceptance of the appropriate agreement located at https://fidoalliance.org/metadata/metadata-legal-terms/.",
-  "aaguid": "fcb1bcb4-f370-078c-6993-bc24d0ae3fbe",
   "description": "Ledger Nano X FIDO2 Authenticator",
+  "aaguid": "fcb1bcb4-f370-078c-6993-bc24d0ae3fbe",
   "alternativeDescriptions": {},
-  "authenticatorVersion": 1,
+  "authenticatorVersion": 10605,
   "protocolFamily": "fido2",
   "schema": 3,
   "upv": [{
@@ -76,7 +76,7 @@
     "extensions": ["hmac-secret"],
     "aaguid": "fcb1bcb4f370078c6993bc24d0ae3fbe",
     "options": {
-      "rk": true,
+      "rk": false,
       "up": true,
       "uv": true,
       "clientPin": true
