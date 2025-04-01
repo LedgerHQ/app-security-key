@@ -8,6 +8,10 @@ on:
       - main
       - develop
   pull_request:
+# Cancel previous runs on this reference
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   job_unit_test:
