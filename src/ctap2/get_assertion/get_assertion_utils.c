@@ -476,15 +476,15 @@ int handle_allowList_item(cbipDecoder_t *decoder, cbipItem_t *item, bool unwrap)
         status = credential_unwrap(ctap2AssertData->rpIdHash,
                                    ctap2AssertData->credId,
                                    ctap2AssertData->credIdLen,
-                                   &ctap2AssertData->nonce,
-                                   &ctap2AssertData->credential,
+                                   ctap2AssertData->nonce,
+                                   ctap2AssertData->credential,
                                    &ctap2AssertData->credentialLen);
     } else {
         status = credential_extract(ctap2AssertData->rpIdHash,
                                     ctap2AssertData->credId,
                                     ctap2AssertData->credIdLen,
-                                    &ctap2AssertData->nonce,
-                                    &ctap2AssertData->credential,
+                                    ctap2AssertData->nonce,
+                                    ctap2AssertData->credential,
                                     &ctap2AssertData->credentialLen);
     }
 
@@ -514,8 +514,8 @@ void get_assertion_credential_idx(uint16_t idx) {
             // Find the next entry in rk
             status = rk_storage_find_youngest(ctap2AssertData->rpIdHash,
                                               &ctap2AssertData->multipleFlowData.rk.minAge,
-                                              &ctap2AssertData->nonce,
-                                              &ctap2AssertData->credential,
+                                              ctap2AssertData->nonce,
+                                              ctap2AssertData->credential,
                                               &ctap2AssertData->credentialLen);
             if (status <= 0) {
                 // Should not happen, just continue a credential will be picked eventually

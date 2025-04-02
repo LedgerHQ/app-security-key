@@ -237,7 +237,7 @@ static int u2f_handle_apdu_enroll(const uint8_t *rx, uint32_t data_length, const
 }
 
 static int u2f_handle_apdu_sign(const uint8_t *rx, uint32_t data_length, uint8_t *data) {
-    uint8_t *nonce;
+    uint8_t nonce[CREDENTIAL_NONCE_SIZE];
     // Parse request base and check length validity
     u2f_auth_req_base_t *auth_req_base = (u2f_auth_req_base_t *) data;
     if (data_length < sizeof(u2f_auth_req_base_t)) {
@@ -273,7 +273,7 @@ static int u2f_handle_apdu_sign(const uint8_t *rx, uint32_t data_length, uint8_t
     if (credential_unwrap(auth_req_base->application_param,
                           key_handle,
                           auth_req_base->key_handle_length,
-                          &nonce,
+                          nonce,
                           NULL,
                           NULL) < 0) {
         return io_send_sw(SW_WRONG_DATA);

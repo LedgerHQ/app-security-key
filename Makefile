@@ -1,6 +1,6 @@
 #******************************************************************************
 #   Ledger App Security Key
-#   (c) 2022 Ledger
+#   (c) 2022-2025 Ledger
 #
 #  Licensed under the Apache License, Version 2.0 (the "License");
 #  you may not use this file except in compliance with the License.
@@ -148,10 +148,23 @@ endif
 DEFINES += HAVE_FIDO2_RPID_FILTER
 
 ifeq ($(TARGET_NAME),TARGET_NANOS)
-DEFINES += RK_SIZE=2048
+RK_SIZE=2048
 else
-DEFINES += RK_SIZE=6144
+RK_SIZE=6144
 endif
+DEFINES += RK_SIZE=$(RK_SIZE)
+
+# Enabling app storage feature
+ENABLE_APP_STORAGE = 1
+# Setting its maximum size
+# The storage consists of slots (with RK_SIZE as the total size),
+# config part (~156 bytes now) and version field
+# Let's anticipate big enough maximum storage
+APP_STORAGE_SIZE = $(shell echo $$(( $(RK_SIZE) + 512 )))
+
+# and its properties
+ENABLE_APP_STORAGE_PROP_SETTINGS = 1
+ENABLE_APP_STORAGE_PROP_DATA = 1
 
 #DEFINES += HAVE_DEBUG_THROWS
 #DEFINES  += HAVE_CBOR_DEBUG

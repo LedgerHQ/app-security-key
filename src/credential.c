@@ -1,7 +1,7 @@
 /*
 *******************************************************************************
 *   Ledger App Security Key
-*   (c) 2022 Ledger
+*   (c) 2022-2025 Ledger
 *
 *  Licensed under the Apache License, Version 2.0 (the "License");
 *  you may not use this file except in compliance with the License.
@@ -22,6 +22,7 @@
 #include "cx.h"
 #include "lcx_aes_siv.h"
 
+#include "app_storage_data.h"
 #include "ctap2.h"
 #include "credential.h"
 #include "crypto.h"
@@ -187,9 +188,9 @@ static int credential_handle_ciphering(bool is_encrypt,
     cipher_key_t cipher_key;
 
     if (isCtap2) {
-        key = (uint8_t *) N_u2f.wrappingKeyCTAP2;
+        key = config.wrappingKeyCTAP2;
     } else {
-        key = (uint8_t *) N_u2f.wrappingKeyU2F;
+        key = config.wrappingKeyU2F;
     }
 
     siv_ctx.cipher_ctx = &cipher;
@@ -329,8 +330,8 @@ int credential_wrap(const uint8_t *rpIdHash,
 static int credential_parse(const uint8_t *rpIdHash,
                             uint8_t *credId,
                             uint32_t credIdLen,
-                            uint8_t **noncePtr,
-                            uint8_t **encodedCredential,
+                            uint8_t *noncePtr,
+                            uint8_t *encodedCredential,
                             uint32_t *encodedCredentialLen,
                             bool unwrap) {
     int status;
@@ -395,7 +396,7 @@ static int credential_parse(const uint8_t *rpIdHash,
     // Parse nonce field
     nonce = credId + offset;
     if (noncePtr != NULL) {
-        *noncePtr = nonce;
+        memcpy(noncePtr, nonce, CREDENTIAL_NONCE_SIZE);
     }
 
     offset += CREDENTIAL_NONCE_SIZE;
@@ -422,16 +423,13 @@ static int credential_parse(const uint8_t *rpIdHash,
             return STATUS_RK_CREDENTIAL;
         } else {
             if (encodedCredential != NULL) {
-                *encodedCredential = credId + offset;
+                memcpy(encodedCredential, credId + offset, credIdLen - offset);
             }
             if (encodedCredentialLen != NULL) {
                 *encodedCredentialLen = credIdLen - offset;
             }
         }
     } else {
-        if (encodedCredential != NULL) {
-            *encodedCredential = NULL;
-        }
         if (encodedCredentialLen != NULL) {
             *encodedCredentialLen = 0;
         }
@@ -443,8 +441,8 @@ static int credential_parse(const uint8_t *rpIdHash,
 int credential_unwrap(const uint8_t *rpIdHash,
                       uint8_t *credId,
                       uint32_t credIdLen,
-                      uint8_t **nonce,
-                      uint8_t **encodedCredential,
+                      uint8_t *nonce,
+                      uint8_t *encodedCredential,
                       uint32_t *encodedCredentialLen) {
     return credential_parse(rpIdHash,
                             credId,
@@ -458,8 +456,8 @@ int credential_unwrap(const uint8_t *rpIdHash,
 int credential_extract(const uint8_t *rpIdHash,
                        const uint8_t *credId,
                        uint32_t credIdLen,
-                       uint8_t **nonce,
-                       uint8_t **encodedCredential,
+                       uint8_t *nonce,
+                       uint8_t *encodedCredential,
                        uint32_t *encodedCredentialLen) {
     return credential_parse(rpIdHash,
                             (uint8_t *) credId,

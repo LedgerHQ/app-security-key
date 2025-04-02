@@ -37,8 +37,8 @@ void ctap2_get_next_assertion_handle(u2f_service_t *service, uint8_t *buffer, ui
         PRINTF("GET_NEXT_ASSERTION: looking for the next RK credential.\n");
         ctap2AssertData->availableCredentials = 1;
         int status = rk_next_credential_from_RKList(NULL,
-                                                    &ctap2AssertData->nonce,
-                                                    &ctap2AssertData->credential,
+                                                    ctap2AssertData->nonce,
+                                                    ctap2AssertData->credential,
                                                     &ctap2AssertData->credentialLen);
         if (status == RK_NOT_FOUND) {
             PRINTF("GET_NEXT_ASSERTION: no remaining RK credential.\n");

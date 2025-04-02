@@ -1,7 +1,7 @@
 /*
 *******************************************************************************
 *   Ledger App Security Key
-*   (c) 2022 Ledger
+*   (c) 2022-2025 Ledger
 *
 *  Licensed under the Apache License, Version 2.0 (the "License");
 *  you may not use this file except in compliance with the License.
@@ -38,10 +38,6 @@ typedef struct config_t {
     uint8_t rk_enabled;
 #endif
 } config_t;
-
-extern config_t const N_u2f_real;
-
-#define N_u2f (*(volatile config_t *) PIC(&N_u2f_real))
 
 int config_init(void);
 

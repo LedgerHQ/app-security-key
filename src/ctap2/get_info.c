@@ -1,7 +1,7 @@
 /*
 *******************************************************************************
 *   Ledger App Security Key
-*   (c) 2022 Ledger
+*   (c) 2022-2025 Ledger
 *
 *  Licensed under the Apache License, Version 2.0 (the "License");
 *  you may not use this file except in compliance with the License.
@@ -19,6 +19,7 @@
 #include <os.h>
 #include <cx.h>
 
+#include "app_storage_data.h"
 #include "ctap2.h"
 #include "ctap2_utils.h"
 #include "cbip_encode.h"
@@ -84,7 +85,7 @@ void ctap2_get_info_handle(u2f_service_t *service, uint8_t *buffer, uint16_t len
     cbip_add_string(&encoder, OPTION_USER_VERIFICATION, sizeof(OPTION_USER_VERIFICATION) - 1);
     cbip_add_boolean(&encoder, true);
     cbip_add_string(&encoder, OPTION_CLIENT_PIN, sizeof(OPTION_CLIENT_PIN) - 1);
-    cbip_add_boolean(&encoder, N_u2f.pinSet);
+    cbip_add_boolean(&encoder, config.pinSet);
 
     // maxMsgSize (0x05)
 
