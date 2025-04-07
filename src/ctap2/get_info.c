@@ -57,11 +57,24 @@
 #define TRANSPORT_USB "usb"
 #define TRANSPORT_NFC "nfc"
 
-static void add_option(cbipEncoder_t *encoder, const char* option, size_t size, bool value) {
-    cbip_add_string(encoder, option, size);
+static void cbip_add_option(cbipEncoder_t *encoder,
+                            const char *option_desc,
+                            size_t option_desc_size,
+                            bool value) {
+    cbip_add_string(encoder, option_desc, option_desc_size);
     cbip_add_boolean(encoder, value);
 }
 
+static void cbip_add_alg_pkey(cbipEncoder_t *encoder,
+                              const char *alg_desc,
+                              size_t alg_desc_size,
+                              int alg) {
+    cbip_add_map_header(encoder, 2);
+    cbip_add_string(encoder, alg_desc, alg_desc_size);
+    cbip_add_int(encoder, alg);
+    cbip_add_string(encoder, CREDENTIAL_DESCRIPTOR_TYPE, sizeof(CREDENTIAL_DESCRIPTOR_TYPE) - 1);
+    cbip_add_string(encoder, CREDENTIAL_TYPE_PUBLIC_KEY, sizeof(CREDENTIAL_TYPE_PUBLIC_KEY) - 1);
+}
 
 void ctap2_get_info_handle(u2f_service_t *service, uint8_t *buffer, uint16_t length) {
     UNUSED(buffer);
@@ -96,26 +109,46 @@ void ctap2_get_info_handle(u2f_service_t *service, uint8_t *buffer, uint16_t len
     cbip_add_byte_string(&encoder, AAGUID, sizeof(AAGUID));
 
     // options (0x04)
-    // Ordered correctly - https://fidoalliance.org/specs/fido-v2.2-rd-20241003/fido-client-to-authenticator-protocol-v2.2-rd-20241003.html#message-encoding
+    // Ordered correctly - see here:
+    // https://fidoalliance.org/specs/fido-v2.2-rd-20241003/fido-client-to-authenticator-protocol-v2.2-rd-20241003.html#message-encoding
     cbip_add_int(&encoder, TAG_OPTIONS);
     cbip_add_map_header(&encoder, 5);
 #ifdef ENABLE_RK_CONFIG
-    add_option(&encoder, OPTION_RESIDENT_KEY, sizeof(OPTION_RESIDENT_KEY) -1, config_get_rk_enabled());
+    cbip_add_option(&encoder,
+                    OPTION_RESIDENT_KEY,
+                    sizeof(OPTION_RESIDENT_KEY) - 1,
+                    config_get_rk_enabled());
 #else
-    add_option(&encoder, OPTION_RESIDENT_KEY, sizeof(OPTION_RESIDENT_KEY) - 1, true);
+    cbip_add_option(&encoder, OPTION_RESIDENT_KEY, sizeof(OPTION_RESIDENT_KEY) - 1, true);
 #endif
-    add_option(&encoder, OPTION_USER_PRESENCE, sizeof(OPTION_USER_PRESENCE) - 1, true);
-    add_option(&encoder, OPTION_USER_VERIFICATION, sizeof(OPTION_USER_VERIFICATION) - 1, true);
-    add_option(&encoder, OPTION_PLAT, sizeof(OPTION_PLAT) - 1, false);
-    /* add_option(&encoder, OPTION_ALWAYS_UV, sizeof(OPTION_ALWAYS_UV) - 1, false); */
-    /* add_option(&encoder, OPTION_CRED_MGMT, sizeof(OPTION_CRED_MGMT) - 1, true); */
-    /* add_option(&encoder, OPTION_AUTHN_CFG, sizeof(OPTION_AUTHN_CFG) - 1, true); */
-    add_option(&encoder, OPTION_CLIENT_PIN, sizeof(OPTION_CLIENT_PIN) - 1, N_u2f.pinSet);
-    /* add_option(&encoder, OPTION_LARGE_BLOBS, sizeof(OPTION_LARGE_BLOBS) - 1, true); */
-    /* add_option(&encoder, OPTION_PIN_UV_AUTH_TOKEN, sizeof(OPTION_PIN_UV_AUTH_TOKEN) - 1, true); */
-    /* add_option(&encoder, OPTION_SET_MIN_PIN_LENGTH, sizeof(OPTION_SET_MIN_PIN_LENGTH) - 1, true); */
-    /* add_option(&encoder, OPTION_MAKE_CRED_WITHOUT_UV, sizeof(OPTION_MAKE_CRED_WITHOUT_UV) - 1, true); */
-    /* add_option(&encoder, OPTION_CRED_MGMT_PREVIEW, sizeof(OPTION_CRED_MGMT_PREVIEW) - 1, true); */
+    cbip_add_option(&encoder, OPTION_USER_PRESENCE, sizeof(OPTION_USER_PRESENCE) - 1, true);
+    cbip_add_option(&encoder, OPTION_USER_VERIFICATION, sizeof(OPTION_USER_VERIFICATION) - 1, true);
+    cbip_add_option(&encoder, OPTION_PLAT, sizeof(OPTION_PLAT) - 1, false);
+    /*
+    cbip_add_option(&encoder, OPTION_ALWAYS_UV, sizeof(OPTION_ALWAYS_UV) - 1, false);
+    cbip_add_option(&encoder, OPTION_CRED_MGMT, sizeof(OPTION_CRED_MGMT) - 1, true);
+    cbip_add_option(&encoder, OPTION_AUTHN_CFG, sizeof(OPTION_AUTHN_CFG) - 1, true);
+    */
+    cbip_add_option(&encoder, OPTION_CLIENT_PIN, sizeof(OPTION_CLIENT_PIN) - 1, N_u2f.pinSet);
+    /*
+    cbip_add_option(&encoder,
+                    OPTION_LARGE_BLOBS, sizeof(OPTION_LARGE_BLOBS) - 1, true);
+    cbip_add_option(&encoder,
+                    OPTION_PIN_UV_AUTH_TOKEN,
+                    sizeof(OPTION_PIN_UV_AUTH_TOKEN) - 1,
+                    true);
+    cbip_add_option(&encoder,
+                    OPTION_SET_MIN_PIN_LENGTH,
+                    sizeof(OPTION_SET_MIN_PIN_LENGTH) - 1, true);
+    cbip_add_option(&encoder,
+                    OPTION_MAKE_CRED_WITHOUT_UV,
+                    sizeof(OPTION_MAKE_CRED_WITHOUT_UV) - 1,
+                    true);
+    cbip_add_option(&encoder,
+                    OPTION_CRED_MGMT_PREVIEW,
+                    sizeof(OPTION_CRED_MGMT_PREVIEW) - 1,
+                    true);
+    */
 
     // maxMsgSize (0x05)
 
@@ -139,21 +172,18 @@ void ctap2_get_info_handle(u2f_service_t *service, uint8_t *buffer, uint16_t len
     // List of 3, in this order of preference: ES256, EDDSA, ES256K
     cbip_add_int(&encoder, TAG_ALGORITHMS);
     cbip_add_array_header(&encoder, 3);
-    cbip_add_map_header(&encoder, 2);
-    cbip_add_string(&encoder, CREDENTIAL_DESCRIPTOR_ALG, sizeof(CREDENTIAL_DESCRIPTOR_ALG) - 1);
-    cbip_add_int(&encoder, COSE_ALG_ES256);
-    cbip_add_string(&encoder, CREDENTIAL_DESCRIPTOR_TYPE, sizeof(CREDENTIAL_DESCRIPTOR_TYPE) - 1);
-    cbip_add_string(&encoder, CREDENTIAL_TYPE_PUBLIC_KEY, sizeof(CREDENTIAL_TYPE_PUBLIC_KEY) - 1);
-    cbip_add_map_header(&encoder, 2);
-    cbip_add_string(&encoder, CREDENTIAL_DESCRIPTOR_ALG, sizeof(CREDENTIAL_DESCRIPTOR_ALG) - 1);
-    cbip_add_int(&encoder, COSE_ALG_EDDSA);
-    cbip_add_string(&encoder, CREDENTIAL_DESCRIPTOR_TYPE, sizeof(CREDENTIAL_DESCRIPTOR_TYPE) - 1);
-    cbip_add_string(&encoder, CREDENTIAL_TYPE_PUBLIC_KEY, sizeof(CREDENTIAL_TYPE_PUBLIC_KEY) - 1);
-    cbip_add_map_header(&encoder, 2);
-    cbip_add_string(&encoder, CREDENTIAL_DESCRIPTOR_ALG, sizeof(CREDENTIAL_DESCRIPTOR_ALG) - 1);
-    cbip_add_int(&encoder, COSE_ALG_ES256K);
-    cbip_add_string(&encoder, CREDENTIAL_DESCRIPTOR_TYPE, sizeof(CREDENTIAL_DESCRIPTOR_TYPE) - 1);
-    cbip_add_string(&encoder, CREDENTIAL_TYPE_PUBLIC_KEY, sizeof(CREDENTIAL_TYPE_PUBLIC_KEY) - 1);
+    cbip_add_alg_pkey(&encoder,
+                      CREDENTIAL_DESCRIPTOR_ALG,
+                      sizeof(CREDENTIAL_DESCRIPTOR_ALG) - 1,
+                      COSE_ALG_ES256);
+    cbip_add_alg_pkey(&encoder,
+                      CREDENTIAL_DESCRIPTOR_ALG,
+                      sizeof(CREDENTIAL_DESCRIPTOR_ALG) - 1,
+                      COSE_ALG_EDDSA);
+    cbip_add_alg_pkey(&encoder,
+                      CREDENTIAL_DESCRIPTOR_ALG,
+                      sizeof(CREDENTIAL_DESCRIPTOR_ALG) - 1,
+                      COSE_ALG_ES256K);
 
     responseBuffer[0] = ERROR_NONE;
     send_cbor_response(service, 1 + encoder.offset, NULL);
