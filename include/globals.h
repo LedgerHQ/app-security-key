@@ -101,8 +101,8 @@ void nfc_idle_work2(void);
 
 typedef struct global_s {
     char buffer_20[20];
-    char buffer1_65[NAME_BUFFER_SIZE];
-    char buffer2_65[NAME_BUFFER_SIZE];
+    char rp_buffer[NAME_BUFFER_SIZE];
+    char username_buffer[NAME_BUFFER_SIZE];
     char displayed_message[131];
     bool is_nfc;
     bool display_status;
@@ -152,26 +152,27 @@ static inline ctap2_data_t *globals_get_ctap2_data(void) {
  * - on status screens (buffer display when NFC transport is used), the police is smaller, argument
  *   `large` should be `false`.
  */
-void truncate_pairs_for_display(bool large);
+void globals_truncate_pairs_for_display(bool large);
 
 /*
  * Formats strings stored in global buffers into a single global buffer
  *
- * This functions copies the global buffers `g.buffer1_65` and `g.buffer2_65` into
+ * This functions copies the global buffers `g.rp_buffer` and `g.username_buffer` into
  * `g.display_status`. This `g.display_status` is used by `app_nbgl_status` to display
  * additional informations (RP name, username, ...).
  * These information are copied only if:
  * - the current transport is NFC
  * - AND `clean_buffer` is `false`.
- * In this case, the formatting is the following: `<g.buffer1_65>\n<g.buffer2_65>`.
+ * In this case, the formatting is the following: `<g.rp_buffer>\n<g.username_buffer>`.
  * Else, '\0' is inserted at the beginning of the buffer.
  * The input buffers should have been previously truncated to fit the NBGL page width.
  *
  * @param clean_buffer: always insert a '\0' character at the beginning of the buffer
  */
-void prepare_displayed_message(bool clean_buffer);
+void globals_prepare_displayed_message(bool clean_buffer);
 
-void ctap2_display_copy_username(const char *name, uint8_t nameLength);
-void ctap2_display_copy_rp(const char *name, uint8_t nameLength);
-
-void ctap2_copy_info_on_buffers(void);
+/* Functions to set or clear rp and user names in global array */
+void globals_display_set_username(const char *name, uint8_t nameLength);
+void globals_display_clear_username(void);
+void globals_display_set_rp(const char *name, uint8_t nameLength);
+void globals_display_clear_rp(void);

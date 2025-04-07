@@ -82,14 +82,14 @@ UX_STEP_NOCB(ux_get_assertion_flow_domain_step,
              bnnn_paging,
              {
                  .title = "Website",
-                 .text = (char *) g.buffer1_65,
+                 .text = g.rp_buffer,
              });
 
 UX_STEP_NOCB(ux_get_assertion_flow_user_step,
              bnnn_paging,
              {
                  .title = "User ID",
-                 .text = (char *) g.buffer2_65,
+                 .text = g.username_buffer,
              });
 
 UX_STEP_CB(ux_get_assertion_flow_accept_step,
@@ -130,14 +130,14 @@ static void display_next_multiple_flow_state(uint16_t idx) {
     ctap2_assert_data_t *ctap2AssertData = globals_get_ctap2_assert_data();
     get_assertion_credential_idx(idx);
 
-    snprintf((char *) g.buffer_20,
+    snprintf(g.buffer_20,
              sizeof(g.buffer_20),
              // Max number will be 999: 'Log in user 999/999\n' -> 20 char.
              // As the parameters are uint16_t, this could overflow, but it is very unlikely
              "Log in user %d/%d",
              ctap2AssertData->currentCredentialIndex,
              ctap2AssertData->availableCredentials);
-    ux_display_user_assertion(g.buffer2_65);
+    ux_display_user_assertion(g.username_buffer);
 }
 
 static void display_next_state(uint8_t state) {
@@ -179,7 +179,7 @@ UX_STEP_CB_INIT(ux_get_assertion_multiple_user_border,
                 ctap_ux_on_user_choice(true, ux_step),
                 {
                     .title = g.buffer_20,
-                    .text = g.buffer2_65,
+                    .text = g.username_buffer,
                 });
 #else
 UX_STEP_CB_INIT(ux_get_assertion_multiple_user_border,
@@ -188,7 +188,7 @@ UX_STEP_CB_INIT(ux_get_assertion_multiple_user_border,
                 ctap_ux_on_user_choice(true, ux_step),
                 {
                     g.buffer_20,
-                    g.buffer2_65,
+                    g.username_buffer,
                 });
 #endif
 
@@ -258,8 +258,8 @@ UX_FLOW(ux_ctap2_no_assertion_flow,
 static nbgl_page_t *pageContext;
 #define NB_OF_PAIRS 2
 static const nbgl_layoutTagValue_t pairs[NB_OF_PAIRS] = {
-    {.item = "Website", .value = g.buffer1_65},
-    {.item = "User ID", .value = g.buffer2_65}};
+    {.item = "Website", .value = g.rp_buffer},
+    {.item = "User ID", .value = g.username_buffer}};
 
 #if defined(TARGET_STAX)
 #define SELECT_MAX_ID_NB 5
@@ -333,7 +333,7 @@ static void on_user_select_callback(int token, uint8_t index) {
     // change the current credential idx and relaunch the review
     selected_credential = idx;
     get_assertion_credential_idx(selected_credential);
-    ux_display_user_assertion(g.buffer2_65);
+    ux_display_user_assertion(g.username_buffer);
     app_nbgl_start_review(NB_OF_PAIRS, pairs, "Log in", on_user_choice, on_user_select);
 }
 
@@ -360,7 +360,9 @@ static void on_no_assertion_user_choice(int token, uint8_t index) {
 }
 
 static void app_nbgl_no_assertion(void) {
-    snprintf(g.buffer2_65, sizeof(g.buffer2_65), "Login details not found\nfor %s", g.buffer1_65);
+    char tmp_buf[sizeof(g.username_buffer)] = {0};
+    snprintf(tmp_buf, sizeof(tmp_buf), "Login details not found\nfor %s", g.rp_buffer);
+    globals_display_set_username(tmp_buf, strlen(tmp_buf));
     nbgl_pageInfoDescription_t info = {
         .bottomButtonStyle = NO_BUTTON_STYLE,
         .footerText = NULL,
@@ -368,7 +370,7 @@ static void app_nbgl_no_assertion(void) {
         .centeredInfo.offsetY = 0,
         .centeredInfo.onTop = false,
         .centeredInfo.style = LARGE_CASE_INFO,
-        .centeredInfo.text1 = g.buffer2_65,
+        .centeredInfo.text1 = g.username_buffer,
         .centeredInfo.text2 = "Make sure to log in\nusing the same Ledger\nyou registered with.",
         .centeredInfo.text3 = NULL,
         .tapActionText = "Tap to dismiss",
@@ -387,10 +389,9 @@ void get_assertion_ux(ctap2_ux_state_t state) {
     ctap2_assert_data_t *ctap2AssertData = globals_get_ctap2_assert_data();
 
     // TODO show that rp.id is truncated if necessary
-    uint8_t len = MIN(sizeof(g.buffer1_65) - 1, ctap2AssertData->rpIdLen);
-    memcpy(g.buffer1_65, ctap2AssertData->rpId, len);
-    g.buffer1_65[len] = '\0';
-    PRINTF("GET_ASSERTION: rpId %s\n", g.buffer1_65);
+    uint8_t len = MIN(sizeof(g.rp_buffer) - 1, ctap2AssertData->rpIdLen);
+    globals_display_set_rp(ctap2AssertData->rpId, len);
+    PRINTF("GET_ASSERTION: rpId %s\n", g.rp_buffer);
 
     ctap2UxState = state;
 
@@ -406,8 +407,8 @@ void get_assertion_ux(ctap2_ux_state_t state) {
     switch (state) {
         // Only one possible credential
         case CTAP2_UX_STATE_GET_ASSERTION: {
-            ux_display_user_assertion(g.buffer2_65);
-            PRINTF("GET_ASSERTION: buffer2_65 %s\n", g.buffer2_65);
+            ux_display_user_assertion(g.username_buffer);
+            PRINTF("GET_ASSERTION: g.username_buffer %s\n", g.username_buffer);
 #if defined(HAVE_BAGL)
             ux_flow_init(0, ux_get_assertion_flow, NULL);
 #elif defined(HAVE_NBGL)
@@ -426,8 +427,8 @@ void get_assertion_ux(ctap2_ux_state_t state) {
             // Pre-filling the first selected credential
             // If the user wants to use another one, it will be changed in `on_user_select_callback`
             get_assertion_credential_idx(selected_credential);
-            ux_display_user_assertion(g.buffer2_65);
-            PRINTF("GET_ASSERTION: buffer2_65 %s\n", g.buffer2_65);
+            ux_display_user_assertion(g.username_buffer);
+            PRINTF("GET_ASSERTION: g.username_buffer %s\n", g.username_buffer);
             app_nbgl_start_review(NB_OF_PAIRS, pairs, "Log in", on_user_choice, on_user_select);
 #endif
             break;
