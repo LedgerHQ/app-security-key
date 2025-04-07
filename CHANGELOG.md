@@ -12,7 +12,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Resident Keys: `GET_NEXT_ASSERTION` function implemented on Stax and Flex, available only over NFC
 - On Stax and Flex, over NFC, `MAKE_CREDENTIAL` and `GET_ASSERTION` functions displays RP and user
   information of the current operation.
-- Adding `transports` in the `GET_INFO` function.
 
 ### Fixed
 

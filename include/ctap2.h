@@ -53,6 +53,7 @@
 #define OPTION_USER_VERIFICATION "uv"
 #define OPTION_CLIENT_PIN        "clientPin"
 
+#define CREDENTIAL_DESCRIPTOR_ALG         "alg"
 #define CREDENTIAL_DESCRIPTOR_TYPE        "type"
 #define CREDENTIAL_TYPE_PUBLIC_KEY        "public-key"
 #define CREDENTIAL_TYPE_PUBLIC_KEY_LENGTH 10
