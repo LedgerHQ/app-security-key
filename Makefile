@@ -153,7 +153,9 @@ else
 DEFINES += RK_SIZE=6144
 endif
 
-#DEFINES += HAVE_DEBUG_THROWS
+ifneq ($(DEBUG), 0)
+    DEFINES += DEBUG_UI
+endif
 #DEFINES  += HAVE_CBOR_DEBUG
 
 # The flag that fakes the NFC transport for U2F

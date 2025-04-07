@@ -29,6 +29,7 @@
 #include "nfc_io.h"
 #include "sw_code.h"
 #include "u2f_processing_flow.h"
+#include "ui_messages.h"
 #include "ui_shared.h"
 
 /******************************************/
@@ -344,20 +345,20 @@ static const nbgl_layoutTagValue_t pairs[NB_OF_PAIRS] = {{
 static void on_register_choice(bool confirm) {
     if (confirm) {
         u2f_process_user_presence_confirmed();
-        app_nbgl_status("Registration details\nsent", true, ui_idle);
+        app_nbgl_status(U2F_REGISTRATION, true, ui_idle);
     } else {
         io_send_sw(SW_USER_REFUSED);
-        app_nbgl_status("Registration cancelled", false, ui_idle);
+        app_nbgl_status(U2F_REGISTRATION_CANCELLED, false, ui_idle);
     }
 }
 
 static void on_login_choice(bool confirm) {
     if (confirm) {
         u2f_process_user_presence_confirmed();
-        app_nbgl_status("Login request signed", true, ui_idle);
+        app_nbgl_status(U2F_LOGIN, true, ui_idle);
     } else {
         io_send_sw(SW_USER_REFUSED);
-        app_nbgl_status("Log in cancelled", false, ui_idle);
+        app_nbgl_status(U2F_LOGIN_CANCELLED, false, ui_idle);
     }
 }
 

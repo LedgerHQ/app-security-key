@@ -26,10 +26,12 @@
 #include "cose_keys.h"
 #include "credential.h"
 #include "crypto.h"
+#include "ctap2.h"
+#include "ctap2_utils.h"
 #include "globals.h"
 #include "rk_storage.h"
-#include "ctap2_utils.h"
-#include "ctap2.h"
+#include "ui_messages.h"
+#include "ui_shared.h"
 
 #include "get_assertion_utils.h"
 
@@ -630,7 +632,8 @@ void get_assertion_send(void) {
 
 exit:
     if (status == 0) {
-        send_cbor_response(&G_io_u2f, 1 + dataLen, "Login request signed");
+        // 1 + dataLen: 210
+        send_cbor_response(&G_io_u2f, 1 + dataLen, CTAP2_LOGIN, true);
     } else {
         PRINTF("GET_ASSERTION build / encoding failed '%d'\n", status);
         send_cbor_error(&G_io_u2f, status);

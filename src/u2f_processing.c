@@ -19,13 +19,14 @@
 #include "io.h"
 #include "u2f_processing.h"
 
-#include "u2f_process.h"
-#include "u2f_processing_flow.h"
 #include "config.h"
-#include "ui_shared.h"
 #include "globals.h"
 #include "nfc_io.h"
 #include "sw_code.h"
+#include "u2f_process.h"
+#include "u2f_processing_flow.h"
+#include "ui_messages.h"
+#include "ui_shared.h"
 
 // These are used by some services to perform fake register in order to check for user presence
 // As this could be disruptive, we are going to immediately return an error on such request.
@@ -228,7 +229,7 @@ static int u2f_handle_apdu_enroll(const uint8_t *rx, uint32_t data_length, const
 
         globals_display_clear_username();
         globals_display_clear_rp();
-        nfc_io_set_response_ready(sw, length, "Registration details\nsent");
+        nfc_io_set_response_ready(sw, length, U2F_REGISTRATION);
 
         return nfc_io_send_prepared_response();
     } else if (CMD_IS_OVER_U2F_USB) {
@@ -308,7 +309,7 @@ static int u2f_handle_apdu_sign(const uint8_t *rx, uint32_t data_length, uint8_t
         io_send_response_pointer(responseBuffer, length, sw);
         globals_display_clear_username();
         globals_display_clear_rp();
-        app_nbgl_status("Login request signed", true, ui_idle);
+        app_nbgl_status(U2F_LOGIN, true, ui_idle);
         return 0;
     } else
 #endif  // HAVE_NFC

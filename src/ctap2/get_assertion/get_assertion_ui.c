@@ -24,6 +24,7 @@
 
 #include "credential.h"
 #include "globals.h"
+#include "ui_messages.h"
 #include "ui_shared.h"
 
 #include "get_assertion_ui.h"
@@ -54,14 +55,14 @@ static void ctap_ux_on_user_choice(bool confirm, uint16_t idx) {
             MIN(globals_get_ctap2_assert_data()->availableCredentials, 1);
         get_assertion_confirm(idx);
 #ifdef HAVE_NBGL
-        app_nbgl_status("Login request signed", true, ui_idle);
+        app_nbgl_status(CTAP2_LOGIN, true, ui_idle);
 #else
         ui_idle();
 #endif
     } else {
         get_assertion_user_cancel();
 #ifdef HAVE_NBGL
-        app_nbgl_status("Login cancelled", false, ui_idle);
+        app_nbgl_status(CTAP2_LOGIN_CANCELLED, false, ui_idle);
 #else
         ui_idle();
 #endif
