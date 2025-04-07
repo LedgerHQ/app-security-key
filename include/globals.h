@@ -89,7 +89,11 @@ static const uint8_t FIDO_AID[FIDO_AID_SIZE] = {0xA0, 0x00, 0x00, 0x06, 0x47, 0x
 #define CMD_IS_OVER_U2F_USB (G_io_u2f.media == U2F_MEDIA_USB)
 
 #ifdef HAVE_NFC
+#ifndef HAVE_U2F_OVER_FAKE_NFC_TESTS
 #define CMD_IS_OVER_U2F_NFC (G_io_app.apdu_media == IO_APDU_MEDIA_NFC)
+#else
+#define CMD_IS_OVER_U2F_NFC true
+#endif /* HAVE_U2F_OVER_FAKE_NFC_TESTS */
 void nfc_idle_work2(void);
 #else
 #define CMD_IS_OVER_U2F_NFC false

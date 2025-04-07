@@ -25,6 +25,8 @@ def pytest_addoption(parser):
     parser.addoption("--okta-email", type=str, default=None)
     parser.addoption("--rk-config-ui", action="store_true", default=False,
                      help="Enable RK UI configuration")
+    parser.addoption("--u2f-over-fake-nfc", action="store_true", default=False,
+                     help="Enable U2F tests over fake NFC")
 
 
 @pytest.fixture(scope="session")
@@ -64,6 +66,11 @@ def ctap2_u2f_proxy(pytestconfig):
 @pytest.fixture(scope="session")
 def rk_config_ui(pytestconfig):
     return pytestconfig.getoption("rk_config_ui")
+
+
+@pytest.fixture(scope="session")
+def u2f_over_fake_nfc(pytestconfig):
+    return pytestconfig.getoption("u2f_over_fake_nfc")
 
 
 def prepare_speculos_args(root_pytest_dir: Path,

@@ -35,6 +35,13 @@ jobs:
       upload_app_binaries_artifact: compiled_app_binaries_rk_ui
       flags: 'ENABLE_RK_CONFIG_UI_SETTING=1'
 
+  build_application_nfc_u2f:
+    name: Build application using the reusable workflow with ENABLE_NFC_U2F_TESTS
+    uses: LedgerHQ/ledger-app-workflows/.github/workflows/reusable_build.yml@v1
+    with:
+      upload_app_binaries_artifact: compiled_app_binaries_nfc_u2f
+      flags: 'ENABLE_U2F_OVER_FAKE_NFC_TESTS=1'
+
   tests:
     needs: build_application
     name: Ragger tests
@@ -78,3 +85,12 @@ jobs:
       test_options: '--okta'
     secrets:
       secret_test_options: '--okta-token "${{ secrets.OKTA_TEST_TOKEN }}" --okta-email "${{ secrets.OKTA_TEST_EMAIL }}" --okta-url "${{ secrets.OKTA_TEST_URL }}"'
+
+  tests_nfc_u2f:
+    needs: build_application_nfc_u2f
+    name: Ragger tests with ENABLE_NFC_U2F_TESTS
+    uses: LedgerHQ/ledger-app-workflows/.github/workflows/reusable_ragger_tests.yml@v1
+    with:
+      download_app_binaries_artifact: compiled_app_binaries_nfc_u2f
+      test_filter: 'test_make_credential_followed_u2f'
+      test_options: '--transport HID --u2f-over-fake-nfc'
