@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - UI: Status pages text and titles are now centered
+- UI: displaying previously registered or asserted RP/user names in U2F-over-NFC mode
 
 
 ## [1.6.4] - 2024-01-02
