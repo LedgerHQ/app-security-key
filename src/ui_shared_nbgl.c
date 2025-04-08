@@ -222,7 +222,7 @@ void app_nbgl_start_review(uint8_t nb_pairs,
                            nbgl_choiceCallback_t on_choice,
                            nbgl_callback_t on_select) {
     // only NBGL screens has such needs
-    truncate_pairs_for_display(true);
+    globals_truncate_pairs_for_display(true);
 
     nbgl_layoutDescription_t layoutDescription;
     onChoice = on_choice;
@@ -284,10 +284,10 @@ void app_nbgl_status(const char *message, bool is_success, nbgl_callback_t on_qu
     if (g.is_nfc && is_success) {
         // Truncate display buffers for small police (hence `false`) then format them into the
         // display buffer (which is then used in `centeredInfo.text3`)
-        truncate_pairs_for_display(false);
-        prepare_displayed_message(false);
+        globals_truncate_pairs_for_display(false);
+        globals_prepare_displayed_message(false);
     } else {
-        prepare_displayed_message(true);
+        globals_prepare_displayed_message(true);
     }
 
     if (is_success == true) {

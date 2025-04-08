@@ -61,14 +61,14 @@ UX_STEP_NOCB(ux_ctap2_make_cred_flow_domain_step,
              bnnn_paging,
              {
                  .title = "Website",
-                 .text = g.buffer1_65,
+                 .text = g.rp_buffer,
              });
 
 UX_STEP_NOCB(ux_ctap2_make_cred_flow_user_step,
              bnnn_paging,
              {
                  .title = "User ID",
-                 .text = g.buffer2_65,
+                 .text = g.username_buffer,
              });
 
 UX_STEP_CB(ux_ctap2_make_cred_flow_accept_step,
@@ -118,11 +118,11 @@ UX_FLOW(ux_ctap2_make_cred_resident_flow,
 #define NB_OF_PAIRS 2
 static const nbgl_layoutTagValue_t pairs[NB_OF_PAIRS] = {{
                                                              .item = "Website",
-                                                             .value = g.buffer1_65,
+                                                             .value = g.rp_buffer,
                                                          },
                                                          {
                                                              .item = "User ID",
-                                                             .value = g.buffer2_65,
+                                                             .value = g.username_buffer,
                                                          }};
 
 #endif

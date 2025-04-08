@@ -226,6 +226,8 @@ static int u2f_handle_apdu_enroll(const uint8_t *rx, uint32_t data_length, const
         uint16_t length = 0;
         uint16_t sw = u2f_prepare_enroll_response(responseBuffer, &length);
 
+        globals_display_clear_username();
+        globals_display_clear_rp();
         nfc_io_set_response_ready(sw, length, "Registration details\nsent");
 
         return nfc_io_send_prepared_response();
@@ -304,7 +306,8 @@ static int u2f_handle_apdu_sign(const uint8_t *rx, uint32_t data_length, uint8_t
         uint16_t sw = u2f_prepare_sign_response(responseBuffer, &length);
         // Message fit in a single response, answer directly without nfc_io features
         io_send_response_pointer(responseBuffer, length, sw);
-
+        globals_display_clear_username();
+        globals_display_clear_rp();
         app_nbgl_status("Login request signed", true, ui_idle);
         return 0;
     } else
@@ -377,7 +380,12 @@ int u2f_handle_apdu(uint8_t *rx, int rx_length) {
         nfc_io_set_le(le);
     }
 
-    PRINTF("INS %d, P1 %d P2 %d L %d\n", rx[OFFSET_INS], rx[OFFSET_P1], rx[OFFSET_P2], data_length);
+    PRINTF("CLA 0x%02X INS 0x%02X, P1 0x%02X P2 0x%02X L %d\n",
+           rx[OFFSET_CLA],
+           rx[OFFSET_INS],
+           rx[OFFSET_P1],
+           rx[OFFSET_P2],
+           data_length);
 
     if (rx[OFFSET_CLA] == FIDO_CLA) {
         switch (rx[OFFSET_INS]) {

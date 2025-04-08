@@ -402,15 +402,17 @@ static int process_makeCred_authnr_pin(cbipDecoder_t *decoder, cbipItem_t *mapIt
 static void copy_register_info_on_buffers(void) {
     ctap2_register_data_t *ctap2RegisterData = globals_get_ctap2_register_data();
 
-    ctap2_display_copy_rp(ctap2RegisterData->rpId, ctap2RegisterData->rpIdLen);
+    globals_display_set_rp(ctap2RegisterData->rpId, ctap2RegisterData->rpIdLen);
 
     if (ctap2RegisterData->userStr) {
-        ctap2_display_copy_username(ctap2RegisterData->userStr, ctap2RegisterData->userStrLen);
+        globals_display_set_username(ctap2RegisterData->userStr, ctap2RegisterData->userStrLen);
     } else {
-        uint8_t nameLength = MIN(ctap2RegisterData->userIdLen, (sizeof(g.buffer2_65) - 1) / 2);
-        format_hex(ctap2RegisterData->userId, nameLength, g.buffer2_65, sizeof(g.buffer2_65));
+        uint8_t nameLength = MIN(ctap2RegisterData->userIdLen, (sizeof(g.username_buffer) - 1) / 2);
+        char tmp_buf[sizeof(g.username_buffer)] = {0};
+        format_hex(ctap2RegisterData->userId, nameLength, tmp_buf, sizeof(tmp_buf));
+        globals_display_set_username(tmp_buf, strlen(tmp_buf));
     }
-    PRINTF("After copy, buffer content:\n1 - '%s'\n2 - '%s'\n", g.buffer1_65, g.buffer2_65);
+    PRINTF("After copy, buffer content:\n1 - '%s'\n2 - '%s'\n", g.rp_buffer, g.username_buffer);
 }
 
 void ctap2_make_credential_handle(u2f_service_t *service, uint8_t *buffer, uint16_t length) {

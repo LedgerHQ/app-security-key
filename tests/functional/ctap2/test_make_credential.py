@@ -2,10 +2,11 @@ import pytest
 from fido2.cose import ES256, EdDSA, RS256, PS256
 from fido2.ctap import CtapError
 from fido2.webauthn import AuthenticatorData, AttestedCredentialData
+from ragger.firmware import Firmware
 
 from ..client import TESTS_SPECULOS_DIR, LedgerAttestationVerifier
-from ..utils import generate_random_bytes, generate_make_credentials_params, \
-    ctap2_get_assertion, Nav
+from ..utils import FIDO_RP_ID_HASH_1, generate_random_bytes, \
+    generate_make_credentials_params, ctap2_get_assertion, Nav
 
 
 def test_make_credential(client, test_name):
@@ -23,6 +24,53 @@ def test_make_credential(client, test_name):
     expected_flags |= AuthenticatorData.FLAG.ATTESTED
     assert attestation.auth_data.flags == expected_flags
     assert client.ctap2.info.aaguid == attestation.auth_data.credential_data.aaguid
+
+
+def test_make_credential_followed_u2f(client, test_name, firmware: Firmware, u2f_over_fake_nfc):
+    if firmware.is_nano:
+        pytest.skip(f"No NFC available on {firmware.name.upper()}")
+    if not u2f_over_fake_nfc:
+        pytest.skip("--u2f-over-fake-nfc argument is required")
+
+    # first make credential
+    compare_args = (TESTS_SPECULOS_DIR, client.transported_path(test_name + "_1_make"))
+    user1 = generate_make_credentials_params(client, ref=0)
+
+    attestation = client.ctap2.make_credential(user1,
+                                               check_screens=True,
+                                               compare_args=compare_args)
+
+    credential_data = AttestedCredentialData(attestation.auth_data.credential_data)
+
+    assert attestation.fmt == "packed"
+    assert len(attestation.auth_data) >= 77
+
+    expected_flags = AuthenticatorData.FLAG.USER_PRESENT
+    expected_flags |= AuthenticatorData.FLAG.ATTESTED
+    assert attestation.auth_data.flags == expected_flags
+    assert client.ctap2.info.aaguid == attestation.auth_data.credential_data.aaguid
+
+    # first assert
+    client_data_hash = generate_random_bytes(32)
+
+    compare_args = (TESTS_SPECULOS_DIR, client.transported_path(test_name + "_1_assert"))
+
+    allow_list = [{"id": credential_data.credential_id, "type": "public-key"}]
+    assertion = client.ctap2.get_assertion(user1.rp["id"], client_data_hash, allow_list,
+                                           check_users=[user1], check_screens=True,
+                                           simple_login=False,
+                                           compare_args=compare_args)
+    assertion.verify(client_data_hash, credential_data.public_key)
+
+    # U2F/CTAP1 registration
+    challenge = generate_random_bytes(32)
+    app_param = FIDO_RP_ID_HASH_1
+
+    compare_args = (TESTS_SPECULOS_DIR, test_name + "_u2f")
+    registration_data = client.ctap1.register(challenge, app_param,
+                                              check_screens=True,
+                                              compare_args=compare_args)
+    registration_data.verify(app_param, challenge)
 
 
 def test_make_credential_certificate(client, test_name):

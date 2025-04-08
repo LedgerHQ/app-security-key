@@ -67,9 +67,11 @@ size_t load_user_in_buffer(char *buffer, uint8_t max_size) {
 static void copy_assert_info_on_buffers(void) {
     ctap2_assert_data_t *ctap2AssertData = globals_get_ctap2_assert_data();
 
-    ctap2_display_copy_rp(ctap2AssertData->rpId, ctap2AssertData->rpIdLen);
-    load_user_in_buffer(g.buffer2_65, sizeof(g.buffer2_65));
-    PRINTF("After copy, buffer content:\n1 - '%s'\n2 - '%s'\n", g.buffer1_65, g.buffer2_65);
+    globals_display_set_rp(ctap2AssertData->rpId, ctap2AssertData->rpIdLen);
+    char tmp_buf[sizeof(g.username_buffer)] = {0};
+    load_user_in_buffer(tmp_buf, sizeof(tmp_buf));
+    globals_display_set_username(tmp_buf, strlen(tmp_buf));
+    PRINTF("After copy, buffer content:\n1 - '%s'\n2 - '%s'\n", g.rp_buffer, g.username_buffer);
 }
 
 static int compute_hmacSecret_output(uint8_t **output, uint32_t *outputLen, uint8_t *credRandom) {

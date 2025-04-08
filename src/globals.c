@@ -51,35 +51,45 @@ static void copy_name_in_buffer65(char *buffer, const char *name, uint8_t nameLe
     }
 }
 
-void ctap2_display_copy_username(const char *name, uint8_t nameLength) {
-    copy_name_in_buffer65(g.buffer2_65, name, nameLength);
+void globals_display_set_username(const char *name, uint8_t nameLength) {
+    copy_name_in_buffer65(g.username_buffer, name, nameLength);
 }
 
-void ctap2_display_copy_rp(const char *name, uint8_t nameLength) {
-    copy_name_in_buffer65(g.buffer1_65, name, nameLength);
+void globals_display_clear_username(void) {
+    memset(g.username_buffer, 0, sizeof(g.username_buffer));
 }
 
-void truncate_pairs_for_display(bool large) {
+void globals_display_set_rp(const char *name, uint8_t nameLength) {
+    copy_name_in_buffer65(g.rp_buffer, name, nameLength);
+}
+
+void globals_display_clear_rp(void) {
+    memset(g.rp_buffer, 0, sizeof(g.rp_buffer));
+}
+
+void globals_truncate_pairs_for_display(bool large) {
     /* truncate_for_nb_lines(g.buffer_20, large); */
     /* PRINTF("buffer_20 after truncation: '%s'\n", g.buffer_20); */
-    truncate_for_nb_lines(g.buffer1_65, large);
-    PRINTF("buffer1_65 after truncation: '%s'\n", g.buffer1_65);
-    truncate_for_nb_lines(g.buffer2_65, large);
-    PRINTF("buffer2_65 after truncation: '%s'\n", g.buffer2_65);
+    truncate_for_nb_lines(g.rp_buffer, large);
+    PRINTF("rp_buffer after truncation: '%s'\n", g.rp_buffer);
+    truncate_for_nb_lines(g.username_buffer, large);
+    PRINTF("username_buffer after truncation: '%s'\n", g.username_buffer);
 }
 
-void prepare_displayed_message(bool clean_buffer) {
+void globals_prepare_displayed_message(bool clean_buffer) {
     if (clean_buffer) {
-        PRINTF("NO NFC or cleaning, so no display status for buffer1_65 '%s' and buffer2_65 '%s'\n",
-               g.buffer1_65,
-               g.buffer2_65);
+        PRINTF(
+            "NO NFC or cleaning, so no display status for rp_buffer '%s' and username_buffer "
+            "'%s'\n",
+            g.rp_buffer,
+            g.username_buffer);
         g.displayed_message[0] = '\0';
         return;
     }
     snprintf(g.displayed_message,
              sizeof(g.displayed_message),
              "%s\n%s",
-             g.buffer1_65,
-             g.buffer2_65);
+             g.rp_buffer,
+             g.username_buffer);
     PRINTF("NFC so display status is: '%s'\n", g.displayed_message);
 }
