@@ -217,8 +217,7 @@ static int build_authData(uint8_t *buffer, uint32_t bufferLength, uint32_t *auth
     offset++;
 
     // signCount
-    config_increase_and_get_authentification_counter(buffer + offset);
-    offset += 4;
+    offset += config_increase_and_get_authentification_counter(buffer + offset);
 
     // attestedCredentialData - not managed
 
@@ -283,7 +282,7 @@ static int sign_and_encode_credential_authData_signature(cbipEncoder_t *encoder,
     // Add client data hash for the attestation.
     // We consider we can add it after authData.
     // It can be avoided if we compute the hash in two part, but that would mean allocating
-    // an hash context that is heavy and can be avoided
+    // a hash context that is heavy and can be avoided
     memmove(authData + authDataLen, ctap2AssertData->clientDataHash, CX_SHA256_SIZE);
 
     {
@@ -391,7 +390,6 @@ static int sign_and_encode_credential_authData_signature(cbipEncoder_t *encoder,
 /*
  * Builds and prepares the `authData`, `signature`, and *if RK* `user` and `numberOfCredentials`
  * fields of the answer to the GET_ASSERTION or GET_NEXT_ASSERTION requests.
- *
  */
 static int build_and_encode_getAssertion_response(uint8_t *buffer,
                                                   uint32_t bufferLen,
@@ -617,7 +615,7 @@ void get_assertion_send(void) {
     ctap2_send_keepalive_processing();
     ctap2_assert_data_t *ctap2AssertData = globals_get_ctap2_assert_data();
     credential_data_t credData;
-    uint32_t dataLen;
+    uint32_t dataLen = 0;
 
     // Every successful GET ASSERTION (NFC, USB, RK or not, ...) comes through here, so it is a
     // relevant place to copy the RP/credential into global buffers, in case they are displayed.
@@ -644,6 +642,7 @@ void get_assertion_send(void) {
 
     status = 0;
     responseBuffer[0] = ERROR_NONE;
+    explicit_bzero(shared_ctx.sharedBuffer, sizeof(shared_ctx.sharedBuffer));
 
 exit:
     if (status == 0) {
