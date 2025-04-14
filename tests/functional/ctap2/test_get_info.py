@@ -65,18 +65,16 @@ def test_get_info_options(client):
     assert not info.options["clientPin"]
 
     # Default value options
-    assert "plat" not in info.options
+    assert not info.options["plat"]
 
-    assert len(info.options) == 4
+    assert len(info.options) == 5
 
 
 def test_get_info_max_msg_size(client):
     info = client.ctap2.info
-
     assert info.max_msg_size == 1024
 
 
 def test_get_info_pin_protocol(client):
     info = client.ctap2.info
-
     assert info.pin_uv_protocols == [1]

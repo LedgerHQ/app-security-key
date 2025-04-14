@@ -1,6 +1,6 @@
 ragger[tests,speculos]>=1.11.5
 pytest>=6.1.1,<7.0.0
 pytest-asyncio
-fido2==1.0.0
-cryptography>=3.3.1,<4.0.0
 okta>=2.9
+fido2==1.2.0
+cryptography==44.*

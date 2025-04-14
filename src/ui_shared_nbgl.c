@@ -42,7 +42,7 @@ static uint8_t initSettingPage;
 static nbgl_layoutSwitch_t switches[1] = {0};
 #endif  // ENABLE_RK_CONFIG_UI_SETTING
 static const char *const INFO_TYPES[] = {"Version", "Developer", "Copyright"};
-static const char *const INFO_CONTENTS[] = {APPVERSION, "Ledger", "(c) 2022-2024 Ledger"};
+static const char *const INFO_CONTENTS[] = {APPVERSION, "Ledger", "(c) 2022-2025 Ledger"};
 
 static const nbgl_contentInfoList_t infoList = {
     .nbInfos = 3,

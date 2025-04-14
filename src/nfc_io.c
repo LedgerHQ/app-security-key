@@ -84,6 +84,8 @@ int nfc_io_send_prepared_response() {
     if (sw == SW_NO_ERROR && nfc_status != NULL && g.display_status) {
         app_nbgl_status(nfc_status, true, ui_idle);
     }
+    // display status is enabled by default in NFC
+    // (and must explicitly be set to false in some cases like getNextAssertion)
     g.display_status = true;
     return ret;
 }

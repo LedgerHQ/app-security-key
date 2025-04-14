@@ -32,8 +32,8 @@ PATH_APP_LOAD_PARAMS = "5722689'"  # int("WRA".encode("ascii").hex(), 16)
 PATH_APP_LOAD_PARAMS += "5262163'"  # int("PKS".encode("ascii").hex(), 16)
 
 APPVERSION_M=1
-APPVERSION_N=6
-APPVERSION_P=5
+APPVERSION_N=7
+APPVERSION_P=0
 APPVERSION=$(APPVERSION_M).$(APPVERSION_N).$(APPVERSION_P)
 
 ICON_NANOS=icons/icon_security_key_nanos.gif
@@ -153,7 +153,9 @@ else
 DEFINES += RK_SIZE=6144
 endif
 
-#DEFINES += HAVE_DEBUG_THROWS
+ifneq ($(DEBUG), 0)
+    DEFINES += DEBUG_UI
+endif
 #DEFINES  += HAVE_CBOR_DEBUG
 
 # The flag that fakes the NFC transport for U2F

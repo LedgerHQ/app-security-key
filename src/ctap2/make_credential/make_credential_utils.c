@@ -23,10 +23,11 @@
 #include "cose_keys.h"
 #include "crypto.h"
 #include "crypto_data.h"
+#include "ctap2.h"
+#include "ctap2_utils.h"
 #include "globals.h"
 #include "rk_storage.h"
-#include "ctap2_utils.h"
-#include "ctap2.h"
+#include "ui_messages.h"
 
 #include "make_credential_utils.h"
 
@@ -320,7 +321,7 @@ void ctap2_make_credential_confirm() {
 
 exit:
     if (status == 0) {
-        send_cbor_response(&G_io_u2f, 1 + dataLen, "Registration details\nsent");
+        send_cbor_response(&G_io_u2f, 1 + dataLen, CTAP2_REGISTRATION);
     } else {
         send_cbor_error(&G_io_u2f, status);
     }
