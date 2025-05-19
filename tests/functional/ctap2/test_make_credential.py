@@ -2,7 +2,7 @@ import pytest
 from fido2.cose import ES256, EdDSA, RS256, PS256
 from fido2.ctap import CtapError
 from fido2.webauthn import AuthenticatorData, AttestedCredentialData
-from ragger.firmware import Firmware
+from ledgered.devices import Device
 
 from ..client import TESTS_SPECULOS_DIR, LedgerAttestationVerifier
 from ..utils import FIDO_RP_ID_HASH_1, generate_random_bytes, \
@@ -26,9 +26,9 @@ def test_make_credential(client, test_name):
     assert client.ctap2.info.aaguid == attestation.auth_data.credential_data.aaguid
 
 
-def test_make_credential_followed_u2f(client, test_name, firmware: Firmware, u2f_over_fake_nfc):
-    if firmware.is_nano:
-        pytest.skip(f"No NFC available on {firmware.name.upper()}")
+def test_make_credential_followed_u2f(client, test_name, device: Device, u2f_over_fake_nfc):
+    if device.is_nano:
+        pytest.skip(f"No NFC available on {device.name.upper()}")
     if not u2f_over_fake_nfc:
         pytest.skip("--u2f-over-fake-nfc argument is required")
 
@@ -81,7 +81,7 @@ def test_make_credential_certificate(client, test_name):
                                                check_screens=True,
                                                compare_args=compare_args)
 
-    verifier = LedgerAttestationVerifier(client.firmware)
+    verifier = LedgerAttestationVerifier(client.ledger_device)
     verifier.verify_attestation(attestation, args.client_data_hash)
 
 

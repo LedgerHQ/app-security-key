@@ -8,8 +8,9 @@ from fido2.attestation import AttestationVerifier
 from fido2.ctap import CtapDevice
 from fido2.ctap2.pin import ClientPin
 from pathlib import Path
+from ledgered.devices import Device, DeviceType
+
 from ragger.backend import BackendInterface
-from ragger.firmware import Firmware
 from ragger.navigator import Navigator, NavInsID, NavIns
 from typing import Optional
 
@@ -31,16 +32,16 @@ PROD_CA_PATH = CA_PATH / "prod" / "ca-cert.pem"
 
 
 class LedgerAttestationVerifier(AttestationVerifier):
-    def __init__(self, firmware: Firmware):
+    def __init__(self, device: Device):
         super().__init__()
 
         use_prod_ca = os.environ.get("USE_PROD_CA", False)
 
         if use_prod_ca:
-            self.metadata_path = METADATAS_PATH / "prod-{}.json".format(firmware.name)
+            self.metadata_path = f"{METADATAS_PATH}/prod-{device.name}.json"
             self.ca_path = PROD_CA_PATH
         else:
-            self.metadata_path = METADATAS_PATH / "test-{}.json".format(firmware.name)
+            self.metadata_path = f"{METADATAS_PATH}/test-{device.name}.json"
             self.ca_path = TEST_CA_PATH
 
     def ca_lookup(self, result, auth_data):
@@ -59,13 +60,13 @@ class LedgerAttestationVerifier(AttestationVerifier):
 
 
 class TestClient:
-    def __init__(self, firmware: Firmware,
+    def __init__(self, device: Device,
                  ragger_backend: BackendInterface,
                  navigator: Navigator,
                  transport: TransportType,
                  ctap2_u2f_proxy: bool,
                  debug=False):
-        self.firmware = firmware
+        self.ledger_device = device
         self.ragger_backend = ragger_backend
         self.navigator = navigator
         self.debug = debug
@@ -93,7 +94,7 @@ class TestClient:
         return self._transport
 
     def transported_path(self, name: str) -> str:
-        if self.firmware.is_nano:
+        if self.ledger_device.is_nano:
             return name
         return "/".join([name, ("nfc" if self.transport is TransportType.NFC else "usb")])
 
@@ -104,8 +105,8 @@ class TestClient:
             else:
                 self._device = LedgerCtapHidDevice(self.transport, self.debug)
 
-            self.ctap1 = LedgerCtap1(self._device, self.firmware, self.navigator, self.debug)
-            self.ctap2 = LedgerCtap2(self._device, self.firmware, self.navigator,
+            self.ctap1 = LedgerCtap1(self._device, self.ledger_device, self.navigator, self.debug)
+            self.ctap2 = LedgerCtap2(self._device, self.ledger_device, self.navigator,
                                      self.ctap2_u2f_proxy, self.debug)
             self.client_pin = ClientPin(self.ctap2)
 
@@ -121,7 +122,7 @@ class TestClient:
 
     # TODO: clean when the RK will be activated by default
     def activate_rk_option(self):
-        if self.firmware.is_nano:
+        if self.ledger_device.is_nano:
             instructions = [
                 # Enter in the settings
                 NavInsID.RIGHT_CLICK,
@@ -132,7 +133,7 @@ class TestClient:
                 NavInsID.BOTH_CLICK
             ]
 
-            if self.firmware is Firmware.NANOS:
+            if self.ledger_device.type == DeviceType.NANOS:
                 # Screen 0 -> 5
                 instructions += [NavInsID.RIGHT_CLICK] * 5
             else:
@@ -164,7 +165,7 @@ class TestClient:
         if self.ctap2.info.options["rk"]:
             return
 
-        if self.firmware.is_nano:
+        if self.ledger_device.is_nano:
             instructions = [
                 # Enter in the settings
                 NavInsID.RIGHT_CLICK,
@@ -174,7 +175,7 @@ class TestClient:
                 # Enable and skip "Enabling" message
                 NavInsID.BOTH_CLICK
             ]
-            if self.firmware is not Firmware.NANOS:
+            if self.ledger_device.type != DeviceType.NANOS:
                 # Screen 0 -> 5
                 instructions += [NavInsID.RIGHT_CLICK] * 5
             else:

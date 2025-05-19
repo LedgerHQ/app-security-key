@@ -2,11 +2,13 @@ import struct
 
 from enum import IntEnum
 
-from ragger.firmware import Firmware
+from ledgered.devices import Device
+
 from ragger.navigator import Navigator, NavInsID
 
 from fido2.ctap1 import Ctap1, ApduError, RegistrationData, SignatureData
 from fido2.hid import CTAPHID
+from fido2.ctap import CtapDevice
 
 from .utils import prepare_apdu, LedgerCTAP, Nav
 
@@ -46,9 +48,10 @@ class LedgerCtap1(Ctap1, LedgerCTAP):
     Then, register() and authenticate() Ctap1 functions are overridden
     to add interactions with the screen and the buttons.
     """
-    def __init__(self, device, firmware: Firmware, navigator: Navigator, debug: bool = False):
-        Ctap1.__init__(self, device)
-        LedgerCTAP.__init__(self, firmware, navigator, debug)
+    def __init__(self, ctap_device: CtapDevice, device: Device, navigator: Navigator,
+                 debug: bool = False):
+        Ctap1.__init__(self, ctap_device)
+        LedgerCTAP.__init__(self, device, navigator, debug)
 
     def parse_response(self, response):
         status = struct.unpack(">H", response[-2:])[0]
@@ -86,14 +89,14 @@ class LedgerCtap1(Ctap1, LedgerCTAP):
         nav_ins = None
         val_ins = None
 
-        if self.firmware.is_nano:
+        if self.ledger_device.is_nano:
             nav_ins = NavInsID.RIGHT_CLICK
             val_ins = [NavInsID.BOTH_CLICK]
             if navigation is Nav.USER_ACCEPT:
                 text = "Register"
             else:
                 text = "Abort"
-        elif self.firmware in [Firmware.STAX, Firmware.FLEX]:
+        elif self.ledger_device.touchable:
             if navigation is Nav.USER_ACCEPT:
                 val_ins = [NavInsID.USE_CASE_CHOICE_CONFIRM]
             else:
@@ -144,14 +147,14 @@ class LedgerCtap1(Ctap1, LedgerCTAP):
         nav_ins = None
         val_ins = None
 
-        if self.firmware.is_nano:
+        if self.ledger_device.is_nano:
             nav_ins = NavInsID.RIGHT_CLICK
             val_ins = [NavInsID.BOTH_CLICK]
             if navigation is Nav.USER_ACCEPT:
                 text = "Login"
             else:
                 text = "Abort"
-        elif self.firmware in [Firmware.STAX, Firmware.FLEX]:
+        elif self.ledger_device.touchable:
             if navigation is Nav.USER_ACCEPT:
                 val_ins = [NavInsID.USE_CASE_CHOICE_CONFIRM]
             else:

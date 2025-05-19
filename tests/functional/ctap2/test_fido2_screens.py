@@ -1,7 +1,8 @@
 import pytest
 import sys
 from fido2.webauthn import AttestedCredentialData
-from ragger.firmware import Firmware
+from ledgered.devices import DeviceType
+
 from ragger.navigator import NavInsID, NavIns
 
 from ..client import TESTS_SPECULOS_DIR
@@ -11,7 +12,7 @@ from ..utils import generate_random_bytes, generate_make_credentials_params
 @pytest.mark.skip_if_not_rk_config_ui
 def test_fido_screens_settings(client, test_name):
 
-    if client.firmware.is_nano:
+    if client.ledger_device.is_nano:
         instructions = []
         # Screen 0 -> 1
         instructions.append(NavInsID.RIGHT_CLICK)
@@ -24,7 +25,7 @@ def test_fido_screens_settings(client, test_name):
 
         # Enable and check "Enabling" warning message
         instructions.append(NavInsID.BOTH_CLICK)
-        if client.firmware is not Firmware.NANOS:
+        if client.ledger_device.type != DeviceType.NANOS:
             # Screen 0 -> 5
             instructions += [NavInsID.RIGHT_CLICK] * 5
         else:

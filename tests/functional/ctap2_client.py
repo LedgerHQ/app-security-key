@@ -1,6 +1,7 @@
 import struct
 
-from ragger.firmware import Firmware
+from ledgered.devices import Device
+
 from ragger.navigator import Navigator, NavInsID, NavIns
 from typing import List, Mapping, Union
 
@@ -29,11 +30,11 @@ class LedgerCtap2(Ctap2, LedgerCTAP):
     - directly in CTAPHID.CBOR command
     - encapsulated in U2F APDU with INS=0x10 in CTAPHID.MSG command
     """
-    def __init__(self, device: CtapHidDevice, firmware: Firmware, navigator: Navigator,
+    def __init__(self, ctap_device: CtapHidDevice, device: Device, navigator: Navigator,
                  ctap2_u2f_proxy, debug: bool = False):
         self.ctap2_u2f_proxy = ctap2_u2f_proxy
-        Ctap2.__init__(self, device)
-        LedgerCTAP.__init__(self, firmware, navigator, debug)
+        Ctap2.__init__(self, ctap_device)
+        LedgerCTAP.__init__(self, device, navigator, debug)
 
     @property
     def nfc(self) -> bool:
@@ -127,14 +128,14 @@ class LedgerCtap2(Ctap2, LedgerCTAP):
         # No navigation in NFC, only a screen change, so we enable navigation just to check the
         # snapshot, except in cases where an error is expected.
         if not self.nfc and navigation is not Nav.NONE:
-            if self.firmware.is_nano:
+            if self.ledger_device.is_nano:
                 nav_ins = NavInsID.RIGHT_CLICK
                 val_ins = [NavInsID.BOTH_CLICK]
                 if navigation is Nav.USER_ACCEPT:
                     text = "Register$"
                 else:
                     text = "Don't register"
-            elif self.firmware in [Firmware.STAX, Firmware.FLEX]:
+            elif self.ledger_device.touchable:
                 if navigation is Nav.USER_ACCEPT:
                     val_ins = [NavInsID.USE_CASE_CHOICE_CONFIRM]
                 else:
@@ -208,7 +209,7 @@ class LedgerCtap2(Ctap2, LedgerCTAP):
         # No navigation in NFC, only a screen change, so we enable navigation just to check the
         # snapshot, except in cases where an error is expected.
         if not self.nfc and navigation is not Nav.NONE:
-            if self.firmware.is_nano:
+            if self.ledger_device.is_nano:
                 nav_ins = NavInsID.RIGHT_CLICK
                 val_ins = [NavInsID.BOTH_CLICK]
                 if will_fail:
@@ -227,7 +228,7 @@ class LedgerCtap2(Ctap2, LedgerCTAP):
                         text = "Log in"
                     else:
                         text = "Reject"
-            elif self.firmware in [Firmware.STAX, Firmware.FLEX]:
+            elif self.ledger_device.touchable:
                 if will_fail:
                     val_ins = [NavInsID.TAPPABLE_CENTER_TAP]
                 if navigation is Nav.USER_REFUSE:
@@ -297,14 +298,14 @@ class LedgerCtap2(Ctap2, LedgerCTAP):
 
         # No confirmation needed on NFC
         if not self.nfc:
-            if self.firmware.is_nano:
+            if self.ledger_device.is_nano:
                 nav_ins = NavInsID.RIGHT_CLICK
                 val_ins = [NavInsID.BOTH_CLICK]
                 if navigation is Nav.USER_ACCEPT:
                     text = "Yes, delete"
                 else:
                     text = "No, don't delete"
-            elif self.firmware in [Firmware.STAX, Firmware.FLEX]:
+            elif self.ledger_device.touchable:
                 if navigation is Nav.USER_ACCEPT:
                     val_ins = [NavInsID.USE_CASE_CHOICE_CONFIRM]
                 else:
