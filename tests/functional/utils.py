@@ -11,7 +11,8 @@ from fido2.ctap2.base import args, AttestationResponse
 from fido2.utils import sha256
 from fido2.webauthn import AttestedCredentialData
 
-from ragger.firmware import Firmware
+from ledgered.devices import Device
+
 from ragger.navigator import Navigator, NavIns, NavInsID
 
 # Application build configuration
@@ -182,13 +183,13 @@ fido_known_appid = {get_rp_id_hash(x): y for x, y in fido_known_app.items()}
 
 class LedgerCTAP:
 
-    def __init__(self, firmware: Firmware, navigator: Navigator, debug: bool = False):
-        self.firmware = firmware
+    def __init__(self, device: Device, navigator: Navigator, debug: bool = False):
+        self.ledger_device = device
         self.navigator = navigator
         self.debug = debug
 
     def confirm(self):
-        if self.firmware in [Firmware.STAX, Firmware.FLEX]:
+        if self.ledger_device.touchable:
             instructions = [NavInsID.USE_CASE_CHOICE_CONFIRM]
         else:
             instructions = [NavInsID.BOTH_CLICK]
@@ -196,7 +197,7 @@ class LedgerCTAP:
                                 screen_change_after_last_instruction=False)
 
     def wait_for_return_on_dashboard(self):
-        if self.firmware in [Firmware.STAX, Firmware.FLEX]:
+        if self.ledger_device.touchable:
             # On Stax tap on the center to dismiss the status message faster
             # Ignore if there is nothing that happen (probably already on home screen),
             # which is expected for flow without status (reset)
@@ -220,7 +221,7 @@ class LedgerCTAP:
         else:
             root, test_name = None, None
         if navigation in [Nav.USER_ACCEPT, Nav.USER_REFUSE]:
-            # Over U2F endpoint (but not over HID) the device needs the
+            # Over U2F endpoint (but not over HID) the ledger_device needs the
             # response to be retrieved before continuing the UX flow.
 
             if text:

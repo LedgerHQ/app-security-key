@@ -2,6 +2,8 @@ import pytest
 import sys
 import time
 
+from ledgered.devices import Device
+
 from ragger.navigator import NavInsID
 
 from ..client import TESTS_SPECULOS_DIR
@@ -9,13 +11,13 @@ from ..utils import generate_random_bytes, fido_known_appid
 
 
 @pytest.mark.skip_endpoint("NFC", reason="CTAP1 is not available on NFC - 0x6D00")
-def test_u2f_screens_idle(client, test_name, firmware, rk_config_ui):
+def test_u2f_screens_idle(client, test_name, device: Device, rk_config_ui):
     # Refresh navigator screen content reference
     time.sleep(0.1)
     client.navigator._backend.get_current_screen_content()
 
     instructions = []
-    if firmware.is_nano:
+    if device.is_nano:
         # Screen 0 -> 1
         instructions.append(NavInsID.RIGHT_CLICK)
         # Screen 1 -> 2

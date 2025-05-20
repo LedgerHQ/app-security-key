@@ -1,6 +1,7 @@
 from fido2.ctap2.base import Ctap2, Info
 from hashlib import sha256
-from ragger.firmware import Firmware
+from ledgered.devices import DeviceType
+
 
 from ..utils import ENABLE_RK_CONFIG
 
@@ -32,16 +33,16 @@ def test_get_info_aaguid(client):
     info = client.ctap2.info
 
     expected_base_string = {
-        Firmware.NANOS: "Ledger FIDO 2 1.0",
-        Firmware.NANOX: "Ledger FIDO 2 1.0 NanoX",
-        Firmware.NANOSP: "Ledger FIDO 2 1.0 NanoS+",
-        Firmware.STAX: "Ledger FIDO 2 1.0 Stax",
-        Firmware.FLEX: "Ledger FIDO 2 1.0 Flex"
+        DeviceType.NANOS: "Ledger FIDO 2 1.0",
+        DeviceType.NANOX: "Ledger FIDO 2 1.0 NanoX",
+        DeviceType.NANOSP: "Ledger FIDO 2 1.0 NanoS+",
+        DeviceType.STAX: "Ledger FIDO 2 1.0 Stax",
+        DeviceType.FLEX: "Ledger FIDO 2 1.0 Flex"
     }
-    if client.firmware not in expected_base_string:
+    if client.ledger_device.type not in expected_base_string:
         raise ValueError("Unhandled model")
 
-    base_string = expected_base_string[client.firmware]
+    base_string = expected_base_string[client.ledger_device.type]
     hs = sha256(base_string.encode('utf-8')).hexdigest()
     hs = hs[:32]  # Keep only the 16 first bytes
     assert hs == info.aaguid.hex()

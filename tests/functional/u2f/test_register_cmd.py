@@ -33,7 +33,7 @@ def test_register_certificate(client):
     registration_data = client.ctap1.register(challenge, app_param)
     registration_data.verify(app_param, challenge)
 
-    verifier = LedgerAttestationVerifier(client.firmware)
+    verifier = LedgerAttestationVerifier(client.ledger_device)
     attestation = AttestationObject.from_ctap1(app_param, registration_data)
     verifier.verify_attestation(attestation, challenge)
 
@@ -46,7 +46,7 @@ def test_register_certificate(client):
     assert cert.extensions[0].critical is False
 
     # Check that value correspond to exposed transports
-    if client.firmware.is_nano:
+    if client.ledger_device.is_nano:
         # USB
         assert cert.extensions[0].value.value == bytes.fromhex("03020520")
     else:
