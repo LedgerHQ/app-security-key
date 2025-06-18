@@ -116,6 +116,8 @@ DEFINES += HAVE_BOLOS_APP_STACK_CANARY
 # the apdu should not contain a crc.
 DEFINES += HAVE_COUNTER_MARKER
 ENABLE_NOCRC_APP_LOAD_PARAMS = 1
+# required for the marker to be found in the app binary
+CFLAGS += -mno-movt
 
 # Disable resetGeneration increment during ctap2 reset
 # This means credentials that are not discoverable won't be properly
