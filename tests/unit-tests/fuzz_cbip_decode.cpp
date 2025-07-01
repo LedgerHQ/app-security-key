@@ -1,5 +1,5 @@
 /**
- * Fuzz implementation of CBOR in-place parsing in src-cbor/cbip_decode.c
+ * Fuzz implementation of CBOR in-place parsing in cbor-src/cbip_decode.c
  */
 #include <assert.h>
 #include <stdint.h>

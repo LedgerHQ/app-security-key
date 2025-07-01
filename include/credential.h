@@ -19,6 +19,8 @@
 #ifndef __CREDENTIAL_H__
 #define __CREDENTIAL_H__
 
+#include "lcx_aes_siv.h"
+
 #define STATUS_RK_CREDENTIAL 0x01
 
 #define CREDENTIAL_VERSION_U2F   0x01
@@ -29,7 +31,7 @@
  * This API expose credentials in 3 different forms:
  * - credId form (bytes):
  *   This is the form that is exchanged with the platform.
- *   It structure is:
+ *   Its structure is:
  *   +---------+----------+------------------------------+
  *   | VERSION | AES Tag  | AES-SIV encrypted credential |
  *   |         |          |------------------------------+
@@ -37,10 +39,9 @@
  *   +---------+----------+------------------------------+
  *   | 1 byte  | 16 bytes | 16 bytes |encodedLength bytes|
  *   +---------+----------+------------------------------+
-
  *
  * - encodedCredential form (bytes):
- *   This is a list of byte containing information encoded in CBOR.
+ *   This is a list of bytes containing information encoded in CBOR.
  *   It always contains:
  *   - A version
  *   - A flag (currently only storing if the resident key option is used)

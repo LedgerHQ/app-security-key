@@ -32,8 +32,8 @@ PATH_APP_LOAD_PARAMS = "5722689'"  # int("WRA".encode("ascii").hex(), 16)
 PATH_APP_LOAD_PARAMS += "5262163'"  # int("PKS".encode("ascii").hex(), 16)
 
 APPVERSION_M=1
-APPVERSION_N=6
-APPVERSION_P=4
+APPVERSION_N=7
+APPVERSION_P=0
 APPVERSION=$(APPVERSION_M).$(APPVERSION_N).$(APPVERSION_P)
 
 ICON_NANOS=icons/icon_security_key_nanos.gif
@@ -116,6 +116,8 @@ DEFINES += HAVE_BOLOS_APP_STACK_CANARY
 # the apdu should not contain a crc.
 DEFINES += HAVE_COUNTER_MARKER
 ENABLE_NOCRC_APP_LOAD_PARAMS = 1
+# required for the marker to be found in the app binary
+CFLAGS += -mno-movt
 
 # Disable resetGeneration increment during ctap2 reset
 # This means credentials that are not discoverable won't be properly
@@ -141,7 +143,9 @@ DEFINES += HAVE_NO_RESET_GENERATION_INCREMENT
 # - ENABLE_RK_CONFIG & ENABLE_RK_CONFIG_UI_SETTING -> RK are disabled by default but a user can
 #   enable or disable the feature through the app's settings.
 DEFINES += ENABLE_RK_CONFIG
-# DEFINES += ENABLE_RK_CONFIG_UI_SETTING
+ifeq ($(ENABLE_RK_CONFIG_UI_SETTING),1)
+DEFINES += ENABLE_RK_CONFIG_UI_SETTING
+endif
 
 DEFINES += HAVE_FIDO2_RPID_FILTER
 
@@ -151,10 +155,17 @@ else
 DEFINES += RK_SIZE=6144
 endif
 
-DEFINES += HAVE_DEBUG_THROWS
+DISABLE_OS_IO_STACK_USE = 1
 
+ifneq ($(DEBUG), 0)
+    DEFINES += DEBUG_UI
+endif
 #DEFINES  += HAVE_CBOR_DEBUG
 
+# The flag that fakes the NFC transport for U2F
+ifeq ($(ENABLE_U2F_OVER_FAKE_NFC_TESTS),1)
+DEFINES += HAVE_U2F_OVER_FAKE_NFC_TESTS
+endif
 
 ENABLE_NFC = 1
 
@@ -163,7 +174,7 @@ ENABLE_NFC = 1
 ##############
 
 # Application source files
-APP_SOURCE_PATH  += src src-cbor
+APP_SOURCE_PATH  += src cbor-src
 SDK_SOURCE_PATH  += lib_u2f
 
 ifeq ($(API_LEVEL),)

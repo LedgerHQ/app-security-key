@@ -20,7 +20,12 @@
 void nfc_io_set_le(uint32_t le);
 void nfc_io_set_response_ready(uint16_t sw, uint16_t len, const char *status);
 bool nfc_io_is_response_pending(void);
-int nfc_io_send_prepared_response(void);
+
+/*
+ * Sends a previously prepared response through NFC, then (if successful) displays a status screen
+ * (using `app_nbgl_status`).
+ */
+int nfc_io_send_prepared_response();
 
 #else
 static inline void nfc_io_set_le(uint32_t le __attribute__((unused))) {
@@ -38,7 +43,7 @@ static inline bool nfc_io_is_response_pending(void) {
     return false;
 }
 
-static inline int nfc_io_send_prepared_response(void) {
+static inline int nfc_io_send_prepared_response() {
     return -1;
 }
 #endif

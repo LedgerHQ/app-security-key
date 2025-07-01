@@ -1,0 +1,6 @@
+ragger[tests,speculos]>=1.11.5
+pytest>=6.1.1,<7.0.0
+pytest-asyncio
+okta>=2.9
+fido2==1.2.0
+cryptography==44.*

@@ -5,4 +5,4 @@ devices = ["nanos", "nanox", "nanos+", "stax", "flex"]
 
 [tests]
 unit_directory = "./tests/unit-tests/"
-pytest_directory = "./tests/speculos/"
+pytest_directory = "./tests/functional/"

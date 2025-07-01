@@ -12,4 +12,4 @@
  * If not, the string is truncated to fit, and, the last 3 characters are
  * replaced with dots ('...').
  */
-void truncate_for_nb_lines(char *input);
+void truncate_for_nb_lines(char *input, bool large);

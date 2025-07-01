@@ -9,9 +9,10 @@
 #include <nbgl_layout.h>
 #endif  // defined(HAVE_NBGL)
 
-void truncate_for_nb_lines(char *input) {
+void truncate_for_nb_lines(char *input, bool large) {
 #if !defined(HAVE_NBGL)
     UNUSED(input);
+    UNUSED(large);
     return;
 #else  // !defined(HAVE_NBGL)
 
@@ -24,13 +25,15 @@ void truncate_for_nb_lines(char *input) {
     uint8_t size = strlen(input);
 
     do {
-        // Trying to keep as much of the string as possible (hence the `do...` while loop)
+        // 1. Trying to keep as much of the string as possible (hence the `do...` while loop)
         // Ex: on Flex, with a single call, 'MMMMMMMMMMMMMMMMMMMMMMMMMMMM' would be reduced to
         // 'MMMMMMMMMMMMMMMMMMMMMMM...', when it fact 'MMMMMMMMMMMMMMMMMMMMMMMM...' would fit.
         // As the truncation could be severe (down to 24B in this example), I think this is worth
         // the extra computation (in any case, this would take a maximum of 3 iterations into the
         // loop)
-        nbgl_getTextMaxLenInNbLines(LARGE_MEDIUM_FONT,
+        // 2. 'large' is used on 'review' pages (needing user confirmation), while '!large' is used
+        // on 'status' pages (NFC: no confirmation but still credential display)
+        nbgl_getTextMaxLenInNbLines(large ? LARGE_MEDIUM_FONT : SMALL_REGULAR_1BPP_FONT,
                                     input,
                                     AVAILABLE_WIDTH,
                                     line_nb,
