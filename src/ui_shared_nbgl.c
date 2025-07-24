@@ -18,11 +18,13 @@
 
 #if defined(HAVE_NBGL)
 
+#include <main_std_app.h>
+
 #include "ux.h"
 
 static void app_quit(void) {
-    // exit app here
-    os_sched_exit(-1);
+    // exit app here using standard app functionality
+    app_exit();
 }
 
 #include "config.h"
