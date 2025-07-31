@@ -21,7 +21,7 @@ endif
 include $(BOLOS_SDK)/Makefile.defines
 
 $(info TARGET_NAME=$(TARGET_NAME))
-ifneq ($(TARGET_NAME),$(filter $(TARGET_NAME),TARGET_NANOS TARGET_NANOX TARGET_NANOS2 TARGET_STAX TARGET_FLEX))
+ifneq ($(TARGET_NAME),$(filter $(TARGET_NAME),TARGET_NANOS TARGET_NANOX TARGET_NANOS2 TARGET_STAX TARGET_FLEX TARGET_APEX_P))
 $(error Environment variable TARGET_NAME is not valid or not supported)
 endif
 
@@ -41,6 +41,7 @@ ICON_NANOX=icons/icon_security_key.gif
 ICON_NANOSP=icons/icon_security_key.gif
 ICON_STAX=icons/icon_security_key_stax.gif
 ICON_FLEX=icons/icon_security_key_flex.gif
+ICON_APEX_P=icons/icon_security_key_apex_p.gif
 
 ################
 # Attestations #
