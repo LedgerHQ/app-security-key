@@ -264,7 +264,7 @@ static const nbgl_layoutTagValue_t pairs[NB_OF_PAIRS] = {
 
 #if defined(TARGET_STAX)
 #define SELECT_MAX_ID_NB 5
-#elif defined(TARGET_FLEX)
+#elif defined(TARGET_FLEX) || defined(TARGET_APEX_P)
 #define SELECT_MAX_ID_NB 4
 #endif
 
@@ -367,7 +367,7 @@ static void app_nbgl_no_assertion(void) {
     nbgl_pageInfoDescription_t info = {
         .bottomButtonStyle = NO_BUTTON_STYLE,
         .footerText = NULL,
-        .centeredInfo.icon = &C_icon_security_key_64px,
+        .centeredInfo.icon = &ICON_APP_SECURITY,
         .centeredInfo.offsetY = 0,
         .centeredInfo.onTop = false,
         .centeredInfo.style = LARGE_CASE_INFO,

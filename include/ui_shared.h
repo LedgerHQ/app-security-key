@@ -26,6 +26,13 @@ void ui_idle();
 #include "nbgl_use_case.h"
 #include "nbgl_layout.h"
 
+/* Icons */
+#if defined(TARGET_STAX) || defined(TARGET_FLEX)
+#define ICON_APP_SECURITY C_icon_security_key_64px
+#elif defined(TARGET_APEX_P)
+#define ICON_APP_SECURITY C_icon_security_key_48px
+#endif
+
 void app_nbgl_start_review(uint8_t nb_pairs,
                            const nbgl_layoutTagValue_t *pairs,
                            const char *confirm_text,
