@@ -69,7 +69,7 @@ static void ui_back_from_menu_choice(void) {
     switches[0].initState = config_get_rk_enabled();
     nbgl_useCaseHomeAndSettings(
         APPNAME,
-        &C_icon_security_key_64px,
+        &ICON_APP_SECURITY,
         "Use this app for two-factor\nauthentication and\npassword-less log ins.",
         initSettingPage,
         &settingContents,
@@ -94,7 +94,7 @@ static void controls_callback(int token, uint8_t index, int page) {
         if (config_get_rk_enabled()) {
             config_set_rk_enabled(false);
         } else {
-            nbgl_useCaseChoice(&C_Warning_64px,
+            nbgl_useCaseChoice(&ICON_APP_WARNING,
                                "Enable resident keys?",
                                "Updating the OS or this app\n"
                                "will delete login info stored on\n"
@@ -174,7 +174,7 @@ void ui_idle(void) {
 #endif  //  ENABLE_RK_CONFIG_UI_SETTING
     nbgl_useCaseHomeAndSettings(
         APPNAME,
-        &C_icon_security_key_64px,
+        &ICON_APP_SECURITY,
         "Use this app for two-factor\nauthentication and\npassword-less log ins.",
         INIT_HOME_PAGE,
 #ifdef ENABLE_RK_CONFIG_UI_SETTING
@@ -306,7 +306,7 @@ void app_nbgl_status(const char *message, bool is_success, nbgl_callback_t on_qu
     nbgl_pageInfoDescription_t info = {
         .bottomButtonStyle = NO_BUTTON_STYLE,
         .footerText = NULL,
-        .centeredInfo.icon = &C_Denied_Circle_64px,
+        .centeredInfo.icon = &ICON_APP_DENIED,
         .centeredInfo.offsetY = 0,
         .centeredInfo.onTop = false,
         .centeredInfo.style = LARGE_CASE_INFO,
@@ -322,9 +322,9 @@ void app_nbgl_status(const char *message, bool is_success, nbgl_callback_t on_qu
     };
 
     if (is_success) {
-        info.centeredInfo.icon = &C_Check_Circle_64px;
+        info.centeredInfo.icon = &ICON_APP_CHECK;
     } else {
-        info.centeredInfo.icon = &C_Important_Circle_64px;
+        info.centeredInfo.icon = &ICON_APP_IMPORTANT;
     }
 
     pageContext = nbgl_pageDrawInfo(&onActionCallback, &ticker, &info);

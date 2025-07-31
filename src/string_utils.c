@@ -18,7 +18,7 @@ void truncate_for_nb_lines(char *input, bool large) {
 
 #if defined(TARGET_STAX)
     const uint8_t line_nb = 3;
-#elif defined(TARGET_FLEX)
+#elif defined(TARGET_FLEX) || defined(TARGET_APEX_P)
     const uint8_t line_nb = 2;
 #endif
     uint16_t max_bytes;
