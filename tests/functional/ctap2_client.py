@@ -1,7 +1,9 @@
 import struct
 
-from ledgered.devices import Device
+from ledgered.devices import Device, DeviceType
 
+from ragger.firmware.touch.positions import POSITIONS
+from ragger.firmware.touch.positions import APEX_P_X_CENTER
 from ragger.navigator import Navigator, NavInsID, NavIns
 from typing import List, Mapping, Union
 
@@ -236,8 +238,14 @@ class LedgerCtap2(Ctap2, LedgerCTAP):
                 else:
                     if not simple_login and select_user_idx != 1:
                         assert select_user_idx <= 5
-                        val_ins = [NavIns(NavInsID.TOUCH, (200, 350)),
-                                   NavIns(NavInsID.TOUCH, (200, 40 + 90 * select_user_idx)),
+                        device_type = self.ledger_device.type
+                        if device_type in [DeviceType.STAX, DeviceType.FLEX]:
+                            select_another_ID_pos = (POSITIONS["Center"][device_type].x, 360)
+                        elif device_type is DeviceType.APEX_P:
+                            select_another_ID_pos = (APEX_P_X_CENTER, 240)
+                        val_ins = [NavIns(NavInsID.TOUCH, select_another_ID_pos),
+                                   NavIns(NavInsID.TOUCH,
+                                          POSITIONS["ChoiceList"][device_type][select_user_idx]),
                                    NavInsID.USE_CASE_CHOICE_CONFIRM]
                     else:
                         val_ins = [NavInsID.USE_CASE_CHOICE_CONFIRM]
