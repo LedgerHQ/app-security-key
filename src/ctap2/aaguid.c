@@ -128,21 +128,20 @@ uint8_t const AAGUID[16] = {0x1d,
 #if defined(TARGET_APEX_P)
 
 // sha256 "Ledger FIDO 2 1.0 Apex_P"
-// TODO: to generate proper one
-uint8_t const AAGUID[16] = {0x1d,
-                            0x8c,
-                            0xac,
-                            0x46,
-                            0x47,
-                            0xa1,
-                            0x33,
-                            0x86,
-                            0xaf,
-                            0x50,
-                            0xe8,
-                            0x8a,
-                            0xe4,
-                            0x6f,
-                            0xe8,
-                            0x02};
+uint8_t const AAGUID[16] = {0xb3,
+                            0x31,
+                            0x51,
+                            0x66,
+                            0xf3,
+                            0x6c,
+                            0xb0,
+                            0x5f,
+                            0xfe,
+                            0xa8,
+                            0x66,
+                            0xa3,
+                            0xdf,
+                            0xda,
+                            0xd1,
+                            0x71};
 #endif /* #if defined(TARGET_APEX_P) */
