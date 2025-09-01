@@ -1,6 +1,6 @@
 import struct
 
-from ledgered.devices import Device
+from ledgered.devices import Device, DeviceType
 
 from ragger.navigator import Navigator, NavInsID, NavIns
 from typing import List, Mapping, Union
@@ -236,9 +236,18 @@ class LedgerCtap2(Ctap2, LedgerCTAP):
                 else:
                     if not simple_login and select_user_idx != 1:
                         assert select_user_idx <= 5
-                        val_ins = [NavIns(NavInsID.TOUCH, (200, 350)),
-                                   NavIns(NavInsID.TOUCH, (200, 40 + 90 * select_user_idx)),
-                                   NavInsID.USE_CASE_CHOICE_CONFIRM]
+                        if self.ledger_device.type is DeviceType.STAX:
+                            val_ins = [NavIns(NavInsID.TOUCH, (200, 360)),
+                                       NavIns(NavInsID.TOUCH, (200, 48 + 48 * 2 * select_user_idx)),
+                                       NavInsID.USE_CASE_CHOICE_CONFIRM]
+                        elif self.ledger_device.type is DeviceType.FLEX:
+                            val_ins = [NavIns(NavInsID.TOUCH, (240, 360)),
+                                       NavIns(NavInsID.TOUCH, (240, 51 + 51 * 2 * select_user_idx)),
+                                       NavInsID.USE_CASE_CHOICE_CONFIRM]
+                        elif self.ledger_device.type is DeviceType.APEX_P:
+                            val_ins = [NavIns(NavInsID.TOUCH, (150, 240)),
+                                       NavIns(NavInsID.TOUCH, (150, 30 + 30 * 2 * select_user_idx)),
+                                       NavInsID.USE_CASE_CHOICE_CONFIRM]
                     else:
                         val_ins = [NavInsID.USE_CASE_CHOICE_CONFIRM]
         if self.nfc:
