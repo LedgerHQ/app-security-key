@@ -1,0 +1,15 @@
+[req]
+distinguished_name = req_distinguished_name
+prompt = no
+
+[req_distinguished_name]
+C = FR
+O = Ledger
+OU = Authenticator Attestation
+CN = Ledger Apex Plus FIDO 2 Attestation Batch 1
+
+[v3_req]
+subjectKeyIdentifier = none
+authorityKeyIdentifier = none
+1.3.6.1.4.1.45724.1.1.4=ASN1:FORMAT:HEX,OCTETSTRING:b3315166f36cb05ffea866a3dfdad171
+basicConstraints=critical,CA:FALSE
