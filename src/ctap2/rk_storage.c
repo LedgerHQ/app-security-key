@@ -35,7 +35,7 @@ typedef struct __attribute__((__packed__)) rk_header_s {
 } rk_header_t;
 
 #define SLOT_SIZE 256
-// Currently 24 on all devices, except NanoS which only allows 8
+// Currently 24 on all devices
 #define CREDENTIAL_MAX_NUMBER (RK_SIZE / SLOT_SIZE)
 #define CREDENTIAL_MAX_SIZE   (SLOT_SIZE - sizeof(rk_header_t))
 CCASSERT("credentialLen should fit in an uint8_t", CREDENTIAL_MAX_SIZE <= 0xFF);
