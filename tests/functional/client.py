@@ -8,7 +8,7 @@ from fido2.attestation import AttestationVerifier
 from fido2.ctap import CtapDevice
 from fido2.ctap2.pin import ClientPin
 from pathlib import Path
-from ledgered.devices import Device, DeviceType
+from ledgered.devices import Device
 
 from ragger.backend import BackendInterface
 from ragger.navigator import Navigator, NavInsID, NavIns
@@ -133,12 +133,8 @@ class TestClient:
                 NavInsID.BOTH_CLICK
             ]
 
-            if self.ledger_device.type == DeviceType.NANOS:
-                # Screen 0 -> 5
-                instructions += [NavInsID.RIGHT_CLICK] * 5
-            else:
-                # Screen 0 -> 13
-                instructions += [NavInsID.RIGHT_CLICK] * 13
+            # Screen 0 -> 13
+            instructions += [NavInsID.RIGHT_CLICK] * 13
 
             instructions += [
                 NavInsID.BOTH_CLICK,
@@ -175,12 +171,10 @@ class TestClient:
                 # Enable and skip "Enabling" message
                 NavInsID.BOTH_CLICK
             ]
-            if self.ledger_device.type != DeviceType.NANOS:
-                # Screen 0 -> 5
-                instructions += [NavInsID.RIGHT_CLICK] * 5
-            else:
-                # Screen 0 -> 13
-                instructions += [NavInsID.RIGHT_CLICK] * 13
+
+            # Screen 0 -> 5
+            instructions += [NavInsID.RIGHT_CLICK] * 5
+
             instructions += [
                 NavInsID.BOTH_CLICK,
                 # Leave settings

@@ -33,7 +33,6 @@ def test_get_info_aaguid(client):
     info = client.ctap2.info
 
     expected_base_string = {
-        DeviceType.NANOS: "Ledger FIDO 2 1.0",
         DeviceType.NANOX: "Ledger FIDO 2 1.0 NanoX",
         DeviceType.NANOSP: "Ledger FIDO 2 1.0 NanoS+",
         DeviceType.STAX: "Ledger FIDO 2 1.0 Stax",

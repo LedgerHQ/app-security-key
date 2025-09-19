@@ -173,7 +173,6 @@ UX_STEP_INIT(ux_get_assertion_multiple_left_border, NULL, NULL, {
     display_next_state(STATE_LEFT_BORDER);
 });
 
-#ifndef TARGET_NANOS
 UX_STEP_CB_INIT(ux_get_assertion_multiple_user_border,
                 bnnn_paging,
                 { display_next_state(STATE_VARIABLE); },
@@ -182,16 +181,6 @@ UX_STEP_CB_INIT(ux_get_assertion_multiple_user_border,
                     .title = g.buffer_20,
                     .text = g.username_buffer,
                 });
-#else
-UX_STEP_CB_INIT(ux_get_assertion_multiple_user_border,
-                bn,
-                { display_next_state(STATE_VARIABLE); },
-                ctap_ux_on_user_choice(true, ux_step),
-                {
-                    g.buffer_20,
-                    g.username_buffer,
-                });
-#endif
 
 UX_STEP_INIT(ux_get_assertion_multiple_right_border, NULL, NULL, {
     display_next_state(STATE_RIGHT_BORDER);
@@ -207,7 +196,6 @@ UX_FLOW(ux_get_assertion_multiple_flow,
 
 // Dedicated flow to get user presence confirmation if no account is registered
 
-#ifndef TARGET_NANOS
 UX_STEP_NOCB(ux_ctap2_no_assertion_flow_0_step,
              pnn,
              {
@@ -223,22 +211,6 @@ UX_STEP_NOCB(ux_ctap2_no_assertion_flow_1_step,
                  "same Ledger you",
                  "register with.",
              });
-#else
-UX_STEP_NOCB(ux_ctap2_no_assertion_flow_0_step,
-             pnn,
-             {
-                 &C_icon_warning,
-                 "Login details",
-                 "not found",
-             });
-
-UX_STEP_NOCB(ux_ctap2_no_assertion_flow_1_step,
-             nn,
-             {
-                 "Use the same Ledger",
-                 "you register with.",
-             });
-#endif
 
 UX_STEP_CB(ux_ctap2_no_assertion_flow_3_step,
            pb,

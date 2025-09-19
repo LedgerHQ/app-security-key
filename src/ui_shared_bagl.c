@@ -19,11 +19,7 @@
 #if defined(HAVE_BAGL)
 
 #include <os.h>
-#ifndef TARGET_NANOS
 #include <main_std_app.h>
-#else
-extern void __attribute__((noreturn)) app_exit(void);
-#endif /* #ifndef TARGET_NANOS */
 
 #include "ux.h"
 
@@ -119,18 +115,9 @@ static void display_settings() {
 
 UX_STEP_NOCB(ux_idle_flow_1_step, pn, {&C_icon_security_key, "Security Key"});
 
-#ifndef TARGET_NANOS
 UX_STEP_NOCB(ux_idle_flow_2_step,
              nnnn,
              {"Use for two-factor", "authentication and", "password-less", "log ins."});
-#else
-UX_STEP_NOCB(ux_idle_flow_2_step,
-             nn,
-             {
-                 "Use for 2FA and",
-                 "password-less log ins.",
-             });
-#endif
 
 UX_STEP_NOCB(ux_idle_flow_3_step,
              bn,
