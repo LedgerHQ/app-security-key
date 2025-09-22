@@ -120,12 +120,7 @@ extern global_t g;
 
 extern u2f_service_t G_io_u2f;
 
-#ifdef TARGET_NANOS
-// Spare RAM on Nanos
-#define responseBuffer G_io_apdu_buffer
-#else
 extern uint8_t responseBuffer[IO_APDU_BUFFER_SIZE];
-#endif
 
 typedef struct ctap2_data_t {
     union ctap2_data_u {

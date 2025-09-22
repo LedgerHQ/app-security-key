@@ -18,28 +18,6 @@
 
 #include "os.h"
 
-#if defined(TARGET_NANOS)
-
-// sha256 "Ledger FIDO 2 1.0"
-uint8_t const AAGUID[16] = {0x34,
-                            0x1e,
-                            0x4d,
-                            0xa9,
-                            0x3c,
-                            0x2e,
-                            0x81,
-                            0x03,
-                            0x5a,
-                            0x9f,
-                            0xaa,
-                            0xd8,
-                            0x87,
-                            0x13,
-                            0x52,
-                            0x00};
-
-#endif
-
 #if defined(TARGET_NANOX)
 
 // sha256 "Ledger FIDO 2 1.0 NanoX"
@@ -124,3 +102,24 @@ uint8_t const AAGUID[16] = {0x1d,
                             0xe8,
                             0x02};
 #endif
+
+#if defined(TARGET_APEX_P)
+
+// sha256 "Ledger FIDO 2 1.0 Apex_P"
+uint8_t const AAGUID[16] = {0xb3,
+                            0x31,
+                            0x51,
+                            0x66,
+                            0xf3,
+                            0x6c,
+                            0xb0,
+                            0x5f,
+                            0xfe,
+                            0xa8,
+                            0x66,
+                            0xa3,
+                            0xdf,
+                            0xda,
+                            0xd1,
+                            0x71};
+#endif /* #if defined(TARGET_APEX_P) */

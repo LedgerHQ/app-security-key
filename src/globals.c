@@ -27,11 +27,7 @@ global_t g;
 shared_ctx_t shared_ctx;
 ctap2_ux_state_t ctap2UxState;
 
-#ifdef TARGET_NANOS
-// Spare RAM on Nanos
-#else
 uint8_t responseBuffer[IO_APDU_BUFFER_SIZE];
-#endif
 
 #include "string_utils.h"
 

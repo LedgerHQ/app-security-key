@@ -113,6 +113,16 @@ async def verify_factor(client, okta_client, okta_url, user_id: int, factor_id: 
     If none of these steps raises, then the authenticator is verified.
     """
 
+    # getting all factors for user_id
+    factors = await okta_await(okta_client.list_factors, user_id)
+
+    allow_list = list()
+    for factor_dict in factors:
+        if factor_dict.factor_type != "webauthn":
+            continue
+        credential_id = websafe_decode(factor_dict.profile.credential_id)
+        allow_list.append({"id": credential_id, "type": "public-key"})
+
     # first request empty, to fetch the challenge
     challenge = await okta_await(okta_client.verify_factor, user_id, factor_id, dict())
 
@@ -123,14 +133,6 @@ async def verify_factor(client, okta_client, okta_url, user_id: int, factor_id: 
         challenge=ctap2_get_assertion["challenge"],
         origin=okta_url,
     )
-
-    allow_list = list()
-    for factor_dict in challenge.embedded["enrolledFactors"]:
-        if factor_dict["factorType"] != "webauthn":
-            continue
-
-        credential_id = websafe_decode(factor_dict["profile"]["credentialId"])
-        allow_list.append({"id": credential_id, "type": "public-key"})
 
     options = {"uv": ctap2_get_assertion["userVerification"] in ["preferred", "required"]}
 

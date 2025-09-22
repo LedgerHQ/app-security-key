@@ -33,11 +33,11 @@ def test_get_info_aaguid(client):
     info = client.ctap2.info
 
     expected_base_string = {
-        DeviceType.NANOS: "Ledger FIDO 2 1.0",
         DeviceType.NANOX: "Ledger FIDO 2 1.0 NanoX",
         DeviceType.NANOSP: "Ledger FIDO 2 1.0 NanoS+",
         DeviceType.STAX: "Ledger FIDO 2 1.0 Stax",
-        DeviceType.FLEX: "Ledger FIDO 2 1.0 Flex"
+        DeviceType.FLEX: "Ledger FIDO 2 1.0 Flex",
+        DeviceType.APEX_P: "Ledger FIDO 2 1.0 Apex_P"
     }
     if client.ledger_device.type not in expected_base_string:
         raise ValueError("Unhandled model")

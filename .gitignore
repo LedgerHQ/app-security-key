@@ -32,3 +32,6 @@ attestations/data/prod/*/*priv-key.*
 attestations/data/prod/*priv-key.*
 
 tests/functional/snapshots-tmp/
+
+# VIM
+*.swp
