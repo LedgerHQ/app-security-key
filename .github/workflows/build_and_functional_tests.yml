@@ -55,7 +55,7 @@ jobs:
   tests:
     needs: build_application
     name: Ragger tests
-    uses: LedgerHQ/ledger-app-workflows/.github/workflows/reusable_ragger_tests.yml@v1
+    uses: LedgerHQ/ledger-app-workflows/.github/workflows/reusable_ragger_tests.yml@handling_artifact_wspaces
     with:
       download_app_binaries_artifact: compiled_app_binaries
       regenerate_snapshots: ${{ github.event_name == 'workflow_dispatch' && inputs.golden_run == 'Open a PR' }}
@@ -63,7 +63,7 @@ jobs:
   tests_rk:
     needs: build_application_rk_ui
     name: Ragger tests with ENABLE_RK_CONFIG_UI_SETTING
-    uses: LedgerHQ/ledger-app-workflows/.github/workflows/reusable_ragger_tests.yml@v1
+    uses: LedgerHQ/ledger-app-workflows/.github/workflows/reusable_ragger_tests.yml@handling_artifact_wspaces
     with:
       download_app_binaries_artifact: compiled_app_binaries_rk_ui
       test_options: '--rk-config-ui'
@@ -72,7 +72,7 @@ jobs:
   tests_nfc:
     needs: build_application
     name: Ragger NFC tests
-    uses: LedgerHQ/ledger-app-workflows/.github/workflows/reusable_ragger_tests.yml@v1
+    uses: LedgerHQ/ledger-app-workflows/.github/workflows/reusable_ragger_tests.yml@handling_artifact_wspaces
     with:
       download_app_binaries_artifact: compiled_app_binaries
       run_for_devices: '["stax", "flex", "apex_p"]'
@@ -82,7 +82,7 @@ jobs:
   tests_hid:
     needs: build_application
     name: Ragger HID tests
-    uses: LedgerHQ/ledger-app-workflows/.github/workflows/reusable_ragger_tests.yml@v1
+    uses: LedgerHQ/ledger-app-workflows/.github/workflows/reusable_ragger_tests.yml@handling_artifact_wspaces
     with:
       download_app_binaries_artifact: compiled_app_binaries
       run_for_devices: '["nanox"]'
@@ -92,7 +92,7 @@ jobs:
   tests_okta:
     needs: build_application
     name: Ragger OKTA tests
-    uses: LedgerHQ/ledger-app-workflows/.github/workflows/reusable_ragger_tests.yml@v1
+    uses: LedgerHQ/ledger-app-workflows/.github/workflows/reusable_ragger_tests.yml@handling_artifact_wspaces
     with:
       download_app_binaries_artifact: compiled_app_binaries
       run_for_devices: '["flex"]'
@@ -104,7 +104,7 @@ jobs:
   tests_nfc_u2f:
     needs: build_application_nfc_u2f
     name: Ragger tests with ENABLE_NFC_U2F_TESTS
-    uses: LedgerHQ/ledger-app-workflows/.github/workflows/reusable_ragger_tests.yml@v1
+    uses: LedgerHQ/ledger-app-workflows/.github/workflows/reusable_ragger_tests.yml@handling_artifact_wspaces
     with:
       download_app_binaries_artifact: compiled_app_binaries_nfc_u2f
       test_filter: 'test_make_credential_followed_u2f'
