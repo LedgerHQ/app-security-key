@@ -59,6 +59,43 @@ def test_get_assertion_ok(client, test_name: str):
     assert assertion.user is None
     assert assertion.number_of_credentials is None
 
+def test_get_assertion_ok_with_cancel(client, test_name: str):
+    # This test is a non-regression test for an IO-revamp bug in the SDK when
+    # CANCEL operation was not handled correctly and a next authentication failed
+    compare_args = (TESTS_SPECULOS_DIR, client.transported_path(test_name))
+
+    t = ctap2_get_assertion(client, ref=0)
+
+    client_data_hash = generate_random_bytes(32)
+    allow_list = [{"id": t.credential_data.credential_id, "type": "public-key"}]
+    assertion = client.ctap2.get_assertion(t.args.rp["id"], client_data_hash,
+                                           allow_list,
+                                           check_users=[t.args.user],
+                                           check_screens=True,
+                                           compare_args=compare_args)
+
+    assertion.verify(client_data_hash, t.credential_data.public_key)
+
+    assert len(assertion.auth_data) == 37
+    assert sha256(t.args.rp["id"].encode()) == assertion.auth_data.rp_id_hash
+    assert assertion.auth_data.flags == AuthenticatorData.FLAG.USER_PRESENT
+    assert assertion.user is None
+    assert assertion.number_of_credentials is None
+
+    client.ctap2.cancel()
+
+    client_data_hash = generate_random_bytes(32)
+    assertion = client.ctap2.get_assertion(t.args.rp["id"], client_data_hash,
+                                           allow_list)
+
+    assertion.verify(client_data_hash, t.credential_data.public_key)
+
+    assert len(assertion.auth_data) == 37
+    assert sha256(t.args.rp["id"].encode()) == assertion.auth_data.rp_id_hash
+    assert assertion.auth_data.flags == AuthenticatorData.FLAG.USER_PRESENT
+    assert assertion.user is None
+    assert assertion.number_of_credentials is None
+
 
 def test_get_assertion_uv(client, test_name: str):
     compare_args = (TESTS_SPECULOS_DIR, client.transported_path(test_name))
@@ -308,6 +345,22 @@ def test_get_assertion_cancel(client, test_name):
                                    check_users=[t.args.user],
                                    compare_args=compare_args)
     assert e.value.code == CtapError.ERR.KEEPALIVE_CANCEL
+
+    # Let us make sure that it is still possible to execute assert after a cancel
+    assertion = client.ctap2.get_assertion(t.args.rp["id"], client_data_hash,
+                                           allow_list,
+                                           check_users=[t.args.user],
+                                           check_screens=True,
+                                           compare_args=compare_args)
+
+    assertion.verify(client_data_hash, t.credential_data.public_key)
+
+    assert len(assertion.auth_data) == 37
+    assert sha256(t.args.rp["id"].encode()) == assertion.auth_data.rp_id_hash
+    assert assertion.auth_data.flags == AuthenticatorData.FLAG.USER_PRESENT
+    assert assertion.user is None
+    assert assertion.number_of_credentials is None
+
 
 
 def test_get_assertion_bad_allow_list(client):

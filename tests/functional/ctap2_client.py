@@ -98,6 +98,10 @@ class LedgerCtap2(Ctap2, LedgerCTAP):
             return decoded
         raise TypeError("Decoded value of wrong type")
 
+    def cancel(self):
+        # Send a cancel command
+        self.device.send(CTAPHID.CANCEL, b"")
+
     def make_credential(self, args: MakeCredentialArguments,
                         event=None,
                         on_keepalive=None,
