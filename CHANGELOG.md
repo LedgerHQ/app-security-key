@@ -5,10 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.4] - 2024-10-20
+
+### Fixed
+
+- CTAPHID_CANCEL command handling (in the SDK part)
+
+
+## [1.7.3] - 2024-09-22
+
+### Added
+- Apex P porting
+
+### Removed
+- Nano S support
+
+
 ## [1.7.2] - 2024-08-06
 
 ### Fixed
 - Catching up updated `API_LEVEL_24` SDK version with HID U2F fix
+
 
 ## [1.7.1] - 2024-07-24
 
@@ -32,10 +49,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.6.5] - 2024-10-09
 
-
 ### Fixed
 
 - several UI aspects
+
 
 ## [1.6.4] - 2024-07-22
 
@@ -56,6 +73,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Internal minor fixes and changes
+
 
 ## [1.6.1] - 2024-06-26
 
