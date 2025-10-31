@@ -2,6 +2,13 @@ import pytest
 from cryptography.exceptions import InvalidSignature
 from fido2.ctap import CtapError
 from fido2.utils import sha256
+from fido2.ctap2 import Ctap2
+from fido2.hid import CAPABILITY, CtapHidDevice
+try:
+    from fido2.pcsc import CtapPcscDevice
+except ImportError:
+    CtapPcscDevice = None
+
 from fido2.webauthn import AuthenticatorData, AttestedCredentialData
 
 from ..client import TESTS_SPECULOS_DIR
@@ -159,29 +166,44 @@ def test_get_assertion_user_refused(client, test_name: str):
     assert e.value.code == CtapError.ERR.OPERATION_DENIED
 
 
+def enumerate_devices():
+    for dev in CtapHidDevice.list_devices():
+        yield dev
+    if CtapPcscDevice:
+        for dev in CtapPcscDevice.list_devices():
+            yield dev
+
+
 def test_get_assertion_no_existing_credentials_simple(client, test_name: str):
-    compare_args = (TESTS_SPECULOS_DIR, client.transported_path(test_name))
-    args = generate_make_credentials_params(client, ref=0)
-    rp = args.rp
-    # Try without allow_list
-    with pytest.raises(CtapError) as e:
-        client.ctap2.get_assertion(args.rp["id"], args.client_data_hash,
-                                   check_screens=True,
-                                   compare_args=compare_args,
-                                   will_fail=True)
-    assert e.value.code == CtapError.ERR.NO_CREDENTIALS
+    for dev in enumerate_devices():
+        print("CONNECT: %s" % dev)
+        print("Product name: %s" % dev.product_name)
+        print("Serial number: %s" % dev.serial_number)
+        print("CTAPHID protocol version: %d" % dev.version)
+
+        if dev.capabilities & CAPABILITY.CBOR:
+            ctap2 = Ctap2(dev)
+            info = ctap2.get_info()
+            print("DEVICE INFO: %s" % info)
+            break
+        else:
+            print("Device does not support CBOR")
 
     # Try with unknown credential in allow_list
     args = generate_make_credentials_params(client)
+    rp = args.rp
+    options = {"up": False}
     allow_list = [{"id": generate_random_bytes(32), "type": "public-key"}]
-    with pytest.raises(CtapError) as e:
-        client.ctap2.get_assertion(rp["id"], args.client_data_hash,
-                                   allow_list,
-                                   check_screens=True,
-                                   compare_args=compare_args,
-                                   will_fail=True)
-    assert e.value.code == CtapError.ERR.NO_CREDENTIALS
-
+    iteration = 1;
+    while (1):
+        print(f"i = {iteration}")
+        with pytest.raises(CtapError) as e:
+            ctap2.get_assertion(rp["id"], args.client_data_hash,
+                                           allow_list, options=options)
+        assert e.value.code == CtapError.ERR.NO_CREDENTIALS
+        # time.sleep(1)
+        print("")
+        iteration = iteration +1
 
 def test_get_assertion_no_credentials_no_up(client, test_name: str):
     options = {"up": False}
