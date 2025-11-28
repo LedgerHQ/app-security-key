@@ -1,9 +1,9 @@
 {
   "legalHeader": "Submission of this statement and retrieval and use of this statement indicates acceptance of the appropriate agreement located at https://fidoalliance.org/metadata/metadata-legal-terms/.",
-  "description": "Ledger Apex Plus FIDO2 Authenticator",
+  "description": "Ledger Nano Gen5 FIDO2 Authenticator",
   "aaguid": "b3315166-f36c-b05f-fea8-66a3dfdad171",
   "alternativeDescriptions": {},
-  "authenticatorVersion": 10800,
+  "authenticatorVersion": 10704,
   "protocolFamily": "fido2",
   "schema": 3,
   "upv": [{
