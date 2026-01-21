@@ -77,10 +77,10 @@ int config_init(void) {
     uint8_t tmp8;
     if (N_u2f.initialized != 1) {
 #ifdef HAVE_COUNTER_MARKER
-        tmp32 = 0xF1D0C001;
+        tmp32 = COUNTER_MARKER;
 #else
         tmp32 = 1;
-#endif
+#endif /* HAVE_COUNTER_MARKER */
         nvm_write((void *) &N_u2f.authentificationCounter,
                   (void *) &tmp32,
                   sizeof(N_u2f.authentificationCounter));
