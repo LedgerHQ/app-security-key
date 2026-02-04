@@ -104,7 +104,16 @@ DEFINES += HAVE_BOLOS_APP_STACK_CANARY
 # This is necessary to never use the counter with a lower value than previous calls.
 # This means that the app APDU will be patched when streamed from the HSM and therefore
 # the apdu should not contain a crc.
+# For release build a special value marker is used to be patched by HSM in release binary.
+# For debug build a timestamp-based marker is used.
 DEFINES += HAVE_COUNTER_MARKER
+ifneq ($(DEBUG), 0)
+TIMESTAMP_HEX := $(shell printf '%08X' $$(date +%s))
+DEFINES += COUNTER_MARKER=0x${TIMESTAMP_HEX}
+else
+DEFINES += COUNTER_MARKER=0xF1D0C001
+endif
+
 ENABLE_NOCRC_APP_LOAD_PARAMS = 1
 # required for the marker to be found in the app binary
 CFLAGS += -mno-movt
