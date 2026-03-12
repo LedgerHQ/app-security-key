@@ -164,6 +164,12 @@ endif
 
 ENABLE_NFC = 1
 
+# Enable BLE FIDO transport (CTAP2 §8.3) on BLE-capable targets.
+# ENABLE_BLUETOOTH = 1 tells the SDK's Makefile.standard_app to compile
+# lib_blewbxx (HAVE_BLE, BLE_COMMAND_TIMEOUT_MS, etc.).
+ENABLE_BLUETOOTH = 1
+ENABLE_BLE_FIDO = 1
+
 ##############
 # Compiler #
 ##############
@@ -171,6 +177,12 @@ ENABLE_NFC = 1
 # Application source files
 APP_SOURCE_PATH  += src cbor-src
 SDK_SOURCE_PATH  += lib_u2f
+
+# BLE FIDO transport: request the U2F BLE profile and set init mask
+ifeq ($(ENABLE_BLE_FIDO),1)
+DEFINES += HAVE_BLE_FIDO
+DEFINES += BLE_INIT_PROFILE_MASK=BLE_LEDGER_PROFILE_U2F
+endif
 
 VARIANT_PARAM = APP
 VARIANT_VALUES = SecurityKey

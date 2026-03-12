@@ -95,6 +95,12 @@ static const uint8_t FIDO_AID[FIDO_AID_SIZE] = {0xA0, 0x00, 0x00, 0x06, 0x47, 0x
 
 #define CMD_IS_OVER_U2F_USB (G_io_u2f.media == U2F_MEDIA_USB)
 
+#if defined(HAVE_BLE_FIDO) && defined(HAVE_BLE)
+#define CMD_IS_OVER_U2F_BLE (G_io_u2f.media == U2F_MEDIA_BLE)
+#else
+#define CMD_IS_OVER_U2F_BLE false
+#endif
+
 #ifdef HAVE_NFC
 #ifndef HAVE_U2F_OVER_FAKE_NFC_TESTS
 #define CMD_IS_OVER_U2F_NFC (G_io_app.apdu_media == IO_APDU_MEDIA_NFC)
@@ -112,6 +118,7 @@ typedef struct global_s {
     char username_buffer[NAME_BUFFER_SIZE];
     char displayed_message[131];
     bool is_nfc;
+    bool is_ble;
     bool display_status;
     bool get_next_assertion_enabled;
 } global_t;

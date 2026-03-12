@@ -56,6 +56,7 @@
 
 #define TRANSPORT_USB "usb"
 #define TRANSPORT_NFC "nfc"
+#define TRANSPORT_BLE "ble"
 
 static void cbip_add_option(cbipEncoder_t *encoder,
                             const char *option_desc,
@@ -88,7 +89,7 @@ void ctap2_get_info_handle(u2f_service_t *service, uint8_t *buffer, uint16_t len
 
     cbip_encoder_init(&encoder, responseBuffer + 1, CUSTOM_IO_APDU_BUFFER_SIZE - 1);
 
-    cbip_add_map_header(&encoder, 6);
+    cbip_add_map_header(&encoder, 7);
 
     // versions (0x01)
 
@@ -165,35 +166,26 @@ void ctap2_get_info_handle(u2f_service_t *service, uint8_t *buffer, uint16_t len
 
     /*
     // transports (0x09)
-
-    cbip_add_int(&encoder, TAG_TRANSPORTS);
-#ifdef HAVE_NFC
-    cbip_add_array_header(&encoder, 2);
-#else
-    cbip_add_array_header(&encoder, 2);
-#endif // HAVE_NFC
-    cbip_add_string(&encoder, TRANSPORT_USB, sizeof(TRANSPORT_USB) - 1);
-#ifdef HAVE_NFC
-    cbip_add_string(&encoder, TRANSPORT_NFC, sizeof(TRANSPORT_NFC) - 1);
-#endif // HAVE_NFC
-
-    // algorithms (0x0A)
-    // List of 3, in this order of preference: ES256, EDDSA, ES256K
-    cbip_add_int(&encoder, TAG_ALGORITHMS);
-    cbip_add_array_header(&encoder, 3);
-    cbip_add_alg_pkey(&encoder,
-                      CREDENTIAL_DESCRIPTOR_ALG,
-                      sizeof(CREDENTIAL_DESCRIPTOR_ALG) - 1,
-                      COSE_ALG_ES256);
-    cbip_add_alg_pkey(&encoder,
-                      CREDENTIAL_DESCRIPTOR_ALG,
-                      sizeof(CREDENTIAL_DESCRIPTOR_ALG) - 1,
-                      COSE_ALG_EDDSA);
-    cbip_add_alg_pkey(&encoder,
-                      CREDENTIAL_DESCRIPTOR_ALG,
-                      sizeof(CREDENTIAL_DESCRIPTOR_ALG) - 1,
-                      COSE_ALG_ES256K);
     */
+    {
+        uint8_t transport_count = 1;  /* USB always present */
+#ifdef HAVE_NFC
+        transport_count++;
+#endif
+#if defined(HAVE_BLE_FIDO) && defined(HAVE_BLE)
+        transport_count++;
+#endif
+        cbip_add_int(&encoder, TAG_TRANSPORTS);
+        cbip_add_array_header(&encoder, transport_count);
+        cbip_add_string(&encoder, TRANSPORT_USB, sizeof(TRANSPORT_USB) - 1);
+#ifdef HAVE_NFC
+        cbip_add_string(&encoder, TRANSPORT_NFC, sizeof(TRANSPORT_NFC) - 1);
+#endif
+#if defined(HAVE_BLE_FIDO) && defined(HAVE_BLE)
+        cbip_add_string(&encoder, TRANSPORT_BLE, sizeof(TRANSPORT_BLE) - 1);
+#endif
+    }
+
     responseBuffer[0] = ERROR_NONE;
     send_cbor_response(service, 1 + encoder.offset, NULL);
 }

@@ -23,6 +23,7 @@
 #include "ctap2_utils.h"
 #include "globals.h"
 #include "nfc_io.h"
+#include "ble_io.h"
 #include "sw_code.h"
 
 #define RPID_FILTER      "webctap."
@@ -37,7 +38,15 @@ bool ctap2_check_rpid_filter(const char *rpId, uint32_t rpIdLen) {
 }
 
 void send_cbor_error(u2f_service_t *service, uint8_t error) {
-    if (CMD_IS_OVER_U2F_CMD) {
+    if (CMD_IS_OVER_U2F_NFC) {
+        nfc_io_set_response_ready(SW_NO_ERROR, 1, "cbor_error");
+        responseBuffer[0] = error;
+        nfc_io_send_prepared_response();
+    } else if (CMD_IS_OVER_U2F_BLE) {
+        responseBuffer[0] = error;
+        ble_io_set_response_ready(SW_NO_ERROR, 1, "cbor_error");
+        ble_io_send_prepared_response();
+    } else if (CMD_IS_OVER_U2F_CMD) {
         io_send_response_pointer((uint8_t *) &error, 1, SW_NO_ERROR);
     } else {
         u2f_message_reply(service, CTAP2_CMD_CBOR, (uint8_t *) &error, 1);
@@ -48,6 +57,9 @@ void send_cbor_response(u2f_service_t *service, uint32_t length, const char *sta
     if (CMD_IS_OVER_U2F_NFC) {
         nfc_io_set_response_ready(SW_NO_ERROR, length, status);
         nfc_io_send_prepared_response();
+    } else if (CMD_IS_OVER_U2F_BLE) {
+        ble_io_set_response_ready(SW_NO_ERROR, length, status);
+        ble_io_send_prepared_response();
     } else if (CMD_IS_OVER_U2F_CMD) {
         io_send_response_pointer(responseBuffer, length, SW_NO_ERROR);
     } else {
@@ -56,7 +68,9 @@ void send_cbor_response(u2f_service_t *service, uint32_t length, const char *sta
 }
 
 void ctap2_send_keepalive_processing() {
-    if (CMD_IS_OVER_CTAP2_CBOR_CMD) {
+    if (CMD_IS_OVER_U2F_BLE) {
+        ble_io_send_keepalive(KEEPALIVE_REASON_PROCESSING);
+    } else if (CMD_IS_OVER_CTAP2_CBOR_CMD) {
         u2f_transport_ctap2_send_keepalive(&G_io_u2f, KEEPALIVE_REASON_PROCESSING);
 #ifndef REVAMPED_IO
         io_seproxyhal_io_heartbeat();

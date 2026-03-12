@@ -28,13 +28,18 @@
 #include "ui_shared.h"
 #include "ctap2.h"
 #include "rk_storage.h"
+#include "ble_io.h"
 
 /**
  * Override app_ticker_event_callback io_event() dummy implementation
  */
 void app_ticker_event_callback(void) {
     if (ctap2UxState != CTAP2_UX_STATE_NONE) {
-        u2f_transport_ctap2_send_keepalive(&G_io_u2f, KEEPALIVE_REASON_TUP_NEEDED);
+        if (CMD_IS_OVER_U2F_BLE) {
+            ble_io_send_keepalive(KEEPALIVE_REASON_TUP_NEEDED);
+        } else {
+            u2f_transport_ctap2_send_keepalive(&G_io_u2f, KEEPALIVE_REASON_TUP_NEEDED);
+        }
     }
 #ifdef HAVE_NFC
     nfc_idle_work();
@@ -112,6 +117,7 @@ void app_main() {
 
     for (;;) {
         g.is_nfc = false;
+        g.is_ble = false;
         // Receive command bytes in G_io_apdu_buffer
         input_len = io_recv_command();
         // WARNING - For most basic U2F usages on USB, the SDK proxies U2F calls and directly calls
@@ -123,6 +129,7 @@ void app_main() {
             return;
         }
         g.is_nfc = CMD_IS_OVER_U2F_NFC;
+        g.is_ble = CMD_IS_OVER_U2F_BLE;
 
         // Dispatch APDU command to handler
         if (u2f_handle_apdu(G_io_apdu_buffer, input_len) < 0) {
