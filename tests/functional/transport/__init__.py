@@ -5,3 +5,4 @@ class TransportType(Enum):
     U2F = auto()
     HID = auto()
     NFC = auto()
+    BLE = auto()
