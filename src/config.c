@@ -29,6 +29,7 @@ config_t const N_u2f_real;
 
 static int derive_and_store_keys(uint32_t resetGeneration) {
     cx_err_t error;
+    int status = -1;
     uint8_t key[64];
     uint8_t derivateKey[CX_SHA256_SIZE];
     uint32_t keyPath[3];
@@ -41,11 +42,12 @@ static int derive_and_store_keys(uint32_t resetGeneration) {
     keyPath[0] = PRIVATE_KEY_SEED_PATH;
     error = os_derive_bip32_no_throw(CX_CURVE_SECP256R1, keyPath, 3, key, key + 32);
     if (error != CX_OK) {
-        return -1;
+        goto exit;
     }
     if (memcmp(key, (uint8_t *) N_u2f.privateKeySeed, sizeof(N_u2f.privateKeySeed)) == 0) {
         // Keys are already initialized with the proper seed and resetGeneration
-        return 0;
+        status = 0;
+        goto exit;
     }
     nvm_write((void *) N_u2f.privateKeySeed, (void *) key, sizeof(N_u2f.privateKeySeed));
 
@@ -53,7 +55,7 @@ static int derive_and_store_keys(uint32_t resetGeneration) {
     keyPath[0] = WRAPPING_KEY_PATH;
     error = os_derive_bip32_no_throw(CX_CURVE_SECP256R1, keyPath, 3, key, key + 32);
     if (error != CX_OK) {
-        return -1;
+        goto exit;
     }
 
     // wrappingKeyU2F: aes_key = SHA256(VERSION || wrappingKeys)
@@ -68,7 +70,11 @@ static int derive_and_store_keys(uint32_t resetGeneration) {
               (void *) derivateKey,
               sizeof(N_u2f.wrappingKeyCTAP2));
 
-    return 0;
+    status = 0;
+exit:
+    explicit_bzero(key, sizeof(key));
+    explicit_bzero(derivateKey, sizeof(derivateKey));
+    return status;
 }
 
 int config_init(void) {
