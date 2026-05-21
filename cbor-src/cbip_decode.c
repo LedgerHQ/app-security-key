@@ -92,9 +92,19 @@ static int cbip_get(cbipDecoder_t *decoder, cbipItem_t *item) {
     if (status >= 0) {
         switch (type) {
             case CBOR_UNSIGNED_INT:
+                // Reject values that do not fit in int32_t so that cbip_get_int()
+                // cannot be confused into matching a key/value of a different sign.
+                if (item->value > INT32_MAX) {
+                    break;
+                }
                 item->type = cbipInt;
                 return 0;
             case CBOR_NEGATIVE_INT:
+                // CBOR negativeInt encodes -1-value; reject anything that would decode below
+                // INT32_MIN (value > INT32_MAX <=> decoded integer < INT32_MIN).
+                if (item->value > INT32_MAX) {
+                    break;
+                }
                 item->type = cbipNegativeInt;
                 return 0;
             case CBOR_BYTE_STRING:
@@ -162,10 +172,12 @@ int cbip_next(cbipDecoder_t *decoder, cbipItem_t *item) {
 }
 
 int cbip_get_int(cbipItem_t *item) {
+    // cbip_get() guarantees item->value <= INT32_MAX for both int variants,
+    // so the conversions and negation below stay within int range.
     if (item->type == cbipInt) {
-        return item->value;
+        return (int) item->value;
     } else if (item->type == cbipNegativeInt) {
-        return -1 - item->value;
+        return -(int) item->value - 1;
     } else {
         return 0;
     }
