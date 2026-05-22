@@ -20,6 +20,7 @@
 void nfc_io_set_le(uint32_t le);
 void nfc_io_set_response_ready(uint16_t sw, uint16_t len, const char *status);
 bool nfc_io_is_response_pending(void);
+void nfc_io_clear_pending(void);
 
 /*
  * Sends a previously prepared response through NFC, then (if successful) displays a status screen
@@ -41,6 +42,10 @@ static inline void nfc_io_set_response_ready(uint16_t sw, uint16_t len, const ch
 
 static inline bool nfc_io_is_response_pending(void) {
     return false;
+}
+
+static inline void nfc_io_clear_pending(void) {
+    return;
 }
 
 static inline int nfc_io_send_prepared_response() {

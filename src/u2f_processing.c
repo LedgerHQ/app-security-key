@@ -391,6 +391,26 @@ int u2f_handle_apdu(uint8_t *rx, int rx_length) {
         nfc_io_set_le(le);
     }
 
+#ifdef HAVE_NFC
+    // If a previous NFC response is still pending and the incoming APDU is
+    // not a GET RESPONSE, drop the leftover state so a later hostile reader
+    // cannot continue pulling chunks of the previous response out of order.
+    // A new command will repopulate the state via nfc_io_set_response_ready
+    // once its own response is ready. NOTE: this does not close the case
+    // where a hostile reader sends only GET RESPONSE between a stopped
+    // legitimate reader and the next legitimate command — bounding that
+    // window requires NFC field-loss notifications not available here.
+    if (CMD_IS_OVER_U2F_NFC && nfc_io_is_response_pending()) {
+        uint8_t cla = rx[OFFSET_CLA];
+        uint8_t ins = rx[OFFSET_INS];
+        bool is_get_response = (cla == FIDO_CLA && ins == 0xC0) ||
+                               (cla == FIDO2_NFC_CLA && (ins == 0x11 || ins == 0xC0));
+        if (!is_get_response) {
+            nfc_io_clear_pending();
+        }
+    }
+#endif
+
     PRINTF("CLA 0x%02X INS 0x%02X, P1 0x%02X P2 0x%02X L %d\n",
            rx[OFFSET_CLA],
            rx[OFFSET_INS],
