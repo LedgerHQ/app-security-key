@@ -187,12 +187,15 @@ int crypto_sign_application(const uint8_t *data_hash,
 
 int crypto_sign_attestation(const uint8_t *data_hash, uint8_t *signature, bool fido2) {
     cx_ecfp_private_key_t attestation_private_key;
+    int rc = -1;
 
     if (cx_ecfp_init_private_key_no_throw(CX_CURVE_SECP256R1,
                                           (fido2 ? FIDO2_ATTESTATION_KEY : ATTESTATION_KEY),
                                           32,
-                                          &attestation_private_key) != CX_OK) {
-        return -1;
+                                          &attestation_private_key) == CX_OK) {
+        rc = crypto_sign(data_hash, &attestation_private_key, signature);
     }
-    return crypto_sign(data_hash, &attestation_private_key, signature);
+
+    explicit_bzero(&attestation_private_key, sizeof(attestation_private_key));
+    return rc;
 }
