@@ -123,9 +123,23 @@ static int cbip_get(cbipDecoder_t *decoder, cbipItem_t *item) {
                     break;
                 return 0;
             case CBOR_ARRAY:
+                // A CBOR array of N items requires at least N more bytes in the buffer
+                // (each item header is >= 1 byte). Reject impossibly-large counts so
+                // downstream arithmetic and loop iterations stay bounded.
+                if (item->value > decoder->length) {
+                    break;
+                }
                 item->type = cbipArray;
                 return 0;
             case CBOR_MAP:
+                // Same defense for maps. Bound is by buffer length, not length/2:
+                // some internally-emitted CBOR (e.g. credential blobs) under-fills
+                // its declared map size, and a tighter bound would reject legitimate
+                // input. 2*value is still safe from uint32 overflow since
+                // length is bounded by the APDU buffer.
+                if (item->value > decoder->length) {
+                    break;
+                }
                 item->type = cbipMap;
                 return 0;
             case CBOR_PRIMITIVE:

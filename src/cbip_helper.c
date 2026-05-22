@@ -24,6 +24,34 @@
 #include "cbip_helper.h"
 #include "ctap2.h"
 
+// Add the number of child items announced by a CBOR array/map header to
+// *extraParse, with arithmetic-overflow protection on both the map doubling
+// and the running sum. Non-aggregate types add 0. Returns false on overflow.
+// cbip_get() already bounds item->value to the buffer size, so reaching the
+// overflow branches here requires a cbipItem_t populated outside of cbip_get();
+// keep this as defense-in-depth.
+static bool cbiph_extra_parse_add(uint32_t *extraParse, cbipType_t type, uint32_t value) {
+    uint32_t add;
+    switch (type) {
+        case cbipArray:
+            add = value;
+            break;
+        case cbipMap:
+            if (value > UINT32_MAX / 2) {
+                return false;
+            }
+            add = value * 2;
+            break;
+        default:
+            return true;
+    }
+    if (*extraParse > UINT32_MAX - add) {
+        return false;
+    }
+    *extraParse += add;
+    return true;
+}
+
 int cbiph_validate(uint8_t *buffer, uint32_t length) {
     cbipDecoder_t decoder;
     cbipItem_t item;
@@ -51,15 +79,9 @@ int cbiph_validate(uint8_t *buffer, uint32_t length) {
         if (extraParse != 0) {
             extraParse--;
         }
-        switch (item.type) {
-            case cbipArray:
-                extraParse += item.value;
-                break;
-            case cbipMap:
-                extraParse += 2 * item.value;
-                break;
-            default:
-                break;
+        if (!cbiph_extra_parse_add(&extraParse, item.type, item.value)) {
+            PRINTF("cbiph_validate : extraParse overflow\n");
+            return -1;
         }
         if (item.type == cbipNone) {
             if (extraParse != 0) {
@@ -183,15 +205,8 @@ int cbiph_next_deep(cbipDecoder_t *decoder, cbipItem_t *item) {
         if (extraParse > 0) {
             extraParse--;
         }
-        switch (item->type) {
-            case cbipArray:
-                extraParse += item->value;
-                break;
-            case cbipMap:
-                extraParse += 2 * item->value;
-                break;
-            default:
-                break;
+        if (!cbiph_extra_parse_add(&extraParse, item->type, item->value)) {
+            return CBIPH_ERROR_INVALID;
         }
         if (extraParse > 0) {
             status = cbip_next(decoder, item);
