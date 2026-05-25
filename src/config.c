@@ -25,6 +25,8 @@
 #include "rk_storage.h"
 #include "crypto.h"
 
+#define CTAP2_PIN_RETRIES 8
+
 config_t const N_u2f_real;
 
 static int derive_and_store_keys(uint32_t resetGeneration) {
@@ -142,14 +144,21 @@ void config_process_ctap2_reset(void) {
     derive_and_store_keys(N_u2f.resetGeneration);
 #endif
 
+    // Clear the validity flag first so any power loss during the subsequent
+    // writes leaves the device in a safe "no PIN configured" state.
     uint8_t pinSet = 0;
     nvm_write((void *) &N_u2f.pinSet, (void *) &pinSet, sizeof(N_u2f.pinSet));
+
+    // Zeroise the persisted PIN verifier and reset the retry counter so a
+    // later NVM disclosure cannot be used to brute-force the previous PIN.
+    uint8_t zero_pin[sizeof(N_u2f.pin)] = {0};
+    nvm_write((void *) &N_u2f.pin, (void *) zero_pin, sizeof(N_u2f.pin));
+    uint8_t retries = CTAP2_PIN_RETRIES;
+    nvm_write((void *) &N_u2f.pinRetries, (void *) &retries, sizeof(N_u2f.pinRetries));
 
     ctap2_client_pin_reset_ctx();
     rk_storage_erase_all();
 }
-
-#define CTAP2_PIN_RETRIES 8
 
 void config_set_ctap2_pin(uint8_t *pin) {
     uint8_t tmp;

@@ -117,6 +117,10 @@ uint16_t u2f_prepare_enroll_response(uint8_t *buffer, uint16_t *length) {
     if (nfc_nonce_and_pubkey_ready) {
         memcpy(globals_get_u2f_data()->nonce, nfc_nonce, CREDENTIAL_NONCE_SIZE);
         memcpy(reg_resp_base->user_key, nfc_pubkey, U2F_ENROLL_USER_KEY_SIZE);
+        // The static buffer is no longer needed once copied into the response
+        // and the U2F globals. Wipe to shrink the in-RAM residency window of
+        // this credential's nonce. nfc_pubkey is a public key; no scrub needed.
+        explicit_bzero(nfc_nonce, sizeof(nfc_nonce));
         nfc_nonce_and_pubkey_ready = false;
     } else
 #endif
@@ -247,7 +251,12 @@ static int u2f_process_user_presence_confirmed(void) {
         default:
             break;
     }
-    return io_send_response_pointer(responseBuffer, length, sw);
+    int result = io_send_response_pointer(responseBuffer, length, sw);
+    // The credential nonce drove the private-key derivation that just
+    // produced the signature; it is no longer needed and is sensitive
+    // (anyone holding it plus privateKeySeed can reproduce the key).
+    explicit_bzero(globals_get_u2f_data()->nonce, sizeof(globals_get_u2f_data()->nonce));
+    return result;
 }
 
 /******************************************/
@@ -257,6 +266,9 @@ static int u2f_process_user_presence_confirmed(void) {
 #if defined(HAVE_BAGL)
 
 static unsigned int u2f_callback_cancel(void) {
+    // For SIGN, the credential nonce was populated during APDU dispatch (before
+    // user confirmation), so a cancel still leaves it in RAM unless wiped here.
+    explicit_bzero(globals_get_u2f_data()->nonce, sizeof(globals_get_u2f_data()->nonce));
     io_send_sw(SW_USER_REFUSED);
     ui_idle();
     return 0;
@@ -347,6 +359,8 @@ static void on_register_choice(bool confirm) {
         u2f_process_user_presence_confirmed();
         app_nbgl_status(U2F_REGISTRATION, true, ui_idle);
     } else {
+        // SIGN populates globals->nonce before user confirmation; wipe on cancel.
+        explicit_bzero(globals_get_u2f_data()->nonce, sizeof(globals_get_u2f_data()->nonce));
         io_send_sw(SW_USER_REFUSED);
         app_nbgl_status(U2F_REGISTRATION_CANCELLED, false, ui_idle);
     }
@@ -357,6 +371,7 @@ static void on_login_choice(bool confirm) {
         u2f_process_user_presence_confirmed();
         app_nbgl_status(U2F_LOGIN, true, ui_idle);
     } else {
+        explicit_bzero(globals_get_u2f_data()->nonce, sizeof(globals_get_u2f_data()->nonce));
         io_send_sw(SW_USER_REFUSED);
         app_nbgl_status(U2F_LOGIN_CANCELLED, false, ui_idle);
     }
