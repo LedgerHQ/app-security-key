@@ -167,10 +167,6 @@ ifneq ($(DEBUG), 0)
 endif
 #DEFINES  += HAVE_CBOR_DEBUG
 
-ifneq ($(TEST_BUILD), 0)
-    DEFINES += TEST_BUILD
-endif
-
 # The flag that fakes the NFC transport for U2F
 ifeq ($(ENABLE_U2F_OVER_FAKE_NFC_TESTS),1)
 DEFINES += HAVE_U2F_OVER_FAKE_NFC_TESTS

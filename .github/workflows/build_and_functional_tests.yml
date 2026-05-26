@@ -41,7 +41,6 @@ jobs:
     uses: LedgerHQ/ledger-app-workflows/.github/workflows/reusable_build.yml@v1
     with:
       upload_app_binaries_artifact: compiled_app_binaries
-      flags: 'TEST_BUILD=1'
 
   build_application_rk_ui:
     name: Build application using the reusable workflow with ENABLE_RK_CONFIG_UI_SETTING
@@ -49,7 +48,7 @@ jobs:
     uses: LedgerHQ/ledger-app-workflows/.github/workflows/reusable_build.yml@v1
     with:
       upload_app_binaries_artifact: compiled_app_binaries_rk_ui
-      flags: 'TEST_BUILD=1 ENABLE_RK_CONFIG_UI_SETTING=1'
+      flags: 'ENABLE_RK_CONFIG_UI_SETTING=1'
 
   build_application_nfc_u2f:
     name: Build application using the reusable workflow with ENABLE_NFC_U2F_TESTS
@@ -57,7 +56,7 @@ jobs:
     uses: LedgerHQ/ledger-app-workflows/.github/workflows/reusable_build.yml@v1
     with:
       upload_app_binaries_artifact: compiled_app_binaries_nfc_u2f
-      flags: 'TEST_BUILD=1 ENABLE_U2F_OVER_FAKE_NFC_TESTS=1'
+      flags: 'ENABLE_U2F_OVER_FAKE_NFC_TESTS=1'
 
   tests:
     needs: build_application
