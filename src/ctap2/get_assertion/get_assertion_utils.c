@@ -646,8 +646,12 @@ void get_assertion_send(void) {
 
 exit:
     if (status == 0) {
+        // A silent assertion (up=0) is a non-interactive pre-flight probe that is fired
+        // just before the real (up=1) getAssertion. Therefore, we must not arm the NBGL
+        // status screen for it; we only need to show it for the user-present assertion.
+        const char *status_str = ctap2AssertData->userPresenceRequired ? CTAP2_LOGIN : NULL;
         // 1 + dataLen: 210
-        send_cbor_response(&G_io_u2f, 1 + dataLen, CTAP2_LOGIN);
+        send_cbor_response(&G_io_u2f, 1 + dataLen, status_str);
     } else {
         PRINTF("GET_ASSERTION build / encoding failed '%d'\n", status);
         send_cbor_error(&G_io_u2f, status);
