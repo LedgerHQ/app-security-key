@@ -25,10 +25,13 @@
 #include "rk_storage.h"
 #include "crypto.h"
 
+#define CTAP2_PIN_RETRIES 8
+
 config_t const N_u2f_real;
 
 static int derive_and_store_keys(uint32_t resetGeneration) {
     cx_err_t error;
+    int status = -1;
     uint8_t key[64];
     uint8_t derivateKey[CX_SHA256_SIZE];
     uint32_t keyPath[3];
@@ -41,11 +44,12 @@ static int derive_and_store_keys(uint32_t resetGeneration) {
     keyPath[0] = PRIVATE_KEY_SEED_PATH;
     error = os_derive_bip32_no_throw(CX_CURVE_SECP256R1, keyPath, 3, key, key + 32);
     if (error != CX_OK) {
-        return -1;
+        goto exit;
     }
     if (memcmp(key, (uint8_t *) N_u2f.privateKeySeed, sizeof(N_u2f.privateKeySeed)) == 0) {
         // Keys are already initialized with the proper seed and resetGeneration
-        return 0;
+        status = 0;
+        goto exit;
     }
     nvm_write((void *) N_u2f.privateKeySeed, (void *) key, sizeof(N_u2f.privateKeySeed));
 
@@ -53,7 +57,7 @@ static int derive_and_store_keys(uint32_t resetGeneration) {
     keyPath[0] = WRAPPING_KEY_PATH;
     error = os_derive_bip32_no_throw(CX_CURVE_SECP256R1, keyPath, 3, key, key + 32);
     if (error != CX_OK) {
-        return -1;
+        goto exit;
     }
 
     // wrappingKeyU2F: aes_key = SHA256(VERSION || wrappingKeys)
@@ -68,7 +72,11 @@ static int derive_and_store_keys(uint32_t resetGeneration) {
               (void *) derivateKey,
               sizeof(N_u2f.wrappingKeyCTAP2));
 
-    return 0;
+    status = 0;
+exit:
+    explicit_bzero(key, sizeof(key));
+    explicit_bzero(derivateKey, sizeof(derivateKey));
+    return status;
 }
 
 int config_init(void) {
@@ -77,10 +85,10 @@ int config_init(void) {
     uint8_t tmp8;
     if (N_u2f.initialized != 1) {
 #ifdef HAVE_COUNTER_MARKER
-        tmp32 = 0xF1D0C001;
+        tmp32 = COUNTER_MARKER;
 #else
         tmp32 = 1;
-#endif
+#endif /* HAVE_COUNTER_MARKER */
         nvm_write((void *) &N_u2f.authentificationCounter,
                   (void *) &tmp32,
                   sizeof(N_u2f.authentificationCounter));
@@ -136,14 +144,21 @@ void config_process_ctap2_reset(void) {
     derive_and_store_keys(N_u2f.resetGeneration);
 #endif
 
+    // Clear the validity flag first so any power loss during the subsequent
+    // writes leaves the device in a safe "no PIN configured" state.
     uint8_t pinSet = 0;
     nvm_write((void *) &N_u2f.pinSet, (void *) &pinSet, sizeof(N_u2f.pinSet));
+
+    // Zeroise the persisted PIN verifier and reset the retry counter so a
+    // later NVM disclosure cannot be used to brute-force the previous PIN.
+    uint8_t zero_pin[sizeof(N_u2f.pin)] = {0};
+    nvm_write((void *) &N_u2f.pin, (void *) zero_pin, sizeof(N_u2f.pin));
+    uint8_t retries = CTAP2_PIN_RETRIES;
+    nvm_write((void *) &N_u2f.pinRetries, (void *) &retries, sizeof(N_u2f.pinRetries));
 
     ctap2_client_pin_reset_ctx();
     rk_storage_erase_all();
 }
-
-#define CTAP2_PIN_RETRIES 8
 
 void config_set_ctap2_pin(uint8_t *pin) {
     uint8_t tmp;

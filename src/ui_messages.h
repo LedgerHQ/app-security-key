@@ -18,7 +18,7 @@
 
 #pragma once
 
-#ifdef DEBUG_UI
+#ifdef DEBUG
 #define CTAP2_LOGIN                  "CTAP2 - Login request\nsigned"
 #define CTAP2_LOGIN_CANCELLED        "CTAP2 - Login cancelled"
 #define CTAP2_REGISTRATION           "CTAP2 - Registration\ndetails sent"

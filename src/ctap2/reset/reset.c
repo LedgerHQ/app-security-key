@@ -34,6 +34,7 @@ void ctap2_reset_handle(u2f_service_t *service, uint8_t *buffer, uint16_t length
         // Denied authenticatorReset over NFC as it can't be approved by the user.
         // Note, this is a behavior allowed by the FIDO spec.
         send_cbor_error(&G_io_u2f, ERROR_OPERATION_DENIED);
+        return;
     }
 
     PRINTF("ctap2_reset_handle\n");

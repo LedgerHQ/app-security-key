@@ -163,10 +163,12 @@ bool ctap2_client_pin_verify(int protocol,
 
     if (protocol == PIN_PROTOCOL_VERSION_V1) {
         if (signatureLength != AUTH_PROT_V1_SIZE) {
-            return ERROR_INVALID_CBOR;
+            // ERROR_INVALID_CBOR
+            return false;
         }
     } else {
-        return ERROR_INVALID_PAR;
+        // ERROR_INVALID_PAR;
+        return false;
     }
 
     if (keyLen > CX_SHA256_SIZE) {

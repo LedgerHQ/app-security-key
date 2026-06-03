@@ -50,6 +50,20 @@ bool nfc_io_is_response_pending(void) {
     return nfc_data_ready;
 }
 
+// Drop any pending multi-chunk response state. Used at session boundaries
+// (any incoming APDU that is not a GET RESPONSE) so a later peer cannot
+// continue pulling the tail of a previous response out of responseBuffer.
+// Residual exposure between the legitimate reader losing the field and the
+// next command arriving is not closed by this and is documented at the
+// call sites; closing it requires NFC field-loss signals not available here.
+void nfc_io_clear_pending(void) {
+    nfc_data_ready = false;
+    nfc_buffer_len = 0;
+    nfc_buffer_offset = 0;
+    nfc_sw = SW_NO_ERROR;
+    nfc_status = NULL;
+}
+
 int nfc_io_send_prepared_response() {
     if (!nfc_data_ready) {
         return io_send_sw(SW_WRONG_DATA);
