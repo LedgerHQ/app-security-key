@@ -1,18 +1,18 @@
 ---
 BasedOnStyle: Google
 IndentWidth: 4
----
-Language: Cpp
 ColumnLimit: 100
 PointerAlignment: Right
 AlignAfterOpenBracket: Align
-AlignConsecutiveMacros: true
+AlignConsecutiveMacros:
+  Enabled: true
 AllowAllParametersOfDeclarationOnNextLine: false
-SortIncludes: false
+IncludeBlocks: Preserve
+SortIncludes:
+  Enabled: false
 SpaceAfterCStyleCast: true
 AllowShortCaseLabelsOnASingleLine: false
 AllowAllArgumentsOnNextLine: false
-AllowAllParametersOfDeclarationOnNextLine: false
 AllowShortBlocksOnASingleLine: Never
 AllowShortFunctionsOnASingleLine: None
 BinPackArguments: false
