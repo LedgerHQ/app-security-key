@@ -63,3 +63,11 @@ See dedicated `README.md` in the `tests/` directory.
 * Following FIDO2 spec, there should be a way to revoke credentials. A revocation mechanism has been implemented based on a counter that - just like discoverable credentials - will be wiped upon app deletion. Therefore, in order to avoid unexpected issues on the user side, this counter has been disabled. See `HAVE_NO_RESET_GENERATION_INCREMENT` in the `Makefile` for more details.
 
 For more details, see the [blog post](https://www.ledger.com/blog/strengthen-the-security-of-your-accounts-with-webauthn) and the [Ledger support article](https://support.ledger.com/article/12350325732893-zd).
+
+## Other Use Cases
+
+Beyond website and app authentication, the Security Key app can be used as a hardware factor in several workflows:
+
+- **Git SSH authentication** — hardware-bound SSH key for GitHub, GitLab, and remote servers. See [doc/usecase-git-auth.md](doc/usecase-git-auth.md).
+- **Git commit signing** — SSH-based commit and tag signatures, requiring a physical tap per commit. See [doc/usecase-git-signing.md](doc/usecase-git-signing.md).
+- **LUKS2 volume encryption** — unlock an encrypted image file or partition by tapping the device, using the `hmac-secret` FIDO2 extension. See [doc/usecase-luks.md](doc/usecase-luks.md).
