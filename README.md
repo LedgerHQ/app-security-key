@@ -36,20 +36,7 @@ The [ledger-app-dev-tools](https://github.com/LedgerHQ/ledger-app-builder/pkgs/c
 
 ## Acronyms
 
-Acronyms specific to the project:
-
-* CBIP: CBOR in place
-
-Acronyms not specific to the project:
-
-* CBOR: Concise Binary Object Representation (serialization format standardized as [RFC8949](https://tools.ietf.org/html/rfc8949) and described on [Wikipedia](https://en.wikipedia.org/wiki/CBOR))
-* COSE: CBOR Object Signing and Encryption (serialization format standardized as [RFC9052](https://tools.ietf.org/html/rfc9052) which uses [identifiers assigned by IANA](https://www.iana.org/assignments/cose/cose.xhtml))
-* CTAP: Client to Authenticator Protocol (component of FIDO2 specifications, described on [FIDO Alliance's website](https://fidoalliance.org/specifications/download/))
-* FIDO2: Fast IDentity Online (open authentication standard, hosted by the [FIDO Alliance](https://fidoalliance.org/fido2/))
-* U2F: Universal 2nd Factor (open authentication standard, precedes FIDO2)
-* WebAuthn: Web Authentication (component of FIDO2 specifications, described on [FIDO Alliance's website](https://fidoalliance.org/fido2/fido2-web-authentication-webauthn/))
-* UP: User Presence (for example clicking buttons)
-* UV: User Verification (for example verifying a PIN code)
+See [doc/acronyms.md](doc/acronyms.md).
 
 
 ## Testing the app
