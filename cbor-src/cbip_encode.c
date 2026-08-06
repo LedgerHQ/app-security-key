@@ -21,12 +21,14 @@
 #include "cbip_encode.h"
 #include "cbip_internal.h"
 
-#define CHECK_AVAILABLE(x)                             \
-    do {                                               \
-        if ((encoder->offset + x) > encoder->length) { \
-            encoder->fault = true;                     \
-            return -1;                                 \
-        }                                              \
+#define CHECK_AVAILABLE(x)                                             \
+    do {                                                               \
+        uint32_t requestedLength = (uint32_t) (x);                     \
+        if ((encoder->offset > encoder->length) ||                     \
+            (requestedLength > (encoder->length - encoder->offset))) { \
+            encoder->fault = true;                                     \
+            return -1;                                                 \
+        }                                                              \
     } while (0)
 
 #define CHECK_FAULT()         \

@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include "cbip_encode.h"
 
@@ -12,6 +13,22 @@
 #define UNUSED(x) ((void)x)
 #endif
 
+static int test_rejects_wrapped_length(void) {
+	unsigned char data[16] = {0};
+	unsigned char value = 0;
+	cbipEncoder_t encoder;
+
+	cbip_encoder_init(&encoder, data, sizeof(data));
+	encoder.offset = 8;
+
+	int status = cbip_add_byte_string(&encoder, &value, UINT32_MAX - 8);
+	if ((status >= 0) || !encoder.fault) {
+		printf("Encoder accepted a wrapped byte-string length\n");
+		return 1;
+	}
+	return 0;
+}
+
 int main(int argc, char **argv) {
 	unsigned char aaguid[16] = { 0xf4,0x60,0xd3,0xbf,0xf8,0x61,0xcf,0xe2,0xf1,0x90,0x9d,0x06,0xf9,0x8c,0x7c,0x83 };
 	unsigned char data[1024];
@@ -21,6 +38,10 @@ int main(int argc, char **argv) {
 
 	UNUSED(argc);
 	UNUSED(argv);
+
+	if (test_rejects_wrapped_length() != 0) {
+		return 1;
+	}
 
 	status = cbip_encoder_init(&encoder, data, sizeof(data));
 	ENCODER_CHECK("Initialize encoder failed");
