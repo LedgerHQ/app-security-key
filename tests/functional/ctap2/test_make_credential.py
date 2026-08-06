@@ -1,8 +1,13 @@
+import time
+from hashlib import sha256
+
 import pytest
 from fido2.cose import ES256, EdDSA, RS256, PS256
 from fido2.ctap import CtapError
+from fido2.ctap2.base import AttestationResponse, Ctap2
 from fido2.webauthn import AuthenticatorData, AttestedCredentialData
 from ledgered.devices import Device
+from ragger.navigator import NavInsID
 
 from ..client import TESTS_SPECULOS_DIR, LedgerAttestationVerifier
 from ..utils import FIDO_RP_ID_HASH_1, generate_random_bytes, \
@@ -24,6 +29,47 @@ def test_make_credential(client, test_name):
     expected_flags |= AuthenticatorData.FLAG.ATTESTED
     assert attestation.auth_data.flags == expected_flags
     assert client.ctap2.info.aaguid == attestation.auth_data.credential_data.aaguid
+
+
+@pytest.mark.skip_endpoint(["HID", "NFC"],
+                           reason="Interleaving requires the CTAPHID transport")
+def test_cbor_command_refused_while_make_credential_pending(client, device: Device):
+    original = generate_make_credentials_params(client, ref=0)
+    original_cmd = client.ctap2.send_cbor_nowait(Ctap2.CMD.MAKE_CREDENTIAL,
+                                                 original.cbor_args)
+
+    # Let the review start and at least one keepalive reopen the HID transport.
+    time.sleep(0.5)
+
+    poison = {
+        1: "attacker.example",
+        2: bytes([0xAA] * 32),
+        4: 5,  # Deliberately not an options map.
+    }
+    injected_cmd = client.ctap2.send_cbor_nowait(Ctap2.CMD.GET_ASSERTION, poison)
+    with pytest.raises(CtapError) as e:
+        injected_response = client.ctap2.device.recv(injected_cmd)
+        client.ctap2.parse_response(injected_response)
+    assert e.value.code in (CtapError(0x24).code, CtapError(0x06).code)
+
+    if device.is_nano:
+        nav_ins = NavInsID.RIGHT_CLICK
+        val_ins = [NavInsID.BOTH_CLICK]
+        text = "Register$"
+    else:
+        nav_ins = None
+        val_ins = [NavInsID.USE_CASE_CHOICE_CONFIRM]
+        text = None
+    client.ctap2.navigate(Nav.USER_ACCEPT, False, None, text, nav_ins, val_ins)
+
+    response = client.ctap2.device.recv(original_cmd)
+    attestation = AttestationResponse.from_dict(client.ctap2.parse_response(response))
+    client.ctap2.wait_for_return_on_dashboard()
+
+    expected_flags = AuthenticatorData.FLAG.USER_PRESENT
+    expected_flags |= AuthenticatorData.FLAG.ATTESTED
+    assert attestation.auth_data.rp_id_hash == sha256(original.rp["id"].encode()).digest()
+    assert attestation.auth_data.flags == expected_flags
 
 
 def test_make_credential_followed_u2f(client, test_name, device: Device, u2f_over_fake_nfc):

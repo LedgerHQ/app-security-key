@@ -174,6 +174,11 @@ static int u2f_get_cmd_msg_data(uint8_t *rx, uint16_t rx_length, uint8_t **data,
 /******************************************/
 
 static int u2f_handle_apdu_enroll(const uint8_t *rx, uint32_t data_length, const uint8_t *data) {
+    if ((ctap2UxState != CTAP2_UX_STATE_NONE) || u2fUxPending) {
+        PRINTF("U2F enroll refused: user confirmation pending\n");
+        return io_send_sw(SW_CONDITIONS_NOT_SATISFIED);
+    }
+
     // Parse request and check length validity
     u2f_reg_req_t *reg_req = (u2f_reg_req_t *) data;
     if (data_length != sizeof(u2f_reg_req_t)) {
@@ -241,6 +246,12 @@ static int u2f_handle_apdu_enroll(const uint8_t *rx, uint32_t data_length, const
 
 static int u2f_handle_apdu_sign(const uint8_t *rx, uint32_t data_length, uint8_t *data) {
     uint8_t *nonce;
+
+    if ((ctap2UxState != CTAP2_UX_STATE_NONE) || u2fUxPending) {
+        PRINTF("U2F sign refused: user confirmation pending\n");
+        return io_send_sw(SW_CONDITIONS_NOT_SATISFIED);
+    }
+
     // Parse request base and check length validity
     u2f_auth_req_base_t *auth_req_base = (u2f_auth_req_base_t *) data;
     if (data_length < sizeof(u2f_auth_req_base_t)) {

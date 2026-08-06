@@ -239,6 +239,12 @@ static int u2f_process_user_presence_confirmed(void) {
     uint16_t sw = SW_PROPRIETARY_INTERNAL;
     uint16_t length = 0;
 
+    if (!u2fUxPending) {
+        PRINTF("Refusing unexpected U2F confirmation\n");
+        return io_send_sw(SW_CONDITIONS_NOT_SATISFIED);
+    }
+    u2fUxPending = false;
+
     switch (globals_get_u2f_data()->ins) {
         case FIDO_INS_REGISTER:
             sw = u2f_prepare_enroll_response(responseBuffer, &length);
@@ -269,6 +275,7 @@ static unsigned int u2f_callback_cancel(void) {
     // For SIGN, the credential nonce was populated during APDU dispatch (before
     // user confirmation), so a cancel still leaves it in RAM unless wiped here.
     explicit_bzero(globals_get_u2f_data()->nonce, sizeof(globals_get_u2f_data()->nonce));
+    u2fUxPending = false;
     io_send_sw(SW_USER_REFUSED);
     ui_idle();
     return 0;
@@ -361,6 +368,7 @@ static void on_register_choice(bool confirm) {
     } else {
         // SIGN populates globals->nonce before user confirmation; wipe on cancel.
         explicit_bzero(globals_get_u2f_data()->nonce, sizeof(globals_get_u2f_data()->nonce));
+        u2fUxPending = false;
         io_send_sw(SW_USER_REFUSED);
         app_nbgl_status(U2F_REGISTRATION_CANCELLED, false, ui_idle);
     }
@@ -372,6 +380,7 @@ static void on_login_choice(bool confirm) {
         app_nbgl_status(U2F_LOGIN, true, ui_idle);
     } else {
         explicit_bzero(globals_get_u2f_data()->nonce, sizeof(globals_get_u2f_data()->nonce));
+        u2fUxPending = false;
         io_send_sw(SW_USER_REFUSED);
         app_nbgl_status(U2F_LOGIN_CANCELLED, false, ui_idle);
     }
@@ -380,6 +389,7 @@ static void on_login_choice(bool confirm) {
 #endif
 
 void u2f_prompt_user_presence(bool enroll) {
+    u2fUxPending = true;
     UX_WAKE_UP();
 
     char tmp_buf[sizeof(g.username_buffer)] = {0};
