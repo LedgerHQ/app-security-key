@@ -106,6 +106,7 @@ void app_main() {
     }
     rk_storage_init();
     ctap2UxState = CTAP2_UX_STATE_NONE;
+    u2fUxPending = false;
     ctap2_client_pin_reset_ctx();
 
     ui_idle();

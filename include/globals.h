@@ -18,6 +18,8 @@
 
 #pragma once
 
+#include <stdbool.h>
+
 #include <u2f_service.h>
 
 #include "credential.h"
@@ -139,6 +141,7 @@ typedef struct shared_ctx_s {
 
 extern shared_ctx_t shared_ctx;
 extern ctap2_ux_state_t ctap2UxState;
+extern bool u2fUxPending;
 
 static inline u2f_data_t *globals_get_u2f_data(void) {
     return &shared_ctx.u.u2fData;

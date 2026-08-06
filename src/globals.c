@@ -26,6 +26,7 @@ global_t g;
 
 shared_ctx_t shared_ctx;
 ctap2_ux_state_t ctap2UxState;
+bool u2fUxPending;
 
 uint8_t responseBuffer[IO_APDU_BUFFER_SIZE];
 

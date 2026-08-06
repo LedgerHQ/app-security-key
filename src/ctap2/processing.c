@@ -43,6 +43,13 @@ void ctap2_handle_cmd_cbor(u2f_service_t *service, uint8_t *buffer, uint16_t len
     int status;
     // PRINTF("cmd_cbor %d %.*H\n", length, length, buffer);
 
+    // A user confirmation still owns the shared operation context.
+    if ((ctap2UxState != CTAP2_UX_STATE_NONE) || u2fUxPending) {
+        PRINTF("CBOR command refused: user confirmation pending\n");
+        send_cbor_error(service, ERROR_OPERATION_PENDING);
+        return;
+    }
+
     if (length < 1) {
         send_cbor_error(service, ERROR_INVALID_CBOR);
         return;
