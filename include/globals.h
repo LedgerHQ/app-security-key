@@ -147,6 +147,12 @@ typedef struct shared_ctx_s {
 } shared_ctx_t;
 
 extern shared_ctx_t shared_ctx;
+
+// Set while a user confirmation is on screen; commands that would write the pending
+// context are refused until it clears. Cleared only by the user answering,
+// CTAPHID_CANCEL, or app restart: there is no timeout, and NFC field loss is not
+// detectable (see nfc_io.c), so a re-tap before the user answers gets
+// OPERATION_PENDING.
 extern ctap2_ux_state_t ctap2UxState;
 extern bool u2fUxPending;
 
