@@ -61,9 +61,8 @@ void ctap2_handle_cmd_cbor(u2f_service_t *service, uint8_t *buffer, uint16_t len
         return;
     }
 
-    // Take ownership of the request before anything parses it: handlers keep pointers
-    // into it across the user review, and G_io_apdu_buffer does not survive that.
-    // See the ctap2RequestBuffer comment in globals.h.
+    // Parse an app-owned copy: G_io_apdu_buffer does not survive the user review.
+    // See ctap2RequestBuffer in globals.h.
     memcpy(ctap2RequestBuffer, buffer, length);
     buffer = ctap2RequestBuffer;
 

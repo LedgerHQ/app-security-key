@@ -124,18 +124,11 @@ extern u2f_service_t G_io_u2f;
 
 extern uint8_t responseBuffer[IO_APDU_BUFFER_SIZE];
 
-// App-owned copy of the CBOR request currently being handled.
-//
-// The SDK hands commands to the app in G_io_apdu_buffer, which is #define'd to
-// G_io_tx_buffer (io_legacy/include/os_io_legacy.h) -- the very buffer every
-// response is built in. It therefore does NOT survive a user review:
-//   - io_legacy_apdu_rx() memmove()s the next command over it before the app is
-//     even called, so rejecting that command in ctap2_handle_cmd_cbor() is too late;
-//   - CLA 0xB0 default APDUs are answered inside io_legacy_apdu_rx() and write
-//     their response there without the app ever seeing them.
-// CTAP2 handlers keep pointers into their request across the review (and
-// GET_ASSERTION re-parses it after the user approves), so the request must live in
-// memory the app owns. ctap2_handle_cmd_cbor() snapshots it here before any parsing.
+// App-owned copy of the CBOR request being handled.
+// G_io_apdu_buffer is G_io_tx_buffer (SDK os_io_legacy.h), so it is overwritten by
+// the next command and by the CLA 0xB0 APDUs the SDK answers itself, both without
+// the app being called. Handlers keep pointers into their request across the user
+// review, and GET_ASSERTION re-parses it, so it is copied here before parsing.
 extern uint8_t ctap2RequestBuffer[IO_APDU_BUFFER_SIZE];
 
 typedef struct ctap2_data_t {
