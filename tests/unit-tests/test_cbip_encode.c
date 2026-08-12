@@ -29,6 +29,34 @@ static int test_rejects_wrapped_length(void) {
 	return 0;
 }
 
+static int test_rejects_null_source(void) {
+	unsigned char data[16] = {0};
+	cbipEncoder_t encoder;
+
+	/* A NULL source with a nonzero length is refused and latches fault. */
+	cbip_encoder_init(&encoder, data, sizeof(data));
+	if ((cbip_add_byte_string(&encoder, NULL, 4) >= 0) || !encoder.fault) {
+		printf("Encoder accepted a NULL byte-string source\n");
+		return 1;
+	}
+
+	/* A NULL source with a zero length stays valid: an empty string is legal CBOR
+	   and no copy is made. Runs under UBSan, so a memmove() here would be caught. */
+	cbip_encoder_init(&encoder, data, sizeof(data));
+	if ((cbip_add_byte_string(&encoder, NULL, 0) < 0) || encoder.fault) {
+		printf("Encoder rejected an empty byte string\n");
+		return 1;
+	}
+
+	/* Same for a text string, which shares cbip_add_raw(). */
+	cbip_encoder_init(&encoder, data, sizeof(data));
+	if ((cbip_add_string(&encoder, NULL, 4) >= 0) || !encoder.fault) {
+		printf("Encoder accepted a NULL text-string source\n");
+		return 1;
+	}
+	return 0;
+}
+
 int main(int argc, char **argv) {
 	unsigned char aaguid[16] = { 0xf4,0x60,0xd3,0xbf,0xf8,0x61,0xcf,0xe2,0xf1,0x90,0x9d,0x06,0xf9,0x8c,0x7c,0x83 };
 	unsigned char data[1024];
@@ -40,6 +68,10 @@ int main(int argc, char **argv) {
 	UNUSED(argv);
 
 	if (test_rejects_wrapped_length() != 0) {
+		return 1;
+	}
+
+	if (test_rejects_null_source() != 0) {
 		return 1;
 	}
 

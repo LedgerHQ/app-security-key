@@ -85,12 +85,21 @@ static int cbip_add_raw(cbipEncoder_t *encoder,
                         const uint8_t *value,
                         uint32_t valueLength) {
     int result;
+    // Library boundary: refuse rather than memmove() from a NULL source.
+    if ((value == NULL) && (valueLength != 0)) {
+        encoder->fault = true;
+        return -1;
+    }
     result = cbip_add_header(encoder, tag, valueLength);
     if (result < 0) {
         return result;
     }
     CHECK_AVAILABLE(valueLength);
-    memmove(encoder->buffer + encoder->offset, value, valueLength);
+    // An empty string is valid CBOR, but memmove() forbids a NULL source even for a
+    // zero count, so skip it rather than rely on that being harmless.
+    if (valueLength != 0) {
+        memmove(encoder->buffer + encoder->offset, value, valueLength);
+    }
     encoder->offset += valueLength;
     return 0;
 }
