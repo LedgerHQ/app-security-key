@@ -212,6 +212,26 @@ def test_make_credential_up(client, test_name):
                                  compare_args=compare_args)
 
 
+@pytest.mark.parametrize("size", [0, 65])
+def test_make_credential_user_id_out_of_range(client, size):
+    # user.id is 1..64 bytes. An empty one is present and well typed, so it has to be
+    # rejected on its length like an over-long one.
+    args = generate_make_credentials_params(client, ref=0)
+    args.user = {"id": b"\x01" * size, "name": "My user name"}
+
+    with pytest.raises(CtapError) as e:
+        client.ctap2.make_credential(args, navigation=Nav.NONE, will_fail=True)
+    assert e.value.code == CtapError.ERR.INVALID_LENGTH
+
+
+@pytest.mark.parametrize("size", [1, 64])
+def test_make_credential_user_id_in_range(client, size):
+    args = generate_make_credentials_params(client, ref=0)
+    args.user = {"id": b"\x01" * size, "name": "My user name"}
+
+    client.ctap2.make_credential(args)
+
+
 def test_make_credential_rk(client):
     # Check that option RK can be passed with False value when not supporting RK.
     # This is used on Firefox on Linux and Mac and required by the spec.
