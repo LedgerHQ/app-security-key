@@ -174,11 +174,6 @@ static int u2f_get_cmd_msg_data(uint8_t *rx, uint16_t rx_length, uint8_t **data,
 /******************************************/
 
 static int u2f_handle_apdu_enroll(const uint8_t *rx, uint32_t data_length, const uint8_t *data) {
-    if ((ctap2UxState != CTAP2_UX_STATE_NONE) || u2fUxPending) {
-        PRINTF("U2F enroll refused: user confirmation pending\n");
-        return io_send_sw(SW_CONDITIONS_NOT_SATISFIED);
-    }
-
     // Parse request and check length validity
     u2f_reg_req_t *reg_req = (u2f_reg_req_t *) data;
     if (data_length != sizeof(u2f_reg_req_t)) {
@@ -217,6 +212,14 @@ static int u2f_handle_apdu_enroll(const uint8_t *rx, uint32_t data_length, const
         if (fake_register) {
             return io_send_sw(SW_USER_REFUSED);
         }
+    }
+
+    // Gated here and not on entry: everything above answers from the request alone
+    // (length, P1/P2, bogus register), so refusing earlier masked all of it as
+    // SW_CONDITIONS_NOT_SATISFIED. Nothing above this writes to shared state.
+    if ((ctap2UxState != CTAP2_UX_STATE_NONE) || u2fUxPending) {
+        PRINTF("U2F enroll refused: user confirmation pending\n");
+        return io_send_sw(SW_CONDITIONS_NOT_SATISFIED);
     }
 
     // Backup ins, challenge and application parameters to be used if user accept the request
