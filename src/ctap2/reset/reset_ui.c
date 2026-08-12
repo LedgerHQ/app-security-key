@@ -26,13 +26,15 @@
 #include "reset_ui.h"
 
 static void ctap_ux_on_user_action(bool confirm) {
-    ctap2UxState = CTAP2_UX_STATE_NONE;
-
     if (confirm) {
         ctap2_reset_confirm();
+        // Cleared after the handler, not before it: reset carries no request data,
+        // but the latch should cover the handler here as it does in the other flows.
+        ctap2UxState = CTAP2_UX_STATE_NONE;
         ui_idle();
     } else {
         ctap2_reset_cancel();
+        ctap2UxState = CTAP2_UX_STATE_NONE;
         ui_idle();
     }
 }
