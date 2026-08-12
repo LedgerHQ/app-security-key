@@ -243,7 +243,6 @@ static int u2f_process_user_presence_confirmed(void) {
         PRINTF("Refusing unexpected U2F confirmation\n");
         return io_send_sw(SW_CONDITIONS_NOT_SATISFIED);
     }
-    u2fUxPending = false;
 
     switch (globals_get_u2f_data()->ins) {
         case FIDO_INS_REGISTER:
@@ -257,6 +256,10 @@ static int u2f_process_user_presence_confirmed(void) {
         default:
             break;
     }
+    // Cleared after the response is built, not before: it is built from
+    // globals_get_u2f_data(), and this latch is what keeps a new command out.
+    u2fUxPending = false;
+
     int result = io_send_response_pointer(responseBuffer, length, sw);
     // The credential nonce drove the private-key derivation that just
     // produced the signature; it is no longer needed and is sensitive
