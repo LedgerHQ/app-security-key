@@ -85,6 +85,12 @@ static int cbip_add_raw(cbipEncoder_t *encoder,
                         const uint8_t *value,
                         uint32_t valueLength) {
     int result;
+    // No caller can reach this today, but this is a library boundary: refuse rather
+    // than memmove() from a pointer the caller did not provide.
+    if ((value == NULL) && (valueLength != 0)) {
+        encoder->fault = true;
+        return -1;
+    }
     result = cbip_add_header(encoder, tag, valueLength);
     if (result < 0) {
         return result;
