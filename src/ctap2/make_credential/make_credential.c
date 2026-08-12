@@ -41,6 +41,13 @@
 #define KEY_RP_NAME "name"
 #define KEY_RP_ICON "icon"
 
+// user.id is 1..64 bytes
+// https://www.w3.org/TR/webauthn/#dom-publickeycredentialuserentity-id
+#define CTAP2_MAX_USER_ID_SIZE 64
+// user.displayName may be truncated to 64 bytes for display
+// https://www.w3.org/TR/webauthn/#dom-publickeycredentialuserentity-displayname
+#define CTAP2_MAX_USER_STR_SIZE 64
+
 static int parse_makeCred_authnr_clientDataHash(cbipDecoder_t *decoder, cbipItem_t *mapItem) {
     ctap2_register_data_t *ctap2RegisterData = globals_get_ctap2_register_data();
     uint32_t itemLength;
@@ -115,6 +122,10 @@ static int parse_makeCred_authnr_user(cbipDecoder_t *decoder, cbipItem_t *mapIte
                                     &ctap2RegisterData->userIdLen) != CBIPH_STATUS_FOUND) {
         return ERROR_MISSING_PARAMETER;
     }
+    if (ctap2RegisterData->userIdLen > CTAP2_MAX_USER_ID_SIZE) {
+        PRINTF("Invalid user.id length %d\n", ctap2RegisterData->userIdLen);
+        return ERROR_INVALID_LEN;
+    }
 
     CHECK_MAP_STR_KEY_ITEM_IS_VALID(decoder,
                                     &userItem,
@@ -152,11 +163,11 @@ static int parse_makeCred_authnr_user(cbipDecoder_t *decoder, cbipItem_t *mapIte
     if (ctap2RegisterData->userStr != NULL) {
         // Display name can be truncated to 64bytes
         // https://www.w3.org/TR/webauthn/#dom-publickeycredentialuserentity-displayname
-        if (ctap2RegisterData->userStrLen > 64) {
+        if (ctap2RegisterData->userStrLen > CTAP2_MAX_USER_STR_SIZE) {
             // TODO show that user.display is truncated
             // TODO: on Flex, there is enough place for 3x18 characters (54), so it currently
             //       overflows under the "Register" button. We'll need to clean that (new page?)
-            ctap2RegisterData->userStrLen = 64;
+            ctap2RegisterData->userStrLen = CTAP2_MAX_USER_STR_SIZE;
         }
         PRINTF("MAKE_CREDENTIAL: userStr %.*s\n",
                ctap2RegisterData->userStrLen,
