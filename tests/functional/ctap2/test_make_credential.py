@@ -31,36 +31,22 @@ def test_make_credential(client, test_name):
     assert client.ctap2.info.aaguid == attestation.auth_data.credential_data.aaguid
 
 
-@pytest.mark.skip_endpoint(["HID", "NFC"],
-                           reason="Interleaving requires the CTAPHID transport")
-def test_cbor_command_refused_while_make_credential_pending(client, device: Device):
-    original = generate_make_credentials_params(client, ref=0)
-    original_cmd = client.ctap2.send_cbor_nowait(Ctap2.CMD.MAKE_CREDENTIAL,
-                                                 original.cbor_args)
-
-    # Let the review start and at least one keepalive reopen the HID transport.
-    time.sleep(0.5)
-
-    poison = {
-        1: "attacker.example",
-        2: bytes([0xAA] * 32),
-        4: 5,  # Deliberately not an options map.
-    }
+def inject_while_pending(client, cmd, payload):
     # The transport answers 0x06 (CHANNEL_BUSY) until a keepalive resets its state,
     # so retry until the command is delivered. A run stopping at 0x06 tests nothing.
     code = None
     for _ in range(12):
-        injected_cmd = client.ctap2.send_cbor_nowait(Ctap2.CMD.GET_ASSERTION, poison)
+        injected_cmd = client.ctap2.send_cbor_nowait(cmd, payload)
         with pytest.raises(CtapError) as e:
-            injected_response = client.ctap2.device.recv(injected_cmd)
-            client.ctap2.parse_response(injected_response)
+            client.ctap2.parse_response(client.ctap2.device.recv(injected_cmd))
         code = e.value.code
         if code != CtapError(0x06).code:
             break
         time.sleep(0.3)
-    # CTAP2_ERR_OPERATION_PENDING, raised by the app.
-    assert code == CtapError(0x24).code
+    return code
 
+
+def accept_and_check_attestation(client, device: Device, original, original_cmd):
     if device.is_nano:
         nav_ins = NavInsID.RIGHT_CLICK
         val_ins = [NavInsID.BOTH_CLICK]
@@ -85,6 +71,45 @@ def test_cbor_command_refused_while_make_credential_pending(client, device: Devi
     # clientDataHash, which the interleaved command overwrote in G_io_apdu_buffer.
     verifier = LedgerAttestationVerifier(client.ledger_device)
     verifier.verify_attestation(attestation, original.client_data_hash)
+
+
+@pytest.mark.skip_endpoint(["HID", "NFC"],
+                           reason="Interleaving requires the CTAPHID transport")
+def test_ungated_cbor_command_while_make_credential_pending(client, device: Device):
+    # An unrecognised command ID is not gated, so it reaches the app while the review
+    # is up. It must be answered without touching the request the review points into.
+    original = generate_make_credentials_params(client, ref=0)
+    original_cmd = client.ctap2.send_cbor_nowait(Ctap2.CMD.MAKE_CREDENTIAL,
+                                                 original.cbor_args)
+    time.sleep(0.5)
+
+    code = inject_while_pending(client, 0xEE, {1: bytes([0x41] * 400)})
+    # CTAP2_ERR_INVALID_CBOR: delivered and rejected, not CHANNEL_BUSY.
+    assert code == CtapError(0x12).code
+
+    accept_and_check_attestation(client, device, original, original_cmd)
+
+
+@pytest.mark.skip_endpoint(["HID", "NFC"],
+                           reason="Interleaving requires the CTAPHID transport")
+def test_cbor_command_refused_while_make_credential_pending(client, device: Device):
+    original = generate_make_credentials_params(client, ref=0)
+    original_cmd = client.ctap2.send_cbor_nowait(Ctap2.CMD.MAKE_CREDENTIAL,
+                                                 original.cbor_args)
+
+    # Let the review start and at least one keepalive reopen the HID transport.
+    time.sleep(0.5)
+
+    poison = {
+        1: "attacker.example",
+        2: bytes([0xAA] * 32),
+        4: 5,  # Deliberately not an options map.
+    }
+    code = inject_while_pending(client, Ctap2.CMD.GET_ASSERTION, poison)
+    # CTAP2_ERR_OPERATION_PENDING, raised by the app.
+    assert code == CtapError(0x24).code
+
+    accept_and_check_attestation(client, device, original, original_cmd)
 
 
 def test_make_credential_followed_u2f(client, test_name, device: Device, u2f_over_fake_nfc):

@@ -145,6 +145,12 @@ typedef struct shared_ctx_s {
 } shared_ctx_t;
 
 extern shared_ctx_t shared_ctx;
+
+// Set while a user confirmation is on screen: commands writing the pending context
+// are refused until it clears. No timeout, so a re-tap gets OPERATION_PENDING.
+// Cleared by the user answering or an app restart, plus CTAPHID_CANCEL for
+// ctap2UxState only: during a U2F prompt the transport answers CHANNEL_BUSY, so a
+// cancel never reaches the app.
 extern ctap2_ux_state_t ctap2UxState;
 extern bool u2fUxPending;
 
