@@ -34,7 +34,7 @@ uint8_t ctap2RequestBuffer[IO_APDU_BUFFER_SIZE];
 
 #include "string_utils.h"
 
-static void copy_name_in_buffer65(char *buffer, const char *name, uint8_t nameLength) {
+static void copy_name_in_buffer65(char *buffer, const char *name, uint32_t nameLength) {
     bool name_too_long = (nameLength >= NAME_BUFFER_SIZE);
     if (name_too_long) {
         nameLength = NAME_BUFFER_SIZE - 4;
@@ -50,7 +50,7 @@ static void copy_name_in_buffer65(char *buffer, const char *name, uint8_t nameLe
     }
 }
 
-void globals_display_set_username(const char *name, uint8_t nameLength) {
+void globals_display_set_username(const char *name, uint32_t nameLength) {
     copy_name_in_buffer65(g.username_buffer, name, nameLength);
 }
 
@@ -58,7 +58,7 @@ void globals_display_clear_username(void) {
     memset(g.username_buffer, 0, sizeof(g.username_buffer));
 }
 
-void globals_display_set_rp(const char *name, uint8_t nameLength) {
+void globals_display_set_rp(const char *name, uint32_t nameLength) {
     copy_name_in_buffer65(g.rp_buffer, name, nameLength);
 }
 

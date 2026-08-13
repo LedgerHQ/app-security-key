@@ -187,8 +187,10 @@ void globals_truncate_pairs_for_display(bool large);
  */
 void globals_prepare_displayed_message(bool clean_buffer);
 
-/* Functions to set or clear rp and user names in global array */
-void globals_display_set_username(const char *name, uint8_t nameLength);
+/* Functions to set or clear rp and user names in global array.
+ * nameLength is the raw CBOR length: it must not be narrowed before the callee
+ * truncates it, or an over-long name wraps to a shorter one on screen. */
+void globals_display_set_username(const char *name, uint32_t nameLength);
 void globals_display_clear_username(void);
-void globals_display_set_rp(const char *name, uint8_t nameLength);
+void globals_display_set_rp(const char *name, uint32_t nameLength);
 void globals_display_clear_rp(void);
