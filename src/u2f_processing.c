@@ -370,8 +370,10 @@ static int u2f_handle_apdu_applet_select(uint8_t *rx, int data_length, const uin
         return io_send_sw(SW_INCORRECT_P1P2);
     }
 
+    // Readers probe other applications before ours (Android selects the NDEF Tag
+    // Application first), and an absent application answers SW_FILE_NOT_FOUND.
     if ((data_length != FIDO_AID_SIZE) || (memcmp(data, FIDO_AID, FIDO_AID_SIZE) != 0)) {
-        return io_send_sw(SW_WRONG_DATA);
+        return io_send_sw(SW_FILE_NOT_FOUND);
     }
 
     return io_send_response_pointer((const uint8_t *) U2F_VERSION, U2F_VERSION_SIZE, SW_NO_ERROR);
@@ -477,8 +479,10 @@ int u2f_handle_apdu(uint8_t *rx, int rx_length) {
                 return nfc_io_send_prepared_response();
 
             case FIDO2_NFC_INS_APPLET_DESELECT:
-                PRINTF("NFC APPLET unsupported\n");
-                return io_send_sw(SW_INS_NOT_SUPPORTED);
+                // The platform is done with the applet: acknowledge it. P1/P2 are not
+                // checked as readers disagree on them.
+                PRINTF("NFC applet deselect\n");
+                return io_send_sw(SW_NO_ERROR);
 
             case 0xc0:
                 return nfc_io_send_prepared_response();
