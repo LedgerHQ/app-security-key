@@ -124,6 +124,11 @@ extern u2f_service_t G_io_u2f;
 
 extern uint8_t responseBuffer[IO_APDU_BUFFER_SIZE];
 
+// App-owned copy of the CBOR request. G_io_apdu_buffer aliases G_io_tx_buffer and
+// is overwritten by the next command without the app being called, while handlers
+// keep pointers into their request across the user review.
+extern uint8_t ctap2RequestBuffer[IO_APDU_BUFFER_SIZE];
+
 typedef struct ctap2_data_t {
     union ctap2_data_u {
         ctap2_register_data_t ctap2RegisterData;

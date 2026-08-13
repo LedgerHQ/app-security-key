@@ -55,6 +55,16 @@ void ctap2_handle_cmd_cbor(u2f_service_t *service, uint8_t *buffer, uint16_t len
         return;
     }
 
+    if (length > sizeof(ctap2RequestBuffer)) {
+        PRINTF("CBOR command too long\n");
+        send_cbor_error(service, ERROR_REQUEST_TOO_LARGE);
+        return;
+    }
+
+    // Parse an app-owned copy: G_io_apdu_buffer does not survive the user review.
+    memcpy(ctap2RequestBuffer, buffer, length);
+    buffer = ctap2RequestBuffer;
+
 #ifdef HAVE_CBOR_DEBUG
     PRINTF("CBOR %.*H\n", length, buffer);
     cbiph_dump(buffer + 1, length - 1);

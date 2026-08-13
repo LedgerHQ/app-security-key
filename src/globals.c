@@ -30,6 +30,8 @@ bool u2fUxPending;
 
 uint8_t responseBuffer[IO_APDU_BUFFER_SIZE];
 
+uint8_t ctap2RequestBuffer[IO_APDU_BUFFER_SIZE];
+
 #include "string_utils.h"
 
 static void copy_name_in_buffer65(char *buffer, const char *name, uint8_t nameLength) {

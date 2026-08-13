@@ -46,11 +46,20 @@ def test_cbor_command_refused_while_make_credential_pending(client, device: Devi
         2: bytes([0xAA] * 32),
         4: 5,  # Deliberately not an options map.
     }
-    injected_cmd = client.ctap2.send_cbor_nowait(Ctap2.CMD.GET_ASSERTION, poison)
-    with pytest.raises(CtapError) as e:
-        injected_response = client.ctap2.device.recv(injected_cmd)
-        client.ctap2.parse_response(injected_response)
-    assert e.value.code in (CtapError(0x24).code, CtapError(0x06).code)
+    # The transport answers 0x06 (CHANNEL_BUSY) until a keepalive resets its state,
+    # so retry until the command is delivered. A run stopping at 0x06 tests nothing.
+    code = None
+    for _ in range(12):
+        injected_cmd = client.ctap2.send_cbor_nowait(Ctap2.CMD.GET_ASSERTION, poison)
+        with pytest.raises(CtapError) as e:
+            injected_response = client.ctap2.device.recv(injected_cmd)
+            client.ctap2.parse_response(injected_response)
+        code = e.value.code
+        if code != CtapError(0x06).code:
+            break
+        time.sleep(0.3)
+    # CTAP2_ERR_OPERATION_PENDING, raised by the app.
+    assert code == CtapError(0x24).code
 
     if device.is_nano:
         nav_ins = NavInsID.RIGHT_CLICK
@@ -70,6 +79,12 @@ def test_cbor_command_refused_while_make_credential_pending(client, device: Devi
     expected_flags |= AuthenticatorData.FLAG.ATTESTED
     assert attestation.auth_data.rp_id_hash == sha256(original.rp["id"].encode()).digest()
     assert attestation.auth_data.flags == expected_flags
+
+    # The checks above read app-held copies, so they pass even on a corrupted request.
+    # The signature is what binds the approval: it must cover the original
+    # clientDataHash, which the interleaved command overwrote in G_io_apdu_buffer.
+    verifier = LedgerAttestationVerifier(client.ledger_device)
+    verifier.verify_attestation(attestation, original.client_data_hash)
 
 
 def test_make_credential_followed_u2f(client, test_name, device: Device, u2f_over_fake_nfc):
