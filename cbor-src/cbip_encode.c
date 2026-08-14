@@ -21,12 +21,14 @@
 #include "cbip_encode.h"
 #include "cbip_internal.h"
 
-#define CHECK_AVAILABLE(x)                             \
-    do {                                               \
-        if ((encoder->offset + x) > encoder->length) { \
-            encoder->fault = true;                     \
-            return -1;                                 \
-        }                                              \
+#define CHECK_AVAILABLE(x)                                             \
+    do {                                                               \
+        uint32_t requestedLength = (uint32_t) (x);                     \
+        if ((encoder->offset > encoder->length) ||                     \
+            (requestedLength > (encoder->length - encoder->offset))) { \
+            encoder->fault = true;                                     \
+            return -1;                                                 \
+        }                                                              \
     } while (0)
 
 #define CHECK_FAULT()         \
@@ -83,12 +85,21 @@ static int cbip_add_raw(cbipEncoder_t *encoder,
                         const uint8_t *value,
                         uint32_t valueLength) {
     int result;
+    // Library boundary: refuse rather than memmove() from a NULL source.
+    if ((value == NULL) && (valueLength != 0)) {
+        encoder->fault = true;
+        return -1;
+    }
     result = cbip_add_header(encoder, tag, valueLength);
     if (result < 0) {
         return result;
     }
     CHECK_AVAILABLE(valueLength);
-    memmove(encoder->buffer + encoder->offset, value, valueLength);
+    // An empty string is valid CBOR, but memmove() forbids a NULL source even for a
+    // zero count, so skip it rather than rely on that being harmless.
+    if (valueLength != 0) {
+        memmove(encoder->buffer + encoder->offset, value, valueLength);
+    }
     encoder->offset += valueLength;
     return 0;
 }

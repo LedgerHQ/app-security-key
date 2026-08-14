@@ -307,12 +307,15 @@ def test_client_pin_reset(client):
     # Value depends on if a pin as been set.
     # Upon boot, pin is never set as we don't have NVM
     assert not info.options["clientPin"]
+    # The built-in UV is only offered while no client PIN is set.
+    assert info.options["uv"]
 
     # Set pin and validate it has been set
     client.client_pin.set_pin(PIN_A)
 
     info = client.ctap2.get_info()
     assert info.options["clientPin"]
+    assert not info.options["uv"]
 
     assert client.client_pin.get_pin_retries() == (8, None)
 
@@ -323,6 +326,7 @@ def test_client_pin_reset(client):
 
     info = client.ctap2.get_info()
     assert not info.options["clientPin"]
+    assert info.options["uv"]
 
     with pytest.raises(CtapError) as e:
         client.client_pin.get_pin_retries()

@@ -18,6 +18,8 @@
 
 #pragma once
 
+#include <stdbool.h>
+
 #include <u2f_service.h>
 
 #include "credential.h"
@@ -122,6 +124,11 @@ extern u2f_service_t G_io_u2f;
 
 extern uint8_t responseBuffer[IO_APDU_BUFFER_SIZE];
 
+// App-owned copy of the CBOR request. G_io_apdu_buffer aliases G_io_tx_buffer and
+// is overwritten by the next command without the app being called, while handlers
+// keep pointers into their request across the user review.
+extern uint8_t ctap2RequestBuffer[IO_APDU_BUFFER_SIZE];
+
 typedef struct ctap2_data_t {
     union ctap2_data_u {
         ctap2_register_data_t ctap2RegisterData;
@@ -138,7 +145,14 @@ typedef struct shared_ctx_s {
 } shared_ctx_t;
 
 extern shared_ctx_t shared_ctx;
+
+// Set while a user confirmation is on screen: commands writing the pending context
+// are refused until it clears. No timeout, so a re-tap gets OPERATION_PENDING.
+// Cleared by the user answering or an app restart, plus CTAPHID_CANCEL for
+// ctap2UxState only: during a U2F prompt the transport answers CHANNEL_BUSY, so a
+// cancel never reaches the app.
 extern ctap2_ux_state_t ctap2UxState;
+extern bool u2fUxPending;
 
 static inline u2f_data_t *globals_get_u2f_data(void) {
     return &shared_ctx.u.u2fData;
@@ -173,8 +187,10 @@ void globals_truncate_pairs_for_display(bool large);
  */
 void globals_prepare_displayed_message(bool clean_buffer);
 
-/* Functions to set or clear rp and user names in global array */
-void globals_display_set_username(const char *name, uint8_t nameLength);
+/* Functions to set or clear rp and user names in global array.
+ * nameLength is the raw CBOR length: it must not be narrowed before the callee
+ * truncates it, or an over-long name wraps to a shorter one on screen. */
+void globals_display_set_username(const char *name, uint32_t nameLength);
 void globals_display_clear_username(void);
-void globals_display_set_rp(const char *name, uint8_t nameLength);
+void globals_display_set_rp(const char *name, uint32_t nameLength);
 void globals_display_clear_rp(void);

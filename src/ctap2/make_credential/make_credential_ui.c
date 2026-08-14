@@ -29,10 +29,11 @@
 #include "make_credential_utils.h"
 
 static void ctap_ux_on_user_choice(bool confirm) {
-    ctap2UxState = CTAP2_UX_STATE_NONE;
-
     if (confirm) {
         ctap2_make_credential_confirm();
+        // Cleared after the handler: it reads the request and signs, and this latch
+        // is what keeps a new command out meanwhile.
+        ctap2UxState = CTAP2_UX_STATE_NONE;
 #ifdef HAVE_NBGL
         app_nbgl_status(CTAP2_REGISTRATION, true, ui_idle);
 #else
@@ -40,6 +41,7 @@ static void ctap_ux_on_user_choice(bool confirm) {
 #endif
     } else {
         ctap2_make_credential_user_cancel();
+        ctap2UxState = CTAP2_UX_STATE_NONE;
 #ifdef HAVE_NBGL
         app_nbgl_status(CTAP2_REGISTRATION_CANCELLED, false, ui_idle);
 #else

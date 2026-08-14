@@ -124,7 +124,12 @@ void ctap2_get_info_handle(u2f_service_t *service, uint8_t *buffer, uint16_t len
     cbip_add_option(&encoder, OPTION_RESIDENT_KEY, sizeof(OPTION_RESIDENT_KEY) - 1, true);
 #endif
     cbip_add_option(&encoder, OPTION_USER_PRESENCE, sizeof(OPTION_USER_PRESENCE) - 1, true);
-    cbip_add_option(&encoder, OPTION_USER_VERIFICATION, sizeof(OPTION_USER_VERIFICATION) - 1, true);
+    // The device unlock PIN is our built-in UV, but it can only be advertised while
+    // no client PIN is set: once one is, CTAP2.0 requires pinAuth on every request.
+    cbip_add_option(&encoder,
+                    OPTION_USER_VERIFICATION,
+                    sizeof(OPTION_USER_VERIFICATION) - 1,
+                    !N_u2f.pinSet);
     cbip_add_option(&encoder, OPTION_PLAT, sizeof(OPTION_PLAT) - 1, false);
     /*
     cbip_add_option(&encoder, OPTION_ALWAYS_UV, sizeof(OPTION_ALWAYS_UV) - 1, false);
