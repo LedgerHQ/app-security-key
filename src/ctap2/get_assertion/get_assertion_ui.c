@@ -45,8 +45,6 @@ static void ux_display_user_assertion(char buffer[static SELECT_ID_BUFFER_SIZE])
 }
 
 static void ctap_ux_on_user_choice(bool confirm, uint16_t idx) {
-    ctap2UxState = CTAP2_UX_STATE_NONE;
-
     if (confirm) {
         // As the choice is made authenticator-side, according to the spec SK should not let the
         // client being aware of additional credentials. This will prevent the client to call
@@ -54,6 +52,9 @@ static void ctap_ux_on_user_choice(bool confirm, uint16_t idx) {
         globals_get_ctap2_assert_data()->availableCredentials =
             MIN(globals_get_ctap2_assert_data()->availableCredentials, 1);
         get_assertion_confirm(idx);
+        // Cleared after the handler: it reads the request and signs, and this latch
+        // is what keeps a new command out meanwhile.
+        ctap2UxState = CTAP2_UX_STATE_NONE;
 #ifdef HAVE_NBGL
         app_nbgl_status(CTAP2_LOGIN, true, ui_idle);
 #else
@@ -61,6 +62,7 @@ static void ctap_ux_on_user_choice(bool confirm, uint16_t idx) {
 #endif
     } else {
         get_assertion_user_cancel();
+        ctap2UxState = CTAP2_UX_STATE_NONE;
 #ifdef HAVE_NBGL
         app_nbgl_status(CTAP2_LOGIN_CANCELLED, false, ui_idle);
 #else
@@ -326,9 +328,8 @@ static void on_no_assertion_user_choice(int token, uint8_t index) {
 
     nbgl_pageRelease(pageContext);
 
-    ctap2UxState = CTAP2_UX_STATE_NONE;
-
     get_assertion_confirm(0);
+    ctap2UxState = CTAP2_UX_STATE_NONE;
     ui_idle();
 }
 

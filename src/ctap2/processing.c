@@ -48,6 +48,33 @@ void ctap2_handle_cmd_cbor(u2f_service_t *service, uint8_t *buffer, uint16_t len
         return;
     }
 
+    // Only these commands keep pointers into their request across the user review,
+    // so only they are gated and only they are copied. Every other command, known
+    // or not, is parsed in place and completes before returning: copying it would
+    // overwrite the request a pending review still points into.
+    switch (buffer[0]) {
+        case CBOR_MAKE_CREDENTIAL:
+        case CBOR_GET_ASSERTION:
+        case CBOR_GET_NEXT_ASSERTION:
+        case CBOR_RESET:
+            if ((ctap2UxState != CTAP2_UX_STATE_NONE) || u2fUxPending) {
+                PRINTF("CBOR command refused: user confirmation pending\n");
+                send_cbor_error(service, ERROR_OPERATION_PENDING);
+                return;
+            }
+            if (length > sizeof(ctap2RequestBuffer)) {
+                PRINTF("CBOR command too long\n");
+                send_cbor_error(service, ERROR_REQUEST_TOO_LARGE);
+                return;
+            }
+            // G_io_apdu_buffer does not survive the user review.
+            memcpy(ctap2RequestBuffer, buffer, length);
+            buffer = ctap2RequestBuffer;
+            break;
+        default:
+            break;
+    }
+
 #ifdef HAVE_CBOR_DEBUG
     PRINTF("CBOR %.*H\n", length, buffer);
     cbiph_dump(buffer + 1, length - 1);

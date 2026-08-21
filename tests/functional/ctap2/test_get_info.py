@@ -58,12 +58,15 @@ def test_get_info_options(client):
         assert info.options["rk"]
 
     assert info.options["up"]
-    assert info.options["uv"]
     assert "clientPin" in info.options
 
     # Value depends on if a pin as been set.
     # Upon boot, pin is never set as we don't have NVM
     assert not info.options["clientPin"]
+
+    # The built-in UV is only offered while no client PIN is set, so it tracks the
+    # inverse of clientPin. Both states are covered by test_client_pin_reset().
+    assert info.options["uv"] == (not info.options["clientPin"])
 
     # Default value options
     assert not info.options["plat"]

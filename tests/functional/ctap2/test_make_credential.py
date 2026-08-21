@@ -1,8 +1,13 @@
+import time
+from hashlib import sha256
+
 import pytest
 from fido2.cose import ES256, EdDSA, RS256, PS256
 from fido2.ctap import CtapError
+from fido2.ctap2.base import AttestationResponse, Ctap2
 from fido2.webauthn import AuthenticatorData, AttestedCredentialData
 from ledgered.devices import Device
+from ragger.navigator import NavInsID
 
 from ..client import TESTS_SPECULOS_DIR, LedgerAttestationVerifier
 from ..utils import FIDO_RP_ID_HASH_1, generate_random_bytes, \
@@ -24,6 +29,87 @@ def test_make_credential(client, test_name):
     expected_flags |= AuthenticatorData.FLAG.ATTESTED
     assert attestation.auth_data.flags == expected_flags
     assert client.ctap2.info.aaguid == attestation.auth_data.credential_data.aaguid
+
+
+def inject_while_pending(client, cmd, payload):
+    # The transport answers 0x06 (CHANNEL_BUSY) until a keepalive resets its state,
+    # so retry until the command is delivered. A run stopping at 0x06 tests nothing.
+    code = None
+    for _ in range(12):
+        injected_cmd = client.ctap2.send_cbor_nowait(cmd, payload)
+        with pytest.raises(CtapError) as e:
+            client.ctap2.parse_response(client.ctap2.device.recv(injected_cmd))
+        code = e.value.code
+        if code != CtapError(0x06).code:
+            break
+        time.sleep(0.3)
+    return code
+
+
+def accept_and_check_attestation(client, device: Device, original, original_cmd):
+    if device.is_nano:
+        nav_ins = NavInsID.RIGHT_CLICK
+        val_ins = [NavInsID.BOTH_CLICK]
+        text = "Register$"
+    else:
+        nav_ins = None
+        val_ins = [NavInsID.USE_CASE_CHOICE_CONFIRM]
+        text = None
+    client.ctap2.navigate(Nav.USER_ACCEPT, False, None, text, nav_ins, val_ins)
+
+    response = client.ctap2.device.recv(original_cmd)
+    attestation = AttestationResponse.from_dict(client.ctap2.parse_response(response))
+    client.ctap2.wait_for_return_on_dashboard()
+
+    expected_flags = AuthenticatorData.FLAG.USER_PRESENT
+    expected_flags |= AuthenticatorData.FLAG.ATTESTED
+    assert attestation.auth_data.rp_id_hash == sha256(original.rp["id"].encode()).digest()
+    assert attestation.auth_data.flags == expected_flags
+
+    # The checks above read app-held copies, so they pass even on a corrupted request.
+    # The signature is what binds the approval: it must cover the original
+    # clientDataHash, which the interleaved command overwrote in G_io_apdu_buffer.
+    verifier = LedgerAttestationVerifier(client.ledger_device)
+    verifier.verify_attestation(attestation, original.client_data_hash)
+
+
+@pytest.mark.skip_endpoint(["HID", "NFC"],
+                           reason="Interleaving requires the CTAPHID transport")
+def test_ungated_cbor_command_while_make_credential_pending(client, device: Device):
+    # An unrecognised command ID is not gated, so it reaches the app while the review
+    # is up. It must be answered without touching the request the review points into.
+    original = generate_make_credentials_params(client, ref=0)
+    original_cmd = client.ctap2.send_cbor_nowait(Ctap2.CMD.MAKE_CREDENTIAL,
+                                                 original.cbor_args)
+    time.sleep(0.5)
+
+    code = inject_while_pending(client, 0xEE, {1: bytes([0x41] * 400)})
+    # CTAP2_ERR_INVALID_CBOR: delivered and rejected, not CHANNEL_BUSY.
+    assert code == CtapError(0x12).code
+
+    accept_and_check_attestation(client, device, original, original_cmd)
+
+
+@pytest.mark.skip_endpoint(["HID", "NFC"],
+                           reason="Interleaving requires the CTAPHID transport")
+def test_cbor_command_refused_while_make_credential_pending(client, device: Device):
+    original = generate_make_credentials_params(client, ref=0)
+    original_cmd = client.ctap2.send_cbor_nowait(Ctap2.CMD.MAKE_CREDENTIAL,
+                                                 original.cbor_args)
+
+    # Let the review start and at least one keepalive reopen the HID transport.
+    time.sleep(0.5)
+
+    poison = {
+        1: "attacker.example",
+        2: bytes([0xAA] * 32),
+        4: 5,  # Deliberately not an options map.
+    }
+    code = inject_while_pending(client, Ctap2.CMD.GET_ASSERTION, poison)
+    # CTAP2_ERR_OPERATION_PENDING, raised by the app.
+    assert code == CtapError(0x24).code
+
+    accept_and_check_attestation(client, device, original, original_cmd)
 
 
 def test_make_credential_followed_u2f(client, test_name, device: Device, u2f_over_fake_nfc):
@@ -124,6 +210,26 @@ def test_make_credential_up(client, test_name):
     client.ctap2.make_credential(args,
                                  check_screens=True,
                                  compare_args=compare_args)
+
+
+@pytest.mark.parametrize("size", [0, 65])
+def test_make_credential_user_id_out_of_range(client, size):
+    # user.id is 1..64 bytes. An empty one is present and well typed, so it has to be
+    # rejected on its length like an over-long one.
+    args = generate_make_credentials_params(client, ref=0)
+    args.user = {"id": b"\x01" * size, "name": "My user name"}
+
+    with pytest.raises(CtapError) as e:
+        client.ctap2.make_credential(args, navigation=Nav.NONE, will_fail=True)
+    assert e.value.code == CtapError.ERR.INVALID_LENGTH
+
+
+@pytest.mark.parametrize("size", [1, 64])
+def test_make_credential_user_id_in_range(client, size):
+    args = generate_make_credentials_params(client, ref=0)
+    args.user = {"id": b"\x01" * size, "name": "My user name"}
+
+    client.ctap2.make_credential(args)
 
 
 def test_make_credential_rk(client):
