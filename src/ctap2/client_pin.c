@@ -345,19 +345,20 @@ static void handle_store_pin(u2f_service_t *service,
                              uint8_t *pinEnc,
                              uint32_t pinEncLen) {
     uint32_t pinLenOut;
+    int status;
 
     // Decrypt pin in place
     if (ctap2_client_pin_decrypt(protocol, sharedSecret, pinEnc, pinEncLen, pinEnc, &pinLenOut) !=
         0) {
         PRINTF("PIN decryption failed\n");
-        send_cbor_error(service, ERROR_PIN_POLICY_VIOLATION);
-        return;
+        status = ERROR_PIN_POLICY_VIOLATION;
+        goto exit;
     }
 
     if (pinLenOut != MAX_PIN_LENGTH) {
         PRINTF("Invalid padded PIN length\n");
-        send_cbor_error(service, ERROR_INVALID_PAR);
-        return;
+        status = ERROR_INVALID_PAR;
+        goto exit;
     }
 
     // Remove padding
@@ -372,8 +373,8 @@ static void handle_store_pin(u2f_service_t *service,
 
     if ((pinLenOut < MIN_PIN_LENGTH) || (pinLenOut >= MAX_PIN_LENGTH)) {
         PRINTF("Invalid PIN length\n");
-        send_cbor_error(service, ERROR_PIN_POLICY_VIOLATION);
-        return;
+        status = ERROR_PIN_POLICY_VIOLATION;
+        goto exit;
     }
 
     // Store LEFT(SHA-256(newPin), 16) as requested in
@@ -384,6 +385,16 @@ static void handle_store_pin(u2f_service_t *service,
 
     // Invalidate previous token and force the user to issue a GET_PIN_TOKEN command
     authTokeninUse = false;
+    status = ERROR_NONE;
+
+exit:
+    // The request buffer outlives this command, so the plaintext PIN and its hash must not stay
+    // in it.
+    explicit_bzero(pinEnc, pinEncLen);
+    if (status != ERROR_NONE) {
+        send_cbor_error(service, status);
+        return;
+    }
 
     responseBuffer[0] = ERROR_NONE;
     send_cbor_response(&G_io_u2f, 1, NULL);
@@ -393,24 +404,35 @@ static int check_pin_hash(int protocol,
                           const uint8_t *sharedSecret,
                           uint8_t *pinHashEnc,
                           uint32_t pinHashEncLen) {
-    uint32_t pinHashLen;
+    uint32_t pinHashLen = 0;
+
+    // The compare below reads a full hash, so the field must be exactly one hash long.
+    if (pinHashEncLen != PIN_HASH_SIZE) {
+        PRINTF("Invalid PIN hash length\n");
+        return ERROR_INVALID_PAR;
+    }
 
     config_decrease_ctap2_pin_retry_counter();
 
     // Decrypt in place
-    if (ctap2_client_pin_decrypt(protocol,
-                                 sharedSecret,
-                                 pinHashEnc,
-                                 pinHashEncLen,
-                                 pinHashEnc,
-                                 &pinHashLen) != 0) {
+    if ((ctap2_client_pin_decrypt(protocol,
+                                  sharedSecret,
+                                  pinHashEnc,
+                                  pinHashEncLen,
+                                  pinHashEnc,
+                                  &pinHashLen) != 0) ||
+        (pinHashLen != PIN_HASH_SIZE)) {
         PRINTF("PIN hash decryption failed\n");
+        explicit_bzero(pinHashEnc, pinHashEncLen);
         ctap2TransientPinAuths++;
         return ERROR_PIN_INVALID;
     }
 
-    if (!crypto_compare(pinHashEnc, (uint8_t *) N_u2f.pin, PIN_HASH_SIZE)) {
-        PRINTF("Computed PIN hash %.*H\n", PIN_HASH_SIZE, pinHashEnc);
+    bool pinHashMatches = crypto_compare(pinHashEnc, (uint8_t *) N_u2f.pin, PIN_HASH_SIZE);
+    // The request buffer outlives this command, so the plaintext hash must not stay in it.
+    explicit_bzero(pinHashEnc, PIN_HASH_SIZE);
+
+    if (!pinHashMatches) {
         PRINTF("Stored PIN hash %.*H\n", PIN_HASH_SIZE, N_u2f.pin);
         if (ctap2_client_pin_regenerate() != 0) {
             return ERROR_OTHER;
