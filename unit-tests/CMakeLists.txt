@@ -94,3 +94,11 @@ ledger_unit_tests_add_test(
     COMPILE_OPTIONS ${UT_SANITIZERS}
     LINK_OPTIONS    ${UT_SANITIZERS}
 )
+
+ledger_unit_tests_add_test(
+    NAME            test_config
+    SOURCES         ${APP_DIR}/src/config.c
+                    ${CMAKE_CURRENT_SOURCE_DIR}/stubs/stub_config.c
+    INCLUDE_DIRS    ${UT_INCLUDE_DIRS_SDK} ${UT_INCLUDE_DIRS} ${CMAKE_CURRENT_SOURCE_DIR}/stubs
+    COMPILE_DEFS    ${UT_COMPILE_DEFS_SDK} ${UT_COMPILE_DEFS}
+)
