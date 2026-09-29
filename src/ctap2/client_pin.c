@@ -220,6 +220,7 @@ int ctap2_client_pin_decrypt(int protocol,
     const uint8_t *data;
     uint32_t dataLength;
     cx_aes_key_t key;
+    size_t outLength = dataInLength;
 
     if ((dataInLength % CX_AES_BLOCK_SIZE) != 0) {
         return -1;
@@ -246,9 +247,10 @@ int ctap2_client_pin_decrypt(int protocol,
                            data,
                            dataLength,
                            dataOut,
-                           dataOutLength) != CX_OK) {
+                           &outLength) != CX_OK) {
         return -1;
     }
+    *dataOutLength = outLength;
 
     return 0;
 }
@@ -265,6 +267,7 @@ int ctap2_client_pin_encrypt(int protocol,
     uint8_t ivLength;
     uint8_t *data;
     cx_aes_key_t key;
+    size_t outLength = dataInLength;
     *dataOutLength = dataInLength;
 
     if ((dataInLength % CX_AES_BLOCK_SIZE) != 0) {
@@ -290,9 +293,10 @@ int ctap2_client_pin_encrypt(int protocol,
                            dataIn,
                            dataInLength,
                            data,
-                           dataOutLength) != CX_OK) {
+                           &outLength) != CX_OK) {
         return -1;
     }
+    *dataOutLength = outLength;
 
     return 0;
 }
