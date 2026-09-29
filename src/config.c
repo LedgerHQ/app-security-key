@@ -32,6 +32,7 @@ config_t const N_u2f_real;
 static int derive_and_store_keys(uint32_t resetGeneration) {
     cx_err_t error;
     int status = -1;
+    uint8_t seed[64];
     uint8_t key[64];
     uint8_t derivateKey[CX_SHA256_SIZE];
     uint32_t keyPath[3];
@@ -42,16 +43,10 @@ static int derive_and_store_keys(uint32_t resetGeneration) {
 
     // privateKeySeed
     keyPath[0] = PRIVATE_KEY_SEED_PATH;
-    error = os_derive_bip32_no_throw(CX_CURVE_SECP256R1, keyPath, 3, key, key + 32);
+    error = os_derive_bip32_no_throw(CX_CURVE_SECP256R1, keyPath, 3, seed, seed + 32);
     if (error != CX_OK) {
         goto exit;
     }
-    if (memcmp(key, (uint8_t *) N_u2f.privateKeySeed, sizeof(N_u2f.privateKeySeed)) == 0) {
-        // Keys are already initialized with the proper seed and resetGeneration
-        status = 0;
-        goto exit;
-    }
-    nvm_write((void *) N_u2f.privateKeySeed, (void *) key, sizeof(N_u2f.privateKeySeed));
 
     // wrappingKey
     keyPath[0] = WRAPPING_KEY_PATH;
@@ -60,20 +55,35 @@ static int derive_and_store_keys(uint32_t resetGeneration) {
         goto exit;
     }
 
+    // Every key is checked: a matching seed does not prove the wrapping keys are in place, as an
+    // older write order or a cut write may have left them zero. Only a differing key is written.
     // wrappingKeyU2F: aes_key = SHA256(VERSION || wrappingKeys)
     version = CREDENTIAL_VERSION_U2F;
     crypto_compute_sha256(&version, sizeof(version), key, sizeof(key), derivateKey);
-    nvm_write((void *) N_u2f.wrappingKeyU2F, (void *) derivateKey, sizeof(N_u2f.wrappingKeyU2F));
+    if (memcmp(derivateKey, (uint8_t *) N_u2f.wrappingKeyU2F, sizeof(N_u2f.wrappingKeyU2F)) != 0) {
+        nvm_write((void *) N_u2f.wrappingKeyU2F,
+                  (void *) derivateKey,
+                  sizeof(N_u2f.wrappingKeyU2F));
+    }
 
     // wrappingKeyCTAP2: aes_key = SHA256(VERSION || wrappingKeys)
     version = CREDENTIAL_VERSION_CTAP2;
     crypto_compute_sha256(&version, sizeof(version), key, sizeof(key), derivateKey);
-    nvm_write((void *) N_u2f.wrappingKeyCTAP2,
-              (void *) derivateKey,
-              sizeof(N_u2f.wrappingKeyCTAP2));
+    if (memcmp(derivateKey, (uint8_t *) N_u2f.wrappingKeyCTAP2, sizeof(N_u2f.wrappingKeyCTAP2)) !=
+        0) {
+        nvm_write((void *) N_u2f.wrappingKeyCTAP2,
+                  (void *) derivateKey,
+                  sizeof(N_u2f.wrappingKeyCTAP2));
+    }
+
+    // privateKeySeed last, once the wrapping keys are in place.
+    if (memcmp(seed, (uint8_t *) N_u2f.privateKeySeed, sizeof(N_u2f.privateKeySeed)) != 0) {
+        nvm_write((void *) N_u2f.privateKeySeed, (void *) seed, sizeof(N_u2f.privateKeySeed));
+    }
 
     status = 0;
 exit:
+    explicit_bzero(seed, sizeof(seed));
     explicit_bzero(key, sizeof(key));
     explicit_bzero(derivateKey, sizeof(derivateKey));
     return status;
@@ -96,8 +106,11 @@ int config_init(void) {
         tmp32 = 0;
         nvm_write((void *) &N_u2f.resetGeneration, (void *) &tmp32, sizeof(N_u2f.resetGeneration));
 
-        // Initialize keys derived from seed
-        derive_and_store_keys(N_u2f.resetGeneration);
+        // Initialize keys derived from seed; without them the app must not start.
+        ret = derive_and_store_keys(N_u2f.resetGeneration);
+        if (ret != 0) {
+            return ret;
+        }
 
         tmp8 = 0;
         nvm_write((void *) &N_u2f.pinSet, (void *) &tmp8, sizeof(N_u2f.pinSet));
