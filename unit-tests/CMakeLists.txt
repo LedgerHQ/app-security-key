@@ -102,3 +102,25 @@ ledger_unit_tests_add_test(
     INCLUDE_DIRS    ${UT_INCLUDE_DIRS_SDK} ${UT_INCLUDE_DIRS} ${CMAKE_CURRENT_SOURCE_DIR}/stubs
     COMPILE_DEFS    ${UT_COMPILE_DEFS_SDK} ${UT_COMPILE_DEFS}
 )
+
+ledger_unit_tests_add_test(
+    NAME            test_client_pin
+    SOURCES         ${APP_DIR}/src/cbip_helper.c
+                    ${APP_DIR}/cbor-src/cbip_decode.c
+                    ${APP_DIR}/cbor-src/cbip_encode.c
+    MOCK_HEADERS    ${SDK_DIR}/lib_cxng/include/lcx_aes.h
+                    ${SDK_DIR}/lib_cxng/include/lcx_ecdh.h
+                    ${SDK_DIR}/lib_cxng/include/lcx_ecfp.h
+                    ${SDK_DIR}/lib_cxng/include/lcx_hmac.h
+                    ${SDK_DIR}/lib_cxng/include/lcx_rng.h
+                    ${SDK_DIR}/lib_cxng/include/lcx_sha256.h
+                    ${APP_DIR}/include/config.h
+                    ${APP_DIR}/include/crypto.h
+                    ${APP_DIR}/include/cose_keys.h
+                    ${APP_DIR}/src/ctap2/ctap2_utils.h
+                    ${SDK_DIR}/include/ledger_assert_internals.h
+    INCLUDE_DIRS    ${UT_INCLUDE_DIRS_SDK} ${UT_INCLUDE_DIRS}
+    COMPILE_DEFS    ${UT_COMPILE_DEFS_SDK} ${UT_COMPILE_DEFS}
+    # The generated mocks include crypto.h and cose_keys.h alone, and those expect os.h/cx.h first.
+    COMPILE_OPTIONS "SHELL:-include os.h" "SHELL:-include cx.h"
+)
