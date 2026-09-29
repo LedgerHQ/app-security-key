@@ -1,54 +1,27 @@
-CC ?= cc
 RM ?= rm -f
 
-CFLAGS ?= -O2 -Wall -Wextra -Wformat=2 -Wp,-MT,$@ -Wp,-MD,$(dir $@).$(notdir $@).d -fstack-protector
-CFLAGS += -DPRINTF=printf
-CFLAGS += -DUNIT_TESTS
-CFLAGS += -I. -I../../include -I../../cbor-src -I../../src/ctap2/
+CFLAGS := -g -O1 -Wall -Wextra -Wformat=2 -fsanitize=fuzzer,address,undefined
+CFLAGS += -DPRINTF= -DUNIT_TESTS -Wno-unused-value
+# Undefined behavior must fail the corpus replay, not only print a warning.
+CFLAGS += -fno-sanitize-recover=undefined
+CFLAGS += -I../unit-tests -I../include -I../cbor-src -I../src -I../src/ctap2/
 
-LDFLAGS ?= -Wl,-O1,-as-needed,-no-undefined,-z,relro,-z,now,--fatal-warnings -fstack-protector
+CORPUS := ../unit-tests/cbor/*.cbor
 
-# Use Address Sanitizer (ASAN) and Undefined Behavior Sanitizer (UBSAN)
-# Require privileges when using a container. For example with Podman:
-# podman run --cap-add=SYS_PTRACE --rm -ti -v "$(pwd):/app" ledgerhq/ledger-app-builder:1.6.0 make test
-CFLAGS += -fsanitize=address,undefined
-LDFLAGS += -fsanitize=address,undefined
+PROGRAMS := fuzz_cbip_decode fuzz_cbip_helper
 
-PROGRAMS := test_cbip_decode test_cbip_encode fuzz_cbip_decode fuzz_cbip_helper
-
+# Replays the corpus once; run a binary without arguments for a real fuzzing session.
 test: $(PROGRAMS)
-	./test_cbip_encode
-	for CBOR in cbor/*.cbor ; do ./test_cbip_decode "$$CBOR" > /dev/null || exit $$? ; done
-	./fuzz_cbip_decode cbor/*.cbor
-	./fuzz_cbip_helper cbor/*.cbor
+	./fuzz_cbip_decode $(CORPUS)
+	./fuzz_cbip_helper $(CORPUS)
 
 clean:
-	$(RM) $(PROGRAMS) ./*.o .*.d
+	$(RM) $(PROGRAMS)
 
-test_cbip_decode: test_cbip_decode.o cbip_decode.o
-	$(CC) $(LDFLAGS) -o $@ $^
+fuzz_cbip_decode: fuzz_cbip_decode.cpp ../cbor-src/cbip_decode.c
+	clang $(CFLAGS) -o $@ $^
 
-test_cbip_encode: test_cbip_encode.o cbip_encode.o
-	$(CC) $(LDFLAGS) -o $@ $^
-
-fuzz_cbip_decode: fuzz_cbip_decode.cpp ../../cbor-src/cbip_decode.c
-	clang -g -O1 -fsanitize=fuzzer,address $(CFLAGS) -UPRINTF -DPRINTF= -Wno-unused-value -o $@ fuzz_cbip_decode.cpp ../../cbor-src/cbip_decode.c
-
-fuzz_cbip_helper: fuzz_cbip_helper.cpp ../../src/cbip_helper.c ../../cbor-src/cbip_decode.c
-	clang -g -O1 -fsanitize=fuzzer,address $(CFLAGS) -UPRINTF -DPRINTF= -DHAVE_CBOR_DEBUG -DFUZZ -Wno-unused-value -o $@ fuzz_cbip_helper.cpp ../../src/cbip_helper.c ../../cbor-src/cbip_decode.c
-
-cbip_decode.o: ../../cbor-src/cbip_decode.c
-	$(CC) $(CFLAGS) -c -o $@ $<
-
-cbip_encode.o: ../../cbor-src/cbip_encode.c
-	$(CC) $(CFLAGS) -c -o $@ $<
-
-test_cbip_decode.o: test_cbip_decode.c
-	$(CC) $(CFLAGS) -c -o $@ $<
-
-test_cbip_encode.o: test_cbip_encode.c
-	$(CC) $(CFLAGS) -c -o $@ $<
+fuzz_cbip_helper: fuzz_cbip_helper.cpp ../src/cbip_helper.c ../cbor-src/cbip_decode.c
+	clang $(CFLAGS) -DHAVE_CBOR_DEBUG -DFUZZ -o $@ $^
 
 .PHONY: test clean
-
--include .*.d
