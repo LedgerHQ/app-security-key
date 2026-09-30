@@ -32,18 +32,16 @@ def test_make_credential(client, test_name):
 
 
 def inject_while_pending(client, cmd, payload):
-    # The transport answers 0x06 (CHANNEL_BUSY) until a keepalive resets its state,
-    # so retry until the command is delivered. A run stopping at 0x06 tests nothing.
-    code = None
+    # The review keeps the channel until its reply, keepalives included, so every attempt
+    # must be refused by the transport. Retrying spans many keepalives.
+    codes = set()
     for _ in range(12):
         injected_cmd = client.ctap2.send_cbor_nowait(cmd, payload)
         with pytest.raises(CtapError) as e:
             client.ctap2.parse_response(client.ctap2.device.recv(injected_cmd))
-        code = e.value.code
-        if code != CtapError(0x06).code:
-            break
+        codes.add(e.value.code)
         time.sleep(0.3)
-    return code
+    return codes
 
 
 def accept_and_check_attestation(client, device: Device, original, original_cmd):
@@ -76,16 +74,16 @@ def accept_and_check_attestation(client, device: Device, original, original_cmd)
 @pytest.mark.skip_endpoint(["HID", "NFC"],
                            reason="Interleaving requires the CTAPHID transport")
 def test_ungated_cbor_command_while_make_credential_pending(client, device: Device):
-    # An unrecognised command ID is not gated, so it reaches the app while the review
-    # is up. It must be answered without touching the request the review points into.
+    # An unrecognised command ID is not gated by the app, so only the transport can keep
+    # it away from the request the review points into.
     original = generate_make_credentials_params(client, ref=0)
     original_cmd = client.ctap2.send_cbor_nowait(Ctap2.CMD.MAKE_CREDENTIAL,
                                                  original.cbor_args)
     time.sleep(0.5)
 
-    code = inject_while_pending(client, 0xEE, {1: bytes([0x41] * 400)})
-    # CTAP2_ERR_INVALID_CBOR: delivered and rejected, not CHANNEL_BUSY.
-    assert code == CtapError(0x12).code
+    # One packet, so the result does not depend on how refused continuations are handled.
+    codes = inject_while_pending(client, 0xEE, {1: bytes([0x41] * 16)})
+    assert codes == {CtapError.ERR.CHANNEL_BUSY}
 
     accept_and_check_attestation(client, device, original, original_cmd)
 
@@ -97,17 +95,18 @@ def test_cbor_command_refused_while_make_credential_pending(client, device: Devi
     original_cmd = client.ctap2.send_cbor_nowait(Ctap2.CMD.MAKE_CREDENTIAL,
                                                  original.cbor_args)
 
-    # Let the review start and at least one keepalive reopen the HID transport.
+    # Let the review start and keepalives flow.
     time.sleep(0.5)
 
+    # 57 bytes with the command byte: exactly one init packet.
     poison = {
         1: "attacker.example",
         2: bytes([0xAA] * 32),
         4: 5,  # Deliberately not an options map.
     }
-    code = inject_while_pending(client, Ctap2.CMD.GET_ASSERTION, poison)
-    # CTAP2_ERR_OPERATION_PENDING, raised by the app.
-    assert code == CtapError(0x24).code
+    codes = inject_while_pending(client, Ctap2.CMD.GET_ASSERTION, poison)
+    # Refused by the transport; the app's OPERATION_PENDING gate is never reached.
+    assert codes == {CtapError.ERR.CHANNEL_BUSY}
 
     accept_and_check_attestation(client, device, original, original_cmd)
 
