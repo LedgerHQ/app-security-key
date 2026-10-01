@@ -104,7 +104,7 @@ static int compute_hmacSecret_output(uint8_t **output, uint32_t *outputLen, uint
                                           sharedSecret);
     if (status != ERROR_NONE) {
         PRINTF("Fail to decapsulate (error %d)\n", status);
-        return status;
+        goto exit;
     }
 
     // Check SALT_ENC
@@ -114,7 +114,8 @@ static int compute_hmacSecret_output(uint8_t **output, uint32_t *outputLen, uint
                                 &saltEnc,
                                 &saltEncLength) != CBIPH_STATUS_FOUND) {
         PRINTF("Unexpected modification of CBOR data\n");
-        return ERROR_INVALID_CBOR;
+        status = ERROR_INVALID_CBOR;
+        goto exit;
     }
 
     // Check SALT_AUTH
@@ -124,7 +125,8 @@ static int compute_hmacSecret_output(uint8_t **output, uint32_t *outputLen, uint
                                 &saltAuth,
                                 &saltAuthLength) != CBIPH_STATUS_FOUND) {
         PRINTF("Unexpected modification of CBOR data\n");
-        return ERROR_INVALID_CBOR;
+        status = ERROR_INVALID_CBOR;
+        goto exit;
     }
 
     // Verify saltAuth
@@ -137,7 +139,8 @@ static int compute_hmacSecret_output(uint8_t **output, uint32_t *outputLen, uint
                                  0,
                                  saltAuth,
                                  saltAuthLength)) {
-        return ERROR_INVALID_CBOR;
+        status = ERROR_INVALID_CBOR;
+        goto exit;
     }
 
     // Decrypt salt in place
@@ -149,12 +152,14 @@ static int compute_hmacSecret_output(uint8_t **output, uint32_t *outputLen, uint
                                       &saltLength);
     if (status < 0) {
         PRINTF("Salt decryption failed\n");
-        return ERROR_INVALID_CBOR;
+        status = ERROR_INVALID_CBOR;
+        goto exit;
     }
 
     if ((saltLength != HMAC_SECRET_SALT_SIZE) && (saltLength != HMAC_SECRET_SALT_SIZE * 2)) {
         PRINTF("Invalid hmac-secret salt enc length %d\n", saltLength);
-        return ERROR_INVALID_CBOR;
+        status = ERROR_INVALID_CBOR;
+        goto exit;
     }
 
     PRINTF("hmac-secret salt %.*H\n", saltLength, saltEnc);
@@ -183,14 +188,19 @@ static int compute_hmacSecret_output(uint8_t **output, uint32_t *outputLen, uint
                                       &saltEncLength);
     if (status < 0) {
         PRINTF("Salt encryption failed\n");
-        return ERROR_INVALID_CBOR;
+        status = ERROR_INVALID_CBOR;
+        goto exit;
     }
 
     PRINTF("hmac-secret return %.*H\n", saltEncLength, saltEnc);
 
     *output = saltEnc;
     *outputLen = saltEncLength;
-    return ERROR_NONE;
+    status = ERROR_NONE;
+
+exit:
+    explicit_bzero(sharedSecret, sizeof(sharedSecret));
+    return status;
 }
 
 static int build_authData(uint8_t *buffer, uint32_t bufferLength, uint32_t *authDataLen) {
