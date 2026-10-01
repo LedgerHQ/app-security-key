@@ -38,3 +38,5 @@ cmake --build build --target generate_coverage
 - `fakes/`: stand-ins for headers the app build generates, such as `glyphs.h`.
 - `unit_test.h`: definitions the CBOR code needs when built without the SDK
   (`UNIT_TESTS`).
+- `wipe_check.h`: records the `explicit_bzero()` calls of the source under test, so a
+  test can check that a stack buffer it only saw through a mock was wiped.
