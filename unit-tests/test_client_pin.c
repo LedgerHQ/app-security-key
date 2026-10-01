@@ -1,7 +1,8 @@
 /*
- * Unit tests for the PIN hash check and the PIN storage in src/ctap2/client_pin.c.
+ * Unit tests for src/ctap2/client_pin.c: the PIN hash check, the PIN storage, and the wipe
+ * of the key material each subcommand puts on the stack.
  *
- * Both helpers are static, so the source is included here. The SDK crypto, the app crypto
+ * The helpers are static, so the source is included here. The SDK crypto, the app crypto
  * and the NVM config are mocked; the CBOR code is the real one.
  */
 
@@ -23,6 +24,8 @@
 #include "Mockcrypto.h"
 #include "Mockctap2_utils.h"
 #include "Mockledger_assert_internals.h"
+
+#include "wipe_check.h"
 
 #include "client_pin.c"
 
@@ -74,12 +77,16 @@ static size_t fake_sha256(const uint8_t *in,
 }
 
 // N_u2f_real is const, so the host linker puts it in .rodata; the device keeps it in NVM.
-static void set_pin_retries(uint8_t retries) {
+static config_t *writable_config(void) {
     long page = sysconf(_SC_PAGESIZE);
     uintptr_t start = (uintptr_t) &N_u2f_real & ~((uintptr_t) page - 1);
     uintptr_t end = (uintptr_t) &N_u2f_real + sizeof(N_u2f_real);
     TEST_ASSERT_EQUAL_INT(0, mprotect((void *) start, end - start, PROT_READ | PROT_WRITE));
-    ((config_t *) &N_u2f_real)->pinRetries = retries;
+    return (config_t *) &N_u2f_real;
+}
+
+static void set_pin_retries(uint8_t retries) {
+    writable_config()->pinRetries = retries;
 }
 
 static void expect_decrypt(const uint8_t *plaintext, size_t out_len, cx_err_t result) {
@@ -96,9 +103,33 @@ void setUp(void) {
     decrypt_result = CX_OK;
     ctap2TransientPinAuths = 0;
     set_pin_retries(8);
+    wipe_check_reset();
 }
 
+// Stubs and expectations would otherwise carry over to the next test.
 void tearDown(void) {
+    Mocklcx_aes_Verify();
+    Mocklcx_ecdh_Verify();
+    Mocklcx_ecfp_Verify();
+    Mocklcx_hmac_Verify();
+    Mocklcx_rng_Verify();
+    Mocklcx_sha256_Verify();
+    Mockconfig_Verify();
+    Mockcose_keys_Verify();
+    Mockcrypto_Verify();
+    Mockctap2_utils_Verify();
+    Mockledger_assert_internals_Verify();
+    Mocklcx_aes_Destroy();
+    Mocklcx_ecdh_Destroy();
+    Mocklcx_ecfp_Destroy();
+    Mocklcx_hmac_Destroy();
+    Mocklcx_rng_Destroy();
+    Mocklcx_sha256_Destroy();
+    Mockconfig_Destroy();
+    Mockcose_keys_Destroy();
+    Mockcrypto_Destroy();
+    Mockctap2_utils_Destroy();
+    Mockledger_assert_internals_Destroy();
 }
 
 // =========================================================================
@@ -244,6 +275,260 @@ void test_store_pin_wipes_on_success(void) {
     assert_wiped(pin_enc, sizeof(pin_enc));
 }
 
+// =========================================================================
+// Key material on the stack is wiped before every return
+// =========================================================================
+
+// Where the code under test put each key, as seen by the mocks.
+static cx_aes_key_t *aes_keys[4];
+static int aes_key_count;
+static uint8_t *ecdh_secret;
+static uint8_t *shared_secret_out;
+static cx_hmac_sha256_t *hmac_ctx;
+
+static cx_err_t capture_aes_init_key(const uint8_t *raw_key,
+                                     size_t key_len,
+                                     cx_aes_key_t *key,
+                                     int cmock_num_calls) {
+    (void) raw_key;
+    (void) key_len;
+    (void) cmock_num_calls;
+
+    TEST_ASSERT_LESS_THAN_INT(4, aes_key_count);
+    memset(key, 0xA5, sizeof(*key));
+    aes_keys[aes_key_count++] = key;
+    return CX_OK;
+}
+
+static cx_err_t capture_ecdh(const cx_ecfp_private_key_t *private_key,
+                             uint32_t mode,
+                             const uint8_t *point,
+                             size_t point_len,
+                             uint8_t *secret,
+                             size_t secret_len,
+                             int cmock_num_calls) {
+    (void) private_key;
+    (void) mode;
+    (void) point;
+    (void) point_len;
+    (void) cmock_num_calls;
+
+    memset(secret, 0x5A, secret_len);
+    ecdh_secret = secret;
+    return CX_OK;
+}
+
+static size_t capture_shared_secret(const uint8_t *in,
+                                    size_t len,
+                                    uint8_t *out,
+                                    size_t out_len,
+                                    int cmock_num_calls) {
+    (void) in;
+    (void) len;
+    (void) cmock_num_calls;
+
+    memset(out, 0x3C, out_len);
+    shared_secret_out = out;
+    return out_len;
+}
+
+static cx_err_t capture_hmac_init(cx_hmac_sha256_t *hmac,
+                                  const uint8_t *key,
+                                  size_t key_len,
+                                  int cmock_num_calls) {
+    (void) key;
+    (void) key_len;
+    (void) cmock_num_calls;
+
+    memset(hmac, 0x77, sizeof(*hmac));
+    hmac_ctx = hmac;
+    return CX_OK;
+}
+
+static void reset_captures(void) {
+    memset(aes_keys, 0, sizeof(aes_keys));
+    aes_key_count = 0;
+    ecdh_secret = NULL;
+    shared_secret_out = NULL;
+    hmac_ctx = NULL;
+}
+
+static void assert_aes_keys_wiped(int expected) {
+    TEST_ASSERT_EQUAL_INT(expected, aes_key_count);
+    for (int i = 0; i < aes_key_count; i++) {
+        TEST_ASSERT_TRUE_MESSAGE(wipe_check_covered(aes_keys[i], sizeof(cx_aes_key_t)),
+                                 "AES key schedule left on the stack");
+    }
+}
+
+static void assert_shared_secret_wiped(void) {
+    TEST_ASSERT_NOT_NULL(ecdh_secret);
+    TEST_ASSERT_TRUE_MESSAGE(wipe_check_covered(ecdh_secret, 32), "ECDH output left on the stack");
+    TEST_ASSERT_NOT_NULL(shared_secret_out);
+    TEST_ASSERT_TRUE_MESSAGE(wipe_check_covered(shared_secret_out, SHARED_SECRET_MAX_SIZE),
+                             "shared secret left on the stack");
+}
+
+static void expect_decapsulate(void) {
+    decode_cose_key_ExpectAnyArgsAndReturn(0);
+    cx_ecdh_no_throw_Stub(capture_ecdh);
+    cx_hash_sha256_Stub(capture_shared_secret);
+}
+
+typedef void (*subcommand_handler_t)(u2f_service_t *service,
+                                     cbipDecoder_t *decoder,
+                                     cbipItem_t *mapItem,
+                                     int protocol);
+
+static void run_subcommand(subcommand_handler_t handler, uint8_t *request, size_t length) {
+    cbipDecoder_t decoder;
+    cbipItem_t mapItem;
+
+    cbip_decoder_init(&decoder, request, length);
+    cbip_first(&decoder, &mapItem);
+    handler(&G_io_u2f, &decoder, &mapItem, PIN_PROTOCOL_VERSION_V1);
+}
+
+void test_decrypt_wipes_aes_key(void) {
+    uint8_t data[16] = {0};
+    uint32_t out_len;
+
+    reset_captures();
+    cx_aes_init_key_no_throw_Stub(capture_aes_init_key);
+    decrypt_out_len = sizeof(data);
+    cx_aes_iv_no_throw_Stub(fake_aes_iv);
+
+    TEST_ASSERT_EQUAL_INT(0,
+                          ctap2_client_pin_decrypt(PIN_PROTOCOL_VERSION_V1,
+                                                   shared_secret,
+                                                   data,
+                                                   sizeof(data),
+                                                   data,
+                                                   &out_len));
+    assert_aes_keys_wiped(1);
+}
+
+void test_decrypt_wipes_aes_key_on_failure(void) {
+    uint8_t data[16] = {0};
+    uint32_t out_len;
+
+    reset_captures();
+    cx_aes_init_key_no_throw_Stub(capture_aes_init_key);
+    decrypt_result = CX_INTERNAL_ERROR;
+    cx_aes_iv_no_throw_Stub(fake_aes_iv);
+
+    TEST_ASSERT_EQUAL_INT(-1,
+                          ctap2_client_pin_decrypt(PIN_PROTOCOL_VERSION_V1,
+                                                   shared_secret,
+                                                   data,
+                                                   sizeof(data),
+                                                   data,
+                                                   &out_len));
+    assert_aes_keys_wiped(1);
+}
+
+void test_encrypt_wipes_aes_key(void) {
+    uint8_t data[16] = {0};
+    uint32_t out_len;
+
+    reset_captures();
+    cx_aes_init_key_no_throw_Stub(capture_aes_init_key);
+    decrypt_out_len = sizeof(data);
+    cx_aes_iv_no_throw_Stub(fake_aes_iv);
+
+    TEST_ASSERT_EQUAL_INT(0,
+                          ctap2_client_pin_encrypt(PIN_PROTOCOL_VERSION_V1,
+                                                   shared_secret,
+                                                   data,
+                                                   sizeof(data),
+                                                   data,
+                                                   &out_len));
+    assert_aes_keys_wiped(1);
+}
+
+// changePin is the only caller that MACs two messages, through an HMAC context.
+void test_verify_wipes_hmac_context(void) {
+    static const uint8_t msg[16] = {0};
+    static const uint8_t signature[AUTH_PROT_V1_SIZE] = {0};
+
+    reset_captures();
+    cx_hmac_sha256_init_no_throw_Stub(capture_hmac_init);
+    cx_hmac_no_throw_ExpectAnyArgsAndReturn(CX_OK);
+    cx_hmac_no_throw_ExpectAnyArgsAndReturn(CX_OK);
+    crypto_compare_ExpectAnyArgsAndReturn(true);
+
+    TEST_ASSERT_TRUE(ctap2_client_pin_verify(PIN_PROTOCOL_VERSION_V1,
+                                             shared_secret,
+                                             sizeof(shared_secret),
+                                             msg,
+                                             sizeof(msg),
+                                             msg,
+                                             sizeof(msg),
+                                             signature,
+                                             sizeof(signature)));
+    TEST_ASSERT_NOT_NULL(hmac_ctx);
+    TEST_ASSERT_TRUE_MESSAGE(wipe_check_covered(hmac_ctx, sizeof(*hmac_ctx)),
+                             "HMAC context left on the stack");
+}
+
+// {3: {}}: a key agreement, then nothing else, so each subcommand stops right after it.
+static uint8_t key_agreement_only[] = {0xA1, 0x03, 0xA0};
+
+void test_set_pin_wipes_shared_secret_on_error(void) {
+    reset_captures();
+    writable_config()->pinSet = 0;
+    expect_decapsulate();
+    send_cbor_error_Expect(&G_io_u2f, ERROR_MISSING_PARAMETER);
+
+    run_subcommand(ctap2_handle_set_pin, key_agreement_only, sizeof(key_agreement_only));
+    assert_shared_secret_wiped();
+}
+
+void test_change_pin_wipes_shared_secret_on_error(void) {
+    reset_captures();
+    writable_config()->pinSet = 1;
+    expect_decapsulate();
+    send_cbor_error_Expect(&G_io_u2f, ERROR_MISSING_PARAMETER);
+
+    run_subcommand(ctap2_handle_change_pin, key_agreement_only, sizeof(key_agreement_only));
+    assert_shared_secret_wiped();
+}
+
+void test_get_pin_token_wipes_shared_secret_on_error(void) {
+    reset_captures();
+    writable_config()->pinSet = 1;
+    expect_decapsulate();
+    send_cbor_error_Expect(&G_io_u2f, ERROR_MISSING_PARAMETER);
+
+    run_subcommand(ctap2_handle_get_pin_token, key_agreement_only, sizeof(key_agreement_only));
+    assert_shared_secret_wiped();
+}
+
+void test_get_pin_token_wipes_shared_secret_and_keys_on_success(void) {
+    // {3: {}, 6: h'EE..EE'}: a key agreement and a 16-byte pinHashEnc.
+    uint8_t request[5 + PIN_HASH_SIZE] = {0xA2, 0x03, 0xA0, 0x06, 0x40 | PIN_HASH_SIZE};
+    static const uint8_t plaintext[PIN_HASH_SIZE] = {0x11};
+
+    memset(request + 5, 0xEE, PIN_HASH_SIZE);
+    reset_captures();
+    writable_config()->pinSet = 1;
+    expect_decapsulate();
+    config_decrease_ctap2_pin_retry_counter_Expect();
+    cx_aes_init_key_no_throw_Stub(capture_aes_init_key);
+    decrypt_plaintext = plaintext;
+    decrypt_out_len = PIN_HASH_SIZE;
+    cx_aes_iv_no_throw_Stub(fake_aes_iv);
+    crypto_compare_ExpectAnyArgsAndReturn(true);
+    config_reset_ctap2_pin_retry_counter_Expect();
+    cx_rng_no_throw_Ignore();
+    send_cbor_response_ExpectAnyArgs();
+
+    run_subcommand(ctap2_handle_get_pin_token, request, sizeof(request));
+    assert_shared_secret_wiped();
+    // One key to decrypt the PIN hash, one to encrypt the token.
+    assert_aes_keys_wiped(2);
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_check_pin_hash_refuses_bad_encrypted_length);
@@ -255,5 +540,13 @@ int main(void) {
     RUN_TEST(test_store_pin_wipes_on_bad_padded_length);
     RUN_TEST(test_store_pin_wipes_on_short_pin);
     RUN_TEST(test_store_pin_wipes_on_success);
+    RUN_TEST(test_decrypt_wipes_aes_key);
+    RUN_TEST(test_decrypt_wipes_aes_key_on_failure);
+    RUN_TEST(test_encrypt_wipes_aes_key);
+    RUN_TEST(test_verify_wipes_hmac_context);
+    RUN_TEST(test_set_pin_wipes_shared_secret_on_error);
+    RUN_TEST(test_change_pin_wipes_shared_secret_on_error);
+    RUN_TEST(test_get_pin_token_wipes_shared_secret_on_error);
+    RUN_TEST(test_get_pin_token_wipes_shared_secret_and_keys_on_success);
     return UNITY_END();
 }
