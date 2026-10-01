@@ -217,7 +217,10 @@ static int credential_handle_ciphering(bool is_encrypt,
     }
 
 exit:
+    // The SDK reset leaves the wrapping key in the cipher key schedule.
     explicit_bzero(&siv_ctx, sizeof(siv_ctx));
+    explicit_bzero(&cipher, sizeof(cipher));
+    explicit_bzero(&cipher_key, sizeof(cipher_key));
 
     return status;
 }
