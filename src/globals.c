@@ -32,6 +32,12 @@ uint8_t responseBuffer[IO_APDU_BUFFER_SIZE];
 
 uint8_t ctap2RequestBuffer[IO_APDU_BUFFER_SIZE];
 
+void ctap2_ux_end(void) {
+    ctap2UxState = CTAP2_UX_STATE_NONE;
+    // The request can hold credential IDs decrypted in place, nonces included.
+    explicit_bzero(ctap2RequestBuffer, sizeof(ctap2RequestBuffer));
+}
+
 #include "string_utils.h"
 
 static void copy_name_in_buffer65(char *buffer, const char *name, uint32_t nameLength) {

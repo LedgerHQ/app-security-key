@@ -388,6 +388,9 @@ static int credential_parse(const uint8_t *rpIdHash,
                                              tag);
         if (status != 0) {
             PRINTF("Credential decryption failed\n");
+            // AES-SIV writes the plaintext before it checks the tag, so a credential ID
+            // wrapped for another RP still leaves its nonce here.
+            explicit_bzero(credId + offset, credIdLen - offset);
             return status;
         }
         // Set UNWRAPPED bit on version byte to indicate that data have been
