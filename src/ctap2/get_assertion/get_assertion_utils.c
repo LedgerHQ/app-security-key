@@ -251,6 +251,7 @@ static int build_authData(uint8_t *buffer, uint32_t bufferLength, uint32_t *auth
                                            ctap2AssertData->pinRequired);
 
             status = compute_hmacSecret_output(&salt, &saltLength, credRandom);
+            explicit_bzero(credRandom, sizeof(credRandom));
             if (status != ERROR_NONE) {
                 return status;
             }
