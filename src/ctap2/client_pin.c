@@ -136,17 +136,22 @@ int ctap2_client_pin_decapsulate(int protocol,
                               sizeof(tmp));
     if (status != CX_OK) {
         PRINTF("ECDH failed\n");
-        return ERROR_OTHER;
+        status = ERROR_OTHER;
+        goto exit;
     }
 
     if (protocol == PIN_PROTOCOL_VERSION_V1) {
         cx_hash_sha256(tmp, sizeof(tmp), sharedSecret, SHARED_SECRET_V1_SIZE);
         PRINTF("Shared secret %.*H\n", SHARED_SECRET_V1_SIZE, sharedSecret);
     } else {
-        return ERROR_INVALID_PAR;
+        status = ERROR_INVALID_PAR;
+        goto exit;
     }
+    status = ERROR_NONE;
 
-    return ERROR_NONE;
+exit:
+    explicit_bzero(tmp, sizeof(tmp));
+    return status;
 }
 
 // Correspond to FIDO2.1 spec PIN/UV Auth Protocol verify() operation
@@ -194,6 +199,7 @@ bool ctap2_client_pin_verify(int protocol,
                                   hmacValue,
                                   CX_SHA256_SIZE);
         LEDGER_ASSERT(cx_err == CX_OK, "cx_hmac_no_throw fail");
+        explicit_bzero(&hmac, sizeof(hmac));
     }
 
     if (!crypto_compare(signature, hmacValue, signatureLength)) {
@@ -221,6 +227,7 @@ int ctap2_client_pin_decrypt(int protocol,
     uint32_t dataLength;
     cx_aes_key_t key;
     size_t outLength = dataInLength;
+    int status;
 
     if ((dataInLength % CX_AES_BLOCK_SIZE) != 0) {
         return -1;
@@ -238,7 +245,8 @@ int ctap2_client_pin_decrypt(int protocol,
     }
 
     if (cx_aes_init_key_no_throw(aesKey, SECRET_AES_KEY_SIZE, &key) != CX_OK) {
-        return -1;
+        status = -1;
+        goto exit;
     }
     if (cx_aes_iv_no_throw(&key,
                            CX_LAST | CX_DECRYPT | CX_PAD_NONE | CX_CHAIN_CBC,
@@ -248,11 +256,15 @@ int ctap2_client_pin_decrypt(int protocol,
                            dataLength,
                            dataOut,
                            &outLength) != CX_OK) {
-        return -1;
+        status = -1;
+        goto exit;
     }
     *dataOutLength = outLength;
+    status = 0;
 
-    return 0;
+exit:
+    explicit_bzero(&key, sizeof(key));
+    return status;
 }
 
 // Correspond to FIDO2.1 spec PIN/UV Auth Protocol encrypt() operation
@@ -268,6 +280,7 @@ int ctap2_client_pin_encrypt(int protocol,
     uint8_t *data;
     cx_aes_key_t key;
     size_t outLength = dataInLength;
+    int status;
     *dataOutLength = dataInLength;
 
     if ((dataInLength % CX_AES_BLOCK_SIZE) != 0) {
@@ -284,7 +297,8 @@ int ctap2_client_pin_encrypt(int protocol,
     }
 
     if (cx_aes_init_key_no_throw(aesKey, SECRET_AES_KEY_SIZE, &key) != CX_OK) {
-        return -1;
+        status = -1;
+        goto exit;
     }
     if (cx_aes_iv_no_throw(&key,
                            CX_LAST | CX_ENCRYPT | CX_PAD_NONE | CX_CHAIN_CBC,
@@ -294,11 +308,15 @@ int ctap2_client_pin_encrypt(int protocol,
                            dataInLength,
                            data,
                            &outLength) != CX_OK) {
-        return -1;
+        status = -1;
+        goto exit;
     }
     *dataOutLength = outLength;
+    status = 0;
 
-    return 0;
+exit:
+    explicit_bzero(&key, sizeof(key));
+    return status;
 }
 
 /******************************************/
@@ -533,19 +551,19 @@ static void ctap2_handle_set_pin(u2f_service_t *service,
         ctap2_client_pin_decapsulate(protocol, decoder, mapItem, TAG_KEY_AGREEMENT, sharedSecret);
     if (status != ERROR_NONE) {
         send_cbor_error(service, status);
-        return;
+        goto exit;
     }
 
     if (cbiph_get_map_key_bytes(decoder, mapItem, TAG_PIN_AUTH, &pinAuth, &pinAuthLen) !=
         CBIPH_STATUS_FOUND) {
         send_cbor_error(service, ERROR_MISSING_PARAMETER);
-        return;
+        goto exit;
     }
 
     if (cbiph_get_map_key_bytes(decoder, mapItem, TAG_NEW_PIN_ENC, &newPinEnc, &newPinEncLen) !=
         CBIPH_STATUS_FOUND) {
         send_cbor_error(service, ERROR_MISSING_PARAMETER);
-        return;
+        goto exit;
     }
 
     // Check pinAuth
@@ -560,10 +578,13 @@ static void ctap2_handle_set_pin(u2f_service_t *service,
                                  pinAuthLen)) {
         ctap2_client_pin_regenerate();
         send_cbor_error(service, ERROR_PIN_AUTH_INVALID);
-        return;
+        goto exit;
     }
 
     handle_store_pin(service, protocol, sharedSecret, newPinEnc, newPinEncLen);
+
+exit:
+    explicit_bzero(sharedSecret, sizeof(sharedSecret));
 }
 
 static void ctap2_handle_change_pin(u2f_service_t *service,
@@ -588,25 +609,25 @@ static void ctap2_handle_change_pin(u2f_service_t *service,
         ctap2_client_pin_decapsulate(protocol, decoder, mapItem, TAG_KEY_AGREEMENT, sharedSecret);
     if (status != ERROR_NONE) {
         send_cbor_error(service, status);
-        return;
+        goto exit;
     }
 
     if (cbiph_get_map_key_bytes(decoder, mapItem, TAG_PIN_AUTH, &pinAuth, &pinAuthLen) !=
         CBIPH_STATUS_FOUND) {
         send_cbor_error(service, ERROR_MISSING_PARAMETER);
-        return;
+        goto exit;
     }
 
     if (cbiph_get_map_key_bytes(decoder, mapItem, TAG_PIN_HASH_ENC, &pinHashEnc, &pinHashEncLen) !=
         CBIPH_STATUS_FOUND) {
         send_cbor_error(service, ERROR_MISSING_PARAMETER);
-        return;
+        goto exit;
     }
 
     if (cbiph_get_map_key_bytes(decoder, mapItem, TAG_NEW_PIN_ENC, &newPinEnc, &newPinEncLen) !=
         CBIPH_STATUS_FOUND) {
         send_cbor_error(service, ERROR_MISSING_PARAMETER);
-        return;
+        goto exit;
     }
 
     // Check pinAuth
@@ -621,18 +642,21 @@ static void ctap2_handle_change_pin(u2f_service_t *service,
                                  pinAuthLen)) {
         ctap2_client_pin_regenerate();
         send_cbor_error(service, ERROR_PIN_AUTH_INVALID);
-        return;
+        goto exit;
     }
 
     // Check pinHashEnc
     status = check_pin_hash(protocol, sharedSecret, pinHashEnc, pinHashEncLen);
     if (status != ERROR_NONE) {
         send_cbor_error(service, status);
-        return;
+        goto exit;
     }
 
     // Process new PIN
     handle_store_pin(service, protocol, sharedSecret, newPinEnc, newPinEncLen);
+
+exit:
+    explicit_bzero(sharedSecret, sizeof(sharedSecret));
 }
 
 static void ctap2_handle_get_pin_token(u2f_service_t *service,
@@ -657,20 +681,20 @@ static void ctap2_handle_get_pin_token(u2f_service_t *service,
         ctap2_client_pin_decapsulate(protocol, decoder, mapItem, TAG_KEY_AGREEMENT, sharedSecret);
     if (status != ERROR_NONE) {
         send_cbor_error(service, status);
-        return;
+        goto exit;
     }
 
     // Check pinHashEnc
     if (cbiph_get_map_key_bytes(decoder, mapItem, TAG_PIN_HASH_ENC, &pinHashEnc, &pinHashEncLen) !=
         CBIPH_STATUS_FOUND) {
         send_cbor_error(service, ERROR_MISSING_PARAMETER);
-        return;
+        goto exit;
     }
 
     status = check_pin_hash(protocol, sharedSecret, pinHashEnc, pinHashEncLen);
     if (status != ERROR_NONE) {
         send_cbor_error(service, status);
-        return;
+        goto exit;
     }
 
     // Prepare token
@@ -694,6 +718,9 @@ static void ctap2_handle_get_pin_token(u2f_service_t *service,
 
     responseBuffer[0] = ERROR_NONE;
     send_cbor_response(&G_io_u2f, 1 + encoder.offset, NULL);
+
+exit:
+    explicit_bzero(sharedSecret, sizeof(sharedSecret));
 }
 
 /******************************************/
