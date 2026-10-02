@@ -177,6 +177,24 @@ void test_cancel_wipes_the_pending_request(void) {
     assert_request_wiped();
 }
 
+// A CANCEL leaves nothing for a later getNextAssertion, review or not.
+void test_cancel_clears_the_next_assertion_state(void) {
+    ctap2_data_t *data = globals_get_ctap2_data();
+
+    for (int ux = 0; ux < 2; ux++) {
+        memset(data, 0xEE, sizeof(*data));
+        memset(ctap2RequestBuffer, 0xEE, sizeof(ctap2RequestBuffer));
+        g.get_next_assertion_enabled = true;
+        ctap2UxState = ux ? CTAP2_UX_STATE_GET_ASSERTION : CTAP2_UX_STATE_NONE;
+
+        ctap2_handle_cmd_cancel(&G_io_u2f, NULL, 0);
+
+        TEST_ASSERT_FALSE(g.get_next_assertion_enabled);
+        TEST_ASSERT_EACH_EQUAL_HEX8(0, (const uint8_t *) data, sizeof(*data));
+        assert_request_wiped();
+    }
+}
+
 // getNextAssertion reads the getAssertion request again, past its own one-byte request.
 void test_get_next_assertion_keeps_the_get_assertion_request(void) {
     enable_next_assertion = true;
@@ -209,6 +227,7 @@ int main(void) {
     RUN_TEST(test_refused_command_keeps_the_pending_request);
     RUN_TEST(test_ungated_command_keeps_the_pending_request);
     RUN_TEST(test_cancel_wipes_the_pending_request);
+    RUN_TEST(test_cancel_clears_the_next_assertion_state);
     RUN_TEST(test_get_next_assertion_keeps_the_get_assertion_request);
     RUN_TEST(test_stale_next_assertion_flag_keeps_no_other_request);
     return UNITY_END();

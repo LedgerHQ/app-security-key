@@ -275,6 +275,125 @@ void test_store_pin_wipes_on_success(void) {
     assert_wiped(pin_enc, sizeof(pin_enc));
 }
 
+// A released PIN token is wiped, not only marked unused.
+void test_new_pin_wipes_the_previous_pin_token(void) {
+    uint8_t pin_enc[MAX_PIN_LENGTH];
+    uint8_t plaintext[MAX_PIN_LENGTH] = "aaaa";
+
+    memset(authToken, 0xAA, sizeof(authToken));
+    authTokeninUse = true;
+    memset(pin_enc, 0xEE, sizeof(pin_enc));
+    expect_decrypt(plaintext, sizeof(pin_enc), CX_OK);
+    cx_hash_sha256_Stub(fake_sha256);
+    config_set_ctap2_pin_Expect(pin_enc);
+    send_cbor_response_Expect(&G_io_u2f, 1, NULL);
+
+    handle_store_pin(&G_io_u2f, PIN_PROTOCOL_VERSION_V1, shared_secret, pin_enc, sizeof(pin_enc));
+    TEST_ASSERT_FALSE(authTokeninUse);
+    TEST_ASSERT_EACH_EQUAL_UINT8(0, authToken, sizeof(authToken));
+}
+
+void test_reset_wipes_the_pin_token(void) {
+    memset(authToken, 0xAA, sizeof(authToken));
+    authTokeninUse = true;
+    cx_ecfp_generate_pair_no_throw_IgnoreAndReturn(CX_OK);
+
+    ctap2_client_pin_reset_ctx();
+    TEST_ASSERT_FALSE(authTokeninUse);
+    TEST_ASSERT_EACH_EQUAL_UINT8(0, authToken, sizeof(authToken));
+}
+
+// =========================================================================
+// ctap2_client_pin_regenerate: the key agreement scalar never outlives a regeneration
+// =========================================================================
+
+static cx_ecfp_private_key_t *generated_key;
+static cx_err_t generate_result;
+// Result of a call that keeps the private key: the SDK only reads it then.
+static cx_err_t keep_result;
+
+static cx_err_t fake_generate_pair(cx_curve_t curve,
+                                   cx_ecfp_public_key_t *pubkey,
+                                   cx_ecfp_private_key_t *privkey,
+                                   bool keepprivate,
+                                   int cmock_num_calls) {
+    (void) pubkey;
+    (void) cmock_num_calls;
+
+    if (keepprivate) {
+        return keep_result;
+    }
+    generated_key = privkey;
+    if (generate_result == CX_OK) {
+        privkey->curve = curve;
+        privkey->d_len = 32;
+        memset(privkey->d, 0x5B, sizeof(privkey->d));
+    }
+    return generate_result;
+}
+
+static void prepare_regenerate(cx_err_t result) {
+    memset(&ctap2KeyAgreement, 0xAA, sizeof(ctap2KeyAgreement));
+    generated_key = NULL;
+    generate_result = result;
+    keep_result = CX_OK;
+    cx_ecfp_generate_pair_no_throw_Stub(fake_generate_pair);
+}
+
+void test_regenerate_replaces_the_key_and_wipes_its_copy(void) {
+    prepare_regenerate(CX_OK);
+
+    TEST_ASSERT_EQUAL_INT(0, ctap2_client_pin_regenerate());
+    TEST_ASSERT_EQUAL(CX_CURVE_SECP256R1, ctap2KeyAgreement.curve);
+    TEST_ASSERT_EACH_EQUAL_UINT8(0x5B, ctap2KeyAgreement.d, sizeof(ctap2KeyAgreement.d));
+    TEST_ASSERT_NOT_NULL(generated_key);
+    TEST_ASSERT_TRUE_MESSAGE(generated_key != &ctap2KeyAgreement,
+                             "key generated in place over the old one");
+    TEST_ASSERT_TRUE_MESSAGE(wipe_check_covered(generated_key, sizeof(*generated_key)),
+                             "new scalar left on the stack");
+}
+
+void test_failed_regenerate_wipes_the_old_key(void) {
+    prepare_regenerate(CX_INTERNAL_ERROR);
+
+    TEST_ASSERT_EQUAL_INT(-1, ctap2_client_pin_regenerate());
+    TEST_ASSERT_EACH_EQUAL_UINT8(0,
+                                 (const uint8_t *) &ctap2KeyAgreement,
+                                 sizeof(ctap2KeyAgreement));
+    TEST_ASSERT_TRUE_MESSAGE(wipe_check_covered(generated_key, sizeof(*generated_key)),
+                             "partial scalar left on the stack");
+}
+
+// The reset ignores the result, so a failed regeneration must not leave the old key behind.
+void test_failed_reset_leaves_no_key_agreement_key(void) {
+    prepare_regenerate(CX_INTERNAL_ERROR);
+
+    ctap2_client_pin_reset_ctx();
+    TEST_ASSERT_EACH_EQUAL_UINT8(0,
+                                 (const uint8_t *) &ctap2KeyAgreement,
+                                 sizeof(ctap2KeyAgreement));
+}
+
+void test_failed_get_key_agreement_replaces_the_key(void) {
+    prepare_regenerate(CX_OK);
+    keep_result = CX_INTERNAL_ERROR;
+    send_cbor_error_Expect(&G_io_u2f, ERROR_OTHER);
+
+    ctap2_handle_get_key_agreement(&G_io_u2f, NULL, NULL, PIN_PROTOCOL_VERSION_V1);
+    TEST_ASSERT_EACH_EQUAL_UINT8(0x5B, ctap2KeyAgreement.d, sizeof(ctap2KeyAgreement.d));
+}
+
+void test_failed_get_key_agreement_and_regenerate_wipe_the_key(void) {
+    prepare_regenerate(CX_INTERNAL_ERROR);
+    keep_result = CX_INTERNAL_ERROR;
+    send_cbor_error_Expect(&G_io_u2f, ERROR_OTHER);
+
+    ctap2_handle_get_key_agreement(&G_io_u2f, NULL, NULL, PIN_PROTOCOL_VERSION_V1);
+    TEST_ASSERT_EACH_EQUAL_UINT8(0,
+                                 (const uint8_t *) &ctap2KeyAgreement,
+                                 sizeof(ctap2KeyAgreement));
+}
+
 // =========================================================================
 // Key material on the stack is wiped before every return
 // =========================================================================
@@ -540,6 +659,13 @@ int main(void) {
     RUN_TEST(test_store_pin_wipes_on_bad_padded_length);
     RUN_TEST(test_store_pin_wipes_on_short_pin);
     RUN_TEST(test_store_pin_wipes_on_success);
+    RUN_TEST(test_new_pin_wipes_the_previous_pin_token);
+    RUN_TEST(test_reset_wipes_the_pin_token);
+    RUN_TEST(test_regenerate_replaces_the_key_and_wipes_its_copy);
+    RUN_TEST(test_failed_regenerate_wipes_the_old_key);
+    RUN_TEST(test_failed_reset_leaves_no_key_agreement_key);
+    RUN_TEST(test_failed_get_key_agreement_replaces_the_key);
+    RUN_TEST(test_failed_get_key_agreement_and_regenerate_wipe_the_key);
     RUN_TEST(test_decrypt_wipes_aes_key);
     RUN_TEST(test_decrypt_wipes_aes_key_on_failure);
     RUN_TEST(test_encrypt_wipes_aes_key);

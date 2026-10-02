@@ -162,6 +162,15 @@ ledger_unit_tests_add_test(
 )
 
 ledger_unit_tests_add_test(
+    NAME            test_get_next_assertion
+    SOURCES         ${APP_DIR}/src/globals.c
+                    ${APP_DIR}/src/string_utils.c
+    MOCK_HEADERS    ${APP_DIR}/src/ctap2/rk_storage.h
+    INCLUDE_DIRS    ${UT_INCLUDE_DIRS_SDK} ${UT_INCLUDE_DIRS}
+    COMPILE_DEFS    ${UT_COMPILE_DEFS_SDK} ${UT_COMPILE_DEFS}
+)
+
+ledger_unit_tests_add_test(
     NAME            test_u2f_processing_flow
     SOURCES         ${APP_DIR}/src/globals.c
                     ${APP_DIR}/src/string_utils.c
