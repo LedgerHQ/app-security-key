@@ -126,6 +126,16 @@ ledger_unit_tests_add_test(
 )
 
 ledger_unit_tests_add_test(
+    NAME            test_crypto
+    MOCK_HEADERS    ${SDK_DIR}/lib_cxng/include/lcx_ecfp.h
+                    ${SDK_DIR}/lib_cxng/include/lcx_hash.h
+                    ${SDK_DIR}/lib_cxng/include/lcx_sha256.h
+                    ${SDK_DIR}/include/ledger_assert_internals.h
+    INCLUDE_DIRS    ${UT_INCLUDE_DIRS_SDK} ${UT_INCLUDE_DIRS}
+    COMPILE_DEFS    ${UT_COMPILE_DEFS_SDK} ${UT_COMPILE_DEFS}
+)
+
+ledger_unit_tests_add_test(
     NAME            test_credential
     SOURCES         ${APP_DIR}/src/cbip_helper.c
                     ${APP_DIR}/cbor-src/cbip_decode.c
