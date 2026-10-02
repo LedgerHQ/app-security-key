@@ -1,3 +1,4 @@
+import struct
 import time
 from hashlib import sha256
 
@@ -5,11 +6,13 @@ import pytest
 from fido2.cose import ES256, EdDSA, RS256, PS256
 from fido2.ctap import CtapError
 from fido2.ctap2.base import AttestationResponse, Ctap2
+from fido2.hid import TYPE_INIT, CTAPHID
 from fido2.webauthn import AuthenticatorData, AttestedCredentialData
 from ledgered.devices import Device
 from ragger.navigator import NavInsID
 
 from ..client import TESTS_SPECULOS_DIR, LedgerAttestationVerifier
+from ..test_transport import init_channel, send_cmd
 from ..utils import FIDO_RP_ID_HASH_1, generate_random_bytes, \
     generate_make_credentials_params, ctap2_get_assertion, Nav
 
@@ -107,6 +110,36 @@ def test_cbor_command_refused_while_make_credential_pending(client, device: Devi
     codes = inject_while_pending(client, Ctap2.CMD.GET_ASSERTION, poison)
     # Refused by the transport; the app's OPERATION_PENDING gate is never reached.
     assert codes == {CtapError.ERR.CHANNEL_BUSY}
+
+    accept_and_check_attestation(client, device, original, original_cmd)
+
+
+@pytest.mark.skip_endpoint(["HID", "NFC"],
+                           reason="Interleaving requires the CTAPHID transport")
+def test_cbor_command_from_another_channel_while_make_credential_pending(client, device: Device):
+    # A second client must neither be served during the review nor take its reply.
+    cid_a = client.device._channel_id
+    # Allocated first: the review keeps the transport, so an INIT would be refused too.
+    cid_b = init_channel(client)
+    assert cid_b != cid_a
+
+    original = generate_make_credentials_params(client, ref=0)
+    original_cmd = client.ctap2.send_cbor_nowait(Ctap2.CMD.MAKE_CREDENTIAL,
+                                                 original.cbor_args)
+    time.sleep(0.5)
+
+    # getInfo is not gated by the app: only the transport keeps it from being answered.
+    for _ in range(4):
+        send_cmd(client, cid_b, TYPE_INIT | CTAPHID.CBOR, bytes([Ctap2.CMD.GET_INFO]))
+        while True:
+            packet = client.device._connection.read_packet()
+            cid, cmd = struct.unpack_from(">IB", packet)
+            if (cid, cmd) == (cid_a, TYPE_INIT | CTAPHID.KEEPALIVE):
+                continue
+            assert (cid, cmd) == (cid_b, TYPE_INIT | CTAPHID.ERROR)
+            assert packet[7] == CtapError.ERR.CHANNEL_BUSY
+            break
+        time.sleep(0.3)
 
     accept_and_check_attestation(client, device, original, original_cmd)
 
