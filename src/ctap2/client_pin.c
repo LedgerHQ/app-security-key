@@ -57,6 +57,12 @@ static uint8_t ctap2TransientPinAuths;
 
 static cx_ecfp_private_key_t ctap2KeyAgreement;
 
+// A released token must not stay readable in RAM.
+static void release_auth_token(void) {
+    authTokeninUse = false;
+    explicit_bzero(authToken, sizeof(authToken));
+}
+
 /******************************************/
 /*        Context check helpers           */
 /******************************************/
@@ -102,12 +108,19 @@ static cx_ecfp_private_key_t ctap2KeyAgreement;
 // Correspond to FIDO2.1 spec PIN/UV Auth Protocol regenerate() operation
 int ctap2_client_pin_regenerate(void) {
     cx_ecfp_public_key_t publicKey;
-    if (cx_ecfp_generate_pair_no_throw(CX_CURVE_SECP256R1, &publicKey, &ctap2KeyAgreement, 0) !=
-        CX_OK) {
+    cx_ecfp_private_key_t newKey;
+    int status = 0;
+
+    // A failed generation may leave the old scalar in place: it must not stay usable.
+    if (cx_ecfp_generate_pair_no_throw(CX_CURVE_SECP256R1, &publicKey, &newKey, 0) != CX_OK) {
         PRINTF("regenerate key agreement failed\n");
-        return -1;
+        explicit_bzero(&ctap2KeyAgreement, sizeof(ctap2KeyAgreement));
+        status = -1;
+    } else {
+        memcpy(&ctap2KeyAgreement, &newKey, sizeof(newKey));
     }
-    return 0;
+    explicit_bzero(&newKey, sizeof(newKey));
+    return status;
 }
 
 // Correspond to FIDO2.1 spec PIN/UV Auth Protocol decapsulate() operation
@@ -406,7 +419,7 @@ static void handle_store_pin(u2f_service_t *service,
     config_set_ctap2_pin(pinEnc);
 
     // Invalidate previous token and force the user to issue a GET_PIN_TOKEN command
-    authTokeninUse = false;
+    release_auth_token();
     status = ERROR_NONE;
 
 exit:
@@ -516,6 +529,8 @@ static void ctap2_handle_get_key_agreement(u2f_service_t *service,
     PRINTF("client_pin_get_key_agreement\n");
     if (cx_ecfp_generate_pair_no_throw(CX_CURVE_SECP256R1, &publicKey, &ctap2KeyAgreement, 1) !=
         CX_OK) {
+        // A key that cannot be used must not stay in RAM: replace it, or wipe it if that fails.
+        ctap2_client_pin_regenerate();
         send_cbor_error(service, ERROR_OTHER);
         return;
     }
@@ -788,7 +803,7 @@ void ctap2_client_pin_handle(u2f_service_t *service, uint8_t *buffer, uint16_t l
 
 void ctap2_client_pin_reset_ctx(void) {
     ctap2_client_pin_regenerate();
-    authTokeninUse = false;
+    release_auth_token();
 
     ctap2TransientPinAuths = 0;
 }

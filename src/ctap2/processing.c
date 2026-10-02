@@ -126,6 +126,11 @@ void ctap2_handle_cmd_cancel(u2f_service_t *service, uint8_t *buffer, uint16_t l
     UNUSED(length);
 
     PRINTF("ctap2_cmd_cancel %d\n", ctap2UxState);
+    // Nothing of the cancelled command may serve a later one, such as getNextAssertion.
+    g.get_next_assertion_enabled = false;
+    explicit_bzero(globals_get_ctap2_data(), sizeof(ctap2_data_t));
+    explicit_bzero(ctap2RequestBuffer, sizeof(ctap2RequestBuffer));
+
     if (ctap2UxState != CTAP2_UX_STATE_NONE) {
         PRINTF("Cancel pending UI\n");
 
