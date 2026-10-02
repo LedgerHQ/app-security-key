@@ -357,7 +357,7 @@ static int u2f_handle_apdu_get_version(const uint8_t *rx,
 
 static int u2f_handle_apdu_ctap2_proxy(uint8_t *rx, int data_length, uint8_t *data) {
     PRINTF("ctap2_proxy\n");
-    if ((rx[OFFSET_P1] != 0) || (rx[OFFSET_P2] != 0)) {
+    if ((rx[OFFSET_P1] != 0 && rx[OFFSET_P1] != 0x80) || (rx[OFFSET_P2] != 0)) {
         return io_send_sw(SW_INCORRECT_P1P2);
     }
 
