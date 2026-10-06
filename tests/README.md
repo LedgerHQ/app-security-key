@@ -16,8 +16,9 @@ See dedicated `README.md` in `tests/functional/` directory for how to launch the
 
 ## Unit test
 
-Some unit tests are located in `tests/unit-tests/` directory.
-See dedicated `README.md` in `tests/unit-tests` directory for how to launch them.
+The unit tests are located in the `unit-tests/` directory at the repository root, and the
+fuzzers in `fuzzing/`.
+See the dedicated `README.md` in each directory for how to launch them.
 
 
 ## Solokeys FIDO2 tests

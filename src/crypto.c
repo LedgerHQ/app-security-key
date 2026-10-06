@@ -71,6 +71,8 @@ void crypto_compute_sha256(const uint8_t *in1,
     cx_sha256_init(&hash);
     crypto_hash(&hash.header, 0, in1, in1_len, NULL, 0);
     crypto_hash(&hash.header, CX_LAST, in2, in2_len, out, CX_SHA256_SIZE);
+    // The context ends up holding the digest: a private key or credRandom for the callers.
+    explicit_bzero(&hash, sizeof(hash));
 }
 
 int crypto_generate_private_key(const uint8_t *nonce,
@@ -98,8 +100,9 @@ int crypto_generate_private_key(const uint8_t *nonce,
         status = -1;
     }
 
-    // Reset the private key so that it doesn't stay in RAM.
+    // Reset the private key and its derivation input so that they don't stay in RAM.
     explicit_bzero(private_key_data, CREDENTIAL_PRIVATE_KEY_SIZE);
+    explicit_bzero(extended_nonce, sizeof(extended_nonce));
 
     return status;
 }
@@ -134,6 +137,7 @@ void crypto_generate_credRandom_key(const uint8_t *nonce, uint8_t *credRandom, b
                           (const uint8_t *) N_u2f.privateKeySeed,
                           sizeof(N_u2f.privateKeySeed),
                           credRandom);
+    explicit_bzero(extended_nonce, sizeof(extended_nonce));
 }
 
 static int crypto_sign(const uint8_t *data_hash,

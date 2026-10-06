@@ -291,8 +291,10 @@ static int u2f_handle_apdu_sign(const uint8_t *rx, uint32_t data_length, uint8_t
         return io_send_sw(SW_WRONG_DATA);
     }
 
+    // The key handle was decrypted in place: its nonce must not stay in the APDU buffer.
     // If we only check user presence answer immediately
     if (!sign) {
+        explicit_bzero(nonce, CREDENTIAL_NONCE_SIZE);
         return io_send_sw(SW_CONDITIONS_NOT_SATISFIED);
     }
 
@@ -301,12 +303,14 @@ static int u2f_handle_apdu_sign(const uint8_t *rx, uint32_t data_length, uint8_t
     // every key handle look registered.
     if ((ctap2UxState != CTAP2_UX_STATE_NONE) || u2fUxPending) {
         PRINTF("U2F sign refused: user confirmation pending\n");
+        explicit_bzero(nonce, CREDENTIAL_NONCE_SIZE);
         return io_send_sw(SW_CONDITIONS_NOT_SATISFIED);
     }
 
     // Backup ins, nonce, challenge and application parameters to be used if user accept the request
     globals_get_u2f_data()->ins = FIDO_INS_SIGN;
     memmove(globals_get_u2f_data()->nonce, nonce, CREDENTIAL_NONCE_SIZE);
+    explicit_bzero(nonce, CREDENTIAL_NONCE_SIZE);
     memmove(globals_get_u2f_data()->challenge_param,
             auth_req_base->challenge_param,
             sizeof(auth_req_base->challenge_param));

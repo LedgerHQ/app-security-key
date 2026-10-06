@@ -30,11 +30,11 @@ static void ctap_ux_on_user_action(bool confirm) {
         ctap2_reset_confirm();
         // Cleared after the handler, as in the other flows. Reset carries no request
         // data, but the latch covers it for consistency.
-        ctap2UxState = CTAP2_UX_STATE_NONE;
+        ctap2_ux_end();
         ui_idle();
     } else {
         ctap2_reset_cancel();
-        ctap2UxState = CTAP2_UX_STATE_NONE;
+        ctap2_ux_end();
         ui_idle();
     }
 }

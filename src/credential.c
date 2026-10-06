@@ -217,7 +217,10 @@ static int credential_handle_ciphering(bool is_encrypt,
     }
 
 exit:
+    // The SDK reset leaves the wrapping key in the cipher key schedule.
     explicit_bzero(&siv_ctx, sizeof(siv_ctx));
+    explicit_bzero(&cipher, sizeof(cipher));
+    explicit_bzero(&cipher_key, sizeof(cipher_key));
 
     return status;
 }
@@ -385,6 +388,9 @@ static int credential_parse(const uint8_t *rpIdHash,
                                              tag);
         if (status != 0) {
             PRINTF("Credential decryption failed\n");
+            // AES-SIV writes the plaintext before it checks the tag, so a credential ID
+            // wrapped for another RP still leaves its nonce here.
+            explicit_bzero(credId + offset, credIdLen - offset);
             return status;
         }
         // Set UNWRAPPED bit on version byte to indicate that data have been

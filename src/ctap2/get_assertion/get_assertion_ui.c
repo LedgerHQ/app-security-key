@@ -54,7 +54,7 @@ static void ctap_ux_on_user_choice(bool confirm, uint16_t idx) {
         get_assertion_confirm(idx);
         // Cleared after the handler: it reads the request and signs, and this latch
         // is what keeps a new command out meanwhile.
-        ctap2UxState = CTAP2_UX_STATE_NONE;
+        ctap2_ux_end();
 #ifdef HAVE_NBGL
         app_nbgl_status(CTAP2_LOGIN, true, ui_idle);
 #else
@@ -62,7 +62,7 @@ static void ctap_ux_on_user_choice(bool confirm, uint16_t idx) {
 #endif
     } else {
         get_assertion_user_cancel();
-        ctap2UxState = CTAP2_UX_STATE_NONE;
+        ctap2_ux_end();
 #ifdef HAVE_NBGL
         app_nbgl_status(CTAP2_LOGIN_CANCELLED, false, ui_idle);
 #else
@@ -329,7 +329,7 @@ static void on_no_assertion_user_choice(int token, uint8_t index) {
     nbgl_pageRelease(pageContext);
 
     get_assertion_confirm(0);
-    ctap2UxState = CTAP2_UX_STATE_NONE;
+    ctap2_ux_end();
     ui_idle();
 }
 

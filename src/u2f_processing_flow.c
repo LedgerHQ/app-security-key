@@ -103,6 +103,7 @@ uint16_t u2f_prepare_enroll_response(uint8_t *buffer, uint16_t *length) {
     int offset = 0;
     int result;
     int key_handle_length;
+    uint16_t sw = SW_PROPRIETARY_INTERNAL;
 
     *length = 0;
 
@@ -130,7 +131,7 @@ uint16_t u2f_prepare_enroll_response(uint8_t *buffer, uint16_t *length) {
 
         // Generate and fill public key
         if (u2f_generate_pubkey(globals_get_u2f_data()->nonce, reg_resp_base->user_key) != 0) {
-            return SW_PROPRIETARY_INTERNAL;
+            goto exit;
         }
     }
 
@@ -146,7 +147,7 @@ uint16_t u2f_prepare_enroll_response(uint8_t *buffer, uint16_t *length) {
 
     // We only support generating key_handle with fixed length
     if (key_handle_length != sizeof(reg_resp_base->key_handle)) {
-        return SW_PROPRIETARY_INTERNAL;
+        goto exit;
     }
 
     // Fill key handle length
@@ -166,10 +167,13 @@ uint16_t u2f_prepare_enroll_response(uint8_t *buffer, uint16_t *length) {
 
     if (result > 0) {
         *length = offset + result;
-        return SW_NO_ERROR;
-    } else {
-        return SW_PROPRIETARY_INTERNAL;
+        sw = SW_NO_ERROR;
     }
+
+exit:
+    // Every caller is done with the nonce once the response is built, the NFC fast path too.
+    explicit_bzero(globals_get_u2f_data()->nonce, sizeof(globals_get_u2f_data()->nonce));
+    return sw;
 }
 
 static void u2f_compute_sign_response_hash(u2f_auth_resp_base_t *auth_resp_base,
@@ -196,6 +200,7 @@ static void u2f_compute_sign_response_hash(u2f_auth_resp_base_t *auth_resp_base,
 uint16_t u2f_prepare_sign_response(uint8_t *buffer, uint16_t *length) {
     int offset = 0;
     int result;
+    uint16_t sw = SW_PROPRIETARY_INTERNAL;
 
     *length = 0;
 
@@ -219,7 +224,7 @@ uint16_t u2f_prepare_sign_response(uint8_t *buffer, uint16_t *length) {
     if (crypto_generate_private_key(globals_get_u2f_data()->nonce,
                                     &private_key,
                                     CX_CURVE_SECP256R1) != 0) {
-        return SW_PROPRIETARY_INTERNAL;
+        goto exit;
     }
 
     result = crypto_sign_application(data_hash, &private_key, signature);
@@ -229,10 +234,12 @@ uint16_t u2f_prepare_sign_response(uint8_t *buffer, uint16_t *length) {
     if (result > 0) {
         offset += result;
         *length = offset;
-        return SW_NO_ERROR;
-    } else {
-        return SW_PROPRIETARY_INTERNAL;
+        sw = SW_NO_ERROR;
     }
+
+exit:
+    explicit_bzero(globals_get_u2f_data()->nonce, sizeof(globals_get_u2f_data()->nonce));
+    return sw;
 }
 
 static int u2f_process_user_presence_confirmed(void) {
