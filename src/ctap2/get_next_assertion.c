@@ -23,6 +23,12 @@
 #include "globals.h"
 #include "rk_storage.h"
 
+// The getAssertion request is kept only while getNextAssertion may read it again.
+static void end_next_assertion(void) {
+    g.get_next_assertion_enabled = false;
+    explicit_bzero(globals_get_ctap2_data(), sizeof(ctap2_data_t));
+}
+
 void ctap2_get_next_assertion_handle(u2f_service_t *service, uint8_t *buffer, uint16_t length) {
     UNUSED(buffer);
     UNUSED(length);
@@ -42,10 +48,14 @@ void ctap2_get_next_assertion_handle(u2f_service_t *service, uint8_t *buffer, ui
                                                     &ctap2AssertData->credentialLen);
         if (status == RK_NOT_FOUND) {
             PRINTF("GET_NEXT_ASSERTION: no remaining RK credential.\n");
+            end_next_assertion();
             send_cbor_error(service, ERROR_NOT_ALLOWED);
             return;
         }
         g.display_status = false;
         get_assertion_send();
+        if (rk_count_RKList() == 0) {
+            end_next_assertion();
+        }
     }
 }

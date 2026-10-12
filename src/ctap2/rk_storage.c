@@ -313,7 +313,7 @@ static uint8_t pop_RKList() {
     return nextRKList.slotIdx[--nextRKList.next_idx];
 }
 
-static uint8_t count_RKList(void) {
+uint8_t rk_count_RKList(void) {
     return nextRKList.next_idx;
 }
 
@@ -330,7 +330,7 @@ uint8_t rk_build_RKList_from_rpID(const uint8_t *rpIdHash) {
         }
         push_RKList(i);
     }
-    return count_RKList();
+    return rk_count_RKList();
 }
 
 int rk_next_credential_from_RKList(uint16_t *idx,
@@ -338,7 +338,7 @@ int rk_next_credential_from_RKList(uint16_t *idx,
                                    uint8_t **credential,
                                    uint32_t *credentialLen) {
     rk_slot_t *slot;
-    if (count_RKList() == 0) {
+    if (rk_count_RKList() == 0) {
         PRINTF("No more creds in the RKList\n");
         return RK_NOT_FOUND;
     }

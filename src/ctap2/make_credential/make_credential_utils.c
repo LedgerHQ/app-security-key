@@ -67,15 +67,11 @@ void check_and_generate_new_pubkey(void) {
 
     cx_rng_no_throw(nfc_nonce, CREDENTIAL_NONCE_SIZE);
 
-    if (generate_pubkey(nfc_nonce, COSE_ALG_ES256, &nfc_pubkey_ES256) != 0) {
-        return;
-    }
-
-    if (generate_pubkey(nfc_nonce, COSE_ALG_ES256K, &nfc_pubkey_ES256K) != 0) {
-        return;
-    }
-
-    if (generate_pubkey(nfc_nonce, COSE_ALG_EDDSA, &nfc_pubkey_EDDSA) != 0) {
+    if ((generate_pubkey(nfc_nonce, COSE_ALG_ES256, &nfc_pubkey_ES256) != 0) ||
+        (generate_pubkey(nfc_nonce, COSE_ALG_ES256K, &nfc_pubkey_ES256K) != 0) ||
+        (generate_pubkey(nfc_nonce, COSE_ALG_EDDSA, &nfc_pubkey_EDDSA) != 0)) {
+        // Without all its public keys the nonce is never used, so it must not stay in RAM.
+        explicit_bzero(nfc_nonce, sizeof(nfc_nonce));
         return;
     }
 
@@ -264,6 +260,9 @@ void ctap2_make_credential_confirm() {
     ctap2_register_data_t *ctap2RegisterData = globals_get_ctap2_register_data();
     uint32_t dataLen;
     uint8_t nonce[CREDENTIAL_NONCE_SIZE];
+#ifdef HAVE_NFC
+    bool usedNfcNonce = false;
+#endif
     int status;
 
     PRINTF("ctap2_make_credential_confirm\n");
@@ -282,6 +281,7 @@ void ctap2_make_credential_confirm() {
     // Spare response time by pre-generating part of the answer
     if (nfc_nonce_and_pubkey_ready) {
         memcpy(nonce, nfc_nonce, CREDENTIAL_NONCE_SIZE);
+        usedNfcNonce = true;
     } else
 #endif
     {
@@ -320,6 +320,15 @@ void ctap2_make_credential_confirm() {
     responseBuffer[0] = ERROR_NONE;
 
 exit:
+#ifdef HAVE_NFC
+    if (usedNfcNonce) {
+        // Its public keys go with it: a failure before they were used leaves them ready.
+        explicit_bzero(nfc_nonce, sizeof(nfc_nonce));
+        nfc_nonce_and_pubkey_ready = false;
+    }
+#endif
+    explicit_bzero(nonce, sizeof(nonce));
+
     if (status == 0) {
         send_cbor_response(&G_io_u2f, 1 + dataLen, CTAP2_REGISTRATION);
     } else {

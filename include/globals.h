@@ -154,6 +154,9 @@ extern shared_ctx_t shared_ctx;
 extern ctap2_ux_state_t ctap2UxState;
 extern bool u2fUxPending;
 
+// Ends a CTAP2 user review and wipes the request it read from.
+void ctap2_ux_end(void);
+
 static inline u2f_data_t *globals_get_u2f_data(void) {
     return &shared_ctx.u.u2fData;
 }

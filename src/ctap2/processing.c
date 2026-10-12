@@ -84,7 +84,7 @@ void ctap2_handle_cmd_cbor(u2f_service_t *service, uint8_t *buffer, uint16_t len
     if (status < 0) {
         PRINTF("Failed to validate cbor\n");
         send_cbor_error(service, ERROR_INVALID_CBOR);
-        return;
+        goto end;
     }
 
     switch (buffer[0]) {
@@ -110,6 +110,15 @@ void ctap2_handle_cmd_cbor(u2f_service_t *service, uint8_t *buffer, uint16_t len
             send_cbor_error(service, ERROR_INVALID_CBOR);
             break;
     }
+
+end:
+    // A copied request is wiped once nothing reads it: a started review wipes it when it
+    // ends, and getNextAssertion reads the getAssertion request again.
+    if ((buffer == ctap2RequestBuffer) && (ctap2UxState == CTAP2_UX_STATE_NONE) &&
+        !(g.get_next_assertion_enabled &&
+          ((buffer[0] == CBOR_GET_ASSERTION) || (buffer[0] == CBOR_GET_NEXT_ASSERTION)))) {
+        explicit_bzero(ctap2RequestBuffer, sizeof(ctap2RequestBuffer));
+    }
 }
 
 void ctap2_handle_cmd_cancel(u2f_service_t *service, uint8_t *buffer, uint16_t length) {
@@ -117,10 +126,15 @@ void ctap2_handle_cmd_cancel(u2f_service_t *service, uint8_t *buffer, uint16_t l
     UNUSED(length);
 
     PRINTF("ctap2_cmd_cancel %d\n", ctap2UxState);
+    // Nothing of the cancelled command may serve a later one, such as getNextAssertion.
+    g.get_next_assertion_enabled = false;
+    explicit_bzero(globals_get_ctap2_data(), sizeof(ctap2_data_t));
+    explicit_bzero(ctap2RequestBuffer, sizeof(ctap2RequestBuffer));
+
     if (ctap2UxState != CTAP2_UX_STATE_NONE) {
         PRINTF("Cancel pending UI\n");
 
-        ctap2UxState = CTAP2_UX_STATE_NONE;
+        ctap2_ux_end();
 
         // Answer as fast as possible as Chrome expect a fast answer and in case
         // it didn't comes fast enough, it won't be sent back if the user

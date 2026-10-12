@@ -85,4 +85,9 @@ int rk_next_credential_from_RKList(uint16_t *idx,
                                    uint8_t **credential,
                                    uint32_t *credentialLen);
 
+/*
+ * Returns the number of RKs still in the list.
+ */
+uint8_t rk_count_RKList(void);
+
 #endif

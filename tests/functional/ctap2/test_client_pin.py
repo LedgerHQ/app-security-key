@@ -2,6 +2,7 @@ import pytest
 
 from fido2.ctap import CtapError
 from fido2.ctap2.pin import ClientPin, PinProtocolV1, PinProtocolV2
+from fido2.utils import sha256
 from fido2.webauthn import AttestedCredentialData, AuthenticatorData
 
 from ..utils import generate_random_bytes, generate_make_credentials_params, \
@@ -299,6 +300,70 @@ def test_client_pin_set_errors(client):
             pin_uv_param=pin_uv_param,
         )
     assert e.value.code == CtapError.ERR.PIN_POLICY_VIOLATION
+
+
+def _bad_length_pin_hash_encs(client, shared_secret, pin):
+    # PIN protocol v1 carries exactly one 16-byte encrypted block. The oversize case holds the
+    # correct hash in its first block, so only the length makes it invalid.
+    pin_hash = sha256(pin.encode())[:16]
+    return {
+        "empty": b"",
+        "partial block": generate_random_bytes(15),
+        "oversize": client.client_pin.protocol.encrypt(shared_secret, pin_hash * 2),
+    }
+
+
+def test_client_pin_get_token_bad_pin_hash_length(client):
+    client.client_pin.set_pin(PIN_A)
+    protocol = client.client_pin.protocol
+
+    for case in ("empty", "partial block", "oversize"):
+        key_agreement, shared_secret = client.client_pin._get_shared_secret()
+        pin_hash_enc = _bad_length_pin_hash_encs(client, shared_secret, PIN_A)[case]
+        with pytest.raises(CtapError) as e:
+            client.client_pin.ctap.client_pin(
+                protocol.VERSION,
+                ClientPin.CMD.GET_TOKEN_USING_PIN_LEGACY,
+                key_agreement=key_agreement,
+                pin_hash_enc=pin_hash_enc,
+            )
+        assert e.value.code == CtapError.ERR.INVALID_PARAMETER, case
+
+        # A malformed request must not cost the user a PIN try.
+        assert client.client_pin.get_pin_retries() == (8, None), case
+
+    # The well-formed request still works after the refusals.
+    client.client_pin.get_pin_token(PIN_A)
+    assert client.client_pin.get_pin_retries() == (8, None)
+
+
+def test_client_pin_change_pin_bad_pin_hash_length(client):
+    client.client_pin.set_pin(PIN_A)
+    protocol = client.client_pin.protocol
+    new_pin_padded = PIN_B.encode().ljust(64, b"\0")
+
+    for case in ("empty", "partial block", "oversize"):
+        key_agreement, shared_secret = client.client_pin._get_shared_secret()
+        pin_hash_enc = _bad_length_pin_hash_encs(client, shared_secret, PIN_A)[case]
+        new_pin_enc = protocol.encrypt(shared_secret, new_pin_padded)
+        pin_uv_param = protocol.authenticate(shared_secret, new_pin_enc + pin_hash_enc)
+        with pytest.raises(CtapError) as e:
+            client.client_pin.ctap.client_pin(
+                protocol.VERSION,
+                ClientPin.CMD.CHANGE_PIN,
+                key_agreement=key_agreement,
+                pin_hash_enc=pin_hash_enc,
+                new_pin_enc=new_pin_enc,
+                pin_uv_param=pin_uv_param,
+            )
+        assert e.value.code == CtapError.ERR.INVALID_PARAMETER, case
+        assert client.client_pin.get_pin_retries() == (8, None), case
+
+    # The PIN is unchanged, and a well-formed change still works.
+    client.client_pin.get_pin_token(PIN_A)
+    client.client_pin.change_pin(PIN_A, PIN_B)
+    client.client_pin.get_pin_token(PIN_B)
+    assert client.client_pin.get_pin_retries() == (8, None)
 
 
 @pytest.mark.skip_endpoint("NFC", reason="CTAP2 reset is not available on NFC - 0x27")
